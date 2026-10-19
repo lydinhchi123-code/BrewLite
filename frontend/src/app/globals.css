@@ -380,3 +380,13 @@ footer { padding: 68px 0 24px; color: rgba(255,255,255,.72); background: var(--c
   .topping-grid { grid-template-columns: 1fr; }
   .detail-image { height: 360px; }
 }
+
+.footer-grid a {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.footer-grid a:hover {
+  color: white;
+}
