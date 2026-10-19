@@ -39,7 +39,7 @@ Tận hưởng những ly cà phê thơm ngon,
     </div>
 
     <div className="footer-bottom">
-      <span>© {new Date().getFullYear()} BrewLite</span>
+      <span>© 2026 BrewLite</span>
       <span>Made with love for coffee lovers.</span>
     </div>
   </div>

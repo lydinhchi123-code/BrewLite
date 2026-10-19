@@ -1,5 +1,5 @@
-import App from "./App";
+import TrangChu from "./1TrangChu/page";
 
 export default function Home() {
-  return <App />;
+  return <TrangChu />;
 }
