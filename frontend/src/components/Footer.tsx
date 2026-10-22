@@ -15,14 +15,11 @@ Tận hưởng những ly cà phê thơm ngon,
 được pha chế dành riêng cho bạn.
 </p>
 </div>
-
       <div>
         <strong>Khám phá</strong>
         <Link href="/" className="footer-link">Trang chủ</Link>
         <Link href="/menu" className="footer-link">Thực đơn</Link>
-        <Link href="/orders" className="footer-link">
-          Lịch sử đơn hàng
-        </Link>
+        <Link href="/orders" className="footer-link">Lịch sử đơn hàng</Link>
       </div>
 
       <div>
@@ -44,6 +41,5 @@ Tận hưởng những ly cà phê thơm ngon,
     </div>
   </div>
 </footer>
-
 );
 }

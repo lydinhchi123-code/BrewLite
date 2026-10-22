@@ -7,19 +7,19 @@ const monNoiBat = [
     ten: "Cà phê sữa đá",
     loai: "CÀ PHÊ",
     gia: "35.000₫",
-    anh: "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?auto=format&fit=crop&w=800&q=85",
+    anh: "/images/caphesuada.jpg",
   },
   {
     ten: "Caramel Macchiato",
     loai: "CÀ PHÊ",
     gia: "55.000₫",
-    anh: "https://images.unsplash.com/photo-1485808191679-5f86510681a2?auto=format&fit=crop&w=800&q=85",
+    anh: "/images/caramel-macchiato.jpg",
   },
   {
-    ten: "Matcha Latte",
-    loai: "TRÀ",
-    gia: "50.000₫",
-    anh: "https://images.unsplash.com/photo-1515823064-d6e0c04616a7?auto=format&fit=crop&w=800&q=85",
+    ten: "Trà sữa trân châu",
+    loai: "TRÀ SỮA",
+    gia: "42.000₫",
+    anh: "/images/trasuatranchau.jpg",
   },
 ];
 
@@ -121,7 +121,7 @@ export default function TrangChu() {
       <section className="tc-benefits">
         <div className="tc-benefit">
           <span>☕</span>
-          <h3>Chất lượng mỗi ngày</h3>
+          <h3>Tươi ngon mỗi ngày</h3>
           <p>Chú trọng hương vị trong từng thức uống.</p>
         </div>
 

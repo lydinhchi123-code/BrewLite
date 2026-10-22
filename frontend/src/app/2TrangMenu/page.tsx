@@ -671,9 +671,7 @@ export default function MenuPage() {
               <div className="bl-menu-modal-options">
                 {selected.sizes.length > 0 && (
                   <div className="bl-menu-option">
-                    <div className="bl-menu-option-title">
-                      Kích cỡ <small>Chọn size</small>
-                    </div>
+                    <div className="bl-menu-option-title"> Chọn size </div>
                     <div className="bl-menu-choice">
                       {selected.sizes.map((s) => (
                         <button
@@ -726,9 +724,7 @@ export default function MenuPage() {
 
                     {availableToppings.length > 0 ? (
                       <div className="bl-menu-option">
-                        <div className="bl-menu-option-title">
-                          Topping <small>Giá theo SQL</small>
-                        </div>
+                        <div className="bl-menu-option-title"> Topping </div>
                         <div className="bl-menu-choice">
                           {availableToppings.map((t) => (
                             <button
