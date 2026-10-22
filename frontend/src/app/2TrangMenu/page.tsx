@@ -672,7 +672,7 @@ export default function MenuPage() {
                 {selected.sizes.length > 0 && (
                   <div className="bl-menu-option">
                     <div className="bl-menu-option-title">
-                      Kích cỡ <small>Chọn size</small>
+                      Kích cỡ 
                     </div>
                     <div className="bl-menu-choice">
                       {selected.sizes.map((s) => (
@@ -727,7 +727,7 @@ export default function MenuPage() {
                     {availableToppings.length > 0 ? (
                       <div className="bl-menu-option">
                         <div className="bl-menu-option-title">
-                          Topping <small>Giá theo SQL</small>
+                          Topping 
                         </div>
                         <div className="bl-menu-choice">
                           {availableToppings.map((t) => (
