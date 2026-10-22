@@ -628,7 +628,7 @@ export default function MenuPage() {
         </div>
         <div>
           <span>♡</span>
-          <strong>Pha chế tận tâm</strong>
+          <strong>Hương vị trọn vẹn</strong>
           <p>Mỗi ly đều được chuẩn bị khi bạn đặt.</p>
         </div>
       </section>
@@ -671,7 +671,7 @@ export default function MenuPage() {
               <div className="bl-menu-modal-options">
                 {selected.sizes.length > 0 && (
                   <div className="bl-menu-option">
-                    <div className="bl-menu-option-title"> Chọn size </div>
+                    <div className="bl-menu-option-title">Chọn size</div>
                     <div className="bl-menu-choice">
                       {selected.sizes.map((s) => (
                         <button
@@ -724,7 +724,7 @@ export default function MenuPage() {
 
                     {availableToppings.length > 0 ? (
                       <div className="bl-menu-option">
-                        <div className="bl-menu-option-title"> Topping </div>
+                        <div className="bl-menu-option-title">Topping</div>
                         <div className="bl-menu-choice">
                           {availableToppings.map((t) => (
                             <button

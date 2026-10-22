@@ -2,12 +2,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-type CheDo = "dang-nhap" | "dang-ky";
+type CheDo = "dang-nhap" | "dang-ky" | "thong-tin";
 
 type TaiKhoan = {
   makh: number;
@@ -19,6 +19,8 @@ type TaiKhoan = {
 
 export default function Header() {
   const [moForm, setMoForm] = useState(false);
+  const [moMenuTaiKhoan, setMoMenuTaiKhoan] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [cheDo, setCheDo] = useState<CheDo>("dang-nhap");
   const [taiKhoan, setTaiKhoan] = useState<TaiKhoan | null>(null);
   const [dangXuLy, setDangXuLy] = useState(false);
@@ -46,6 +48,36 @@ export default function Header() {
     setMatkhau("");
     setNhapLaiMatKhau("");
   }
+
+  function moThongTinCaNhan() {
+    if (!taiKhoan) return;
+
+    setHoten(taiKhoan.hoten);
+    setSodienthoai(taiKhoan.sodienthoai);
+    setEmail(taiKhoan.email ?? "");
+    setCheDo("thong-tin");
+    setThongBao("");
+    setLoi(false);
+    setMoMenuTaiKhoan(false);
+    setMoForm(true);
+  }
+
+  useEffect(() => {
+    function xuLyClickBenNgoai(e: MouseEvent) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node)
+      ) {
+        setMoMenuTaiKhoan(false);
+      }
+    }
+
+    document.addEventListener("mousedown", xuLyClickBenNgoai);
+
+    return () => {
+      document.removeEventListener("mousedown", xuLyClickBenNgoai);
+    };
+  }, []);
 
   async function xuLySubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -125,6 +157,63 @@ export default function Header() {
     setMatkhau("");
   }
 
+  async function capNhatThongTin(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!taiKhoan || dangXuLy) return;
+
+    setDangXuLy(true);
+    setThongBao("");
+    setLoi(false);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/tai-khoan/cap-nhat/${taiKhoan.makh}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            hoten: hoten.trim(),
+            sodienthoai: sodienthoai.trim(),
+            email: email.trim() || null,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const message = Array.isArray(data.message)
+          ? data.message.join(", ")
+          : data.message;
+
+        throw new Error(
+          message || "Không thể cập nhật thông tin cá nhân.",
+        );
+      }
+
+      setTaiKhoan(data.user);
+      setHoten(data.user.hoten);
+      setSodienthoai(data.user.sodienthoai);
+      setEmail(data.user.email ?? "");
+      setThongBao("Cập nhật thông tin cá nhân thành công!");
+      setLoi(false);
+
+      // Đóng form sau khi lưu thành công
+      setMoForm(false);
+    } catch (error) {
+      setLoi(true);
+      setThongBao(
+        error instanceof Error
+          ? error.message
+          : "Không thể kết nối máy chủ.",
+      );
+    } finally {
+      setDangXuLy(false);
+    }
+  }
+
   return (
     <>
       <header className="header">
@@ -148,17 +237,32 @@ export default function Header() {
 
           <div className="header-actions">
             {taiKhoan ? (
-              <div className="account-actions">
-                <span className="account-name">
-                  Xin chào, {taiKhoan.hoten}
-                </span>
+              <div className="account-actions" ref={menuRef}>
                 <button
                   type="button"
                   className="auth-button"
-                  onClick={dangXuat}
+                  onClick={() => setMoMenuTaiKhoan(!moMenuTaiKhoan)}
                 >
-                  Đăng xuất
+                  {taiKhoan.hoten} ▾
                 </button>
+
+                {moMenuTaiKhoan && (
+                  <div className="account-dropdown">
+                    <button
+                      type="button"
+                      onClick={moThongTinCaNhan}
+                    >
+                      Thông tin cá nhân
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={dangXuat}
+                    >
+                      Đăng xuất
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <button
@@ -166,7 +270,7 @@ export default function Header() {
                 className="auth-button"
                 onClick={moDangNhap}
               >
-                Đăng nhập / Đăng ký
+                Đăng nhập
               </button>
             )}
 
@@ -201,42 +305,56 @@ export default function Header() {
             </button>
 
             <div className="auth-brand">☕ BrewLite</div>
+
             <h2 id="auth-title">
-              {cheDo === "dang-nhap" ? "Chào mừng trở lại!" : "Tạo tài khoản"}
+              {cheDo === "dang-nhap"
+                ? "Chào mừng trở lại!"
+                : cheDo === "dang-ky"
+                  ? "Tạo tài khoản"
+                  : "Thông tin cá nhân"}
             </h2>
+
             <p className="auth-subtitle">
               {cheDo === "dang-nhap"
                 ? "Đăng nhập để tiếp tục đặt món yêu thích."
-                : "Tham gia BrewLite để đặt đồ uống dễ dàng hơn."}
+                : cheDo === "dang-ky"
+                  ? "Tham gia BrewLite để đặt đồ uống dễ dàng hơn."
+                  : "Cập nhật thông tin tài khoản của bạn."}
             </p>
 
-            <div className="auth-tabs">
-              <button
-                type="button"
-                className={cheDo === "dang-nhap" ? "active" : ""}
-                onClick={() => {
-                  setCheDo("dang-nhap");
-                  setThongBao("");
-                  setLoi(false);
-                }}
-              >
-                Đăng nhập
-              </button>
-              <button
-                type="button"
-                className={cheDo === "dang-ky" ? "active" : ""}
-                onClick={() => {
-                  setCheDo("dang-ky");
-                  setThongBao("");
-                  setLoi(false);
-                }}
-              >
-                Đăng ký
-              </button>
-            </div>
+            {cheDo !== "thong-tin" && (
+              <div className="auth-tabs">
+                <button
+                  type="button"
+                  className={cheDo === "dang-nhap" ? "active" : ""}
+                  onClick={() => {
+                    setCheDo("dang-nhap");
+                    setThongBao("");
+                    setLoi(false);
+                  }}
+                >
+                  Đăng nhập
+                </button>
 
-            <form onSubmit={xuLySubmit} className="auth-form">
-              {cheDo === "dang-ky" ? (
+                <button
+                  type="button"
+                  className={cheDo === "dang-ky" ? "active" : ""}
+                  onClick={() => {
+                    setCheDo("dang-ky");
+                    setThongBao("");
+                    setLoi(false);
+                  }}
+                >
+                  Đăng ký
+                </button>
+              </div>
+            )}
+
+            <form
+              onSubmit={cheDo === "thong-tin" ? capNhatThongTin : xuLySubmit}
+              className="auth-form"
+            >
+              {cheDo === "dang-ky" || cheDo === "thong-tin" ? (
                 <>
                   <label htmlFor="auth-hoten">Họ và tên</label>
                   <input
@@ -290,35 +408,41 @@ export default function Header() {
                 </>
               )}
 
-              <label htmlFor="auth-password">Mật khẩu</label>
-              <input
-                id="auth-password"
-                type="password"
-                placeholder="Ít nhất 8 ký tự"
-                value={matkhau}
-                onChange={(e) => setMatkhau(e.target.value)}
-                minLength={8}
-                autoComplete={
-                  cheDo === "dang-nhap" ? "current-password" : "new-password"
-                }
-                required
-              />
-
-              {cheDo === "dang-ky" && (
+              {cheDo !== "thong-tin" && (
                 <>
-                  <label htmlFor="auth-confirm-password">
-                    Nhập lại mật khẩu
-                  </label>
+                  <label htmlFor="auth-password">Mật khẩu</label>
                   <input
-                    id="auth-confirm-password"
+                    id="auth-password"
                     type="password"
-                    placeholder="Nhập lại mật khẩu"
-                    value={nhapLaiMatKhau}
-                    onChange={(e) => setNhapLaiMatKhau(e.target.value)}
+                    placeholder="Ít nhất 8 ký tự"
+                    value={matkhau}
+                    onChange={(e) => setMatkhau(e.target.value)}
                     minLength={8}
-                    autoComplete="new-password"
+                    autoComplete={
+                      cheDo === "dang-nhap"
+                        ? "current-password"
+                        : "new-password"
+                    }
                     required
                   />
+
+                  {cheDo === "dang-ky" && (
+                    <>
+                      <label htmlFor="auth-confirm-password">
+                        Nhập lại mật khẩu
+                      </label>
+                      <input
+                        id="auth-confirm-password"
+                        type="password"
+                        placeholder="Nhập lại mật khẩu"
+                        value={nhapLaiMatKhau}
+                        onChange={(e) => setNhapLaiMatKhau(e.target.value)}
+                        minLength={8}
+                        autoComplete="new-password"
+                        required
+                      />
+                    </>
+                  )}
                 </>
               )}
 
@@ -338,29 +462,44 @@ export default function Header() {
               >
                 {dangXuLy
                   ? "Đang xử lý..."
-                  : cheDo === "dang-nhap"
-                    ? "Đăng nhập"
-                    : "Tạo tài khoản"}
+                  : cheDo === "thong-tin"
+                    ? "Lưu thay đổi"
+                    : cheDo === "dang-nhap"
+                      ? "Đăng nhập"
+                      : "Tạo tài khoản"}
               </button>
+
+              {cheDo === "thong-tin" && (
+                <button
+                  type="button"
+                  className="profile-cancel"
+                  disabled={dangXuLy}
+                  onClick={dongForm}
+                >
+                  Hủy
+                </button>
+              )}
             </form>
 
-            <p className="auth-switch">
-              {cheDo === "dang-nhap"
-                ? "Chưa có tài khoản? "
-                : "Đã có tài khoản? "}
-              <button
-                type="button"
-                onClick={() => {
-                  setCheDo(
-                    cheDo === "dang-nhap" ? "dang-ky" : "dang-nhap",
-                  );
-                  setThongBao("");
-                  setLoi(false);
-                }}
-              >
-                {cheDo === "dang-nhap" ? "Đăng ký ngay" : "Đăng nhập"}
-              </button>
-            </p>
+            {cheDo !== "thong-tin" && (
+              <p className="auth-switch">
+                {cheDo === "dang-nhap"
+                  ? "Chưa có tài khoản? "
+                  : "Đã có tài khoản? "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCheDo(
+                      cheDo === "dang-nhap" ? "dang-ky" : "dang-nhap",
+                    );
+                    setThongBao("");
+                    setLoi(false);
+                  }}
+                >
+                  {cheDo === "dang-nhap" ? "Đăng ký ngay" : "Đăng nhập"}
+                </button>
+              </p>
+            )}
           </section>
         </div>
       )}
@@ -391,6 +530,39 @@ export default function Header() {
           display: flex;
           align-items: center;
           gap: 10px;
+        }
+
+        .account-actions {
+          position: relative;
+        }
+
+        .account-dropdown {
+          position: absolute;
+          top: calc(100% + 8px);
+          right: 0;
+          z-index: 100;
+          width: 200px;
+          padding: 6px;
+          border: 1px solid #eaded3;
+          border-radius: 10px;
+          background: white;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        .account-dropdown button {
+          display: block;
+          width: 100%;
+          padding: 11px 12px;
+          border: none;
+          border-radius: 6px;
+          background: white;
+          color: #49372c;
+          text-align: left;
+          cursor: pointer;
+        }
+
+        .account-dropdown button:hover {
+          background: #f8f0e9;
         }
 
         .account-name {
@@ -584,6 +756,25 @@ export default function Header() {
 
           .auth-modal {
             padding: 28px 22px;
+          }
+
+          .profile-cancel {
+            padding: 11px;
+            border: 1px solid #ddd2c8;
+            border-radius: 8px;
+            background: white;
+            color: #68452f;
+            font-weight: 600;
+            cursor: pointer;
+          }
+
+          .profile-cancel:hover {
+            background: #f8f0e9;
+          }
+
+          .profile-cancel:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
           }
         }
       `}</style>

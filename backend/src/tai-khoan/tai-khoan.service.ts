@@ -162,4 +162,65 @@ export class TaiKhoanService {
       },
     };
   }
+
+  async capNhat(
+    makh: number,
+    data: {
+      hoten: string;
+      sodienthoai: string;
+      email?: string | null;
+    },
+  ) {
+    const hoten = data.hoten?.trim();
+    const sodienthoai = data.sodienthoai?.trim();
+    const email = data.email?.trim().toLowerCase() || null;
+
+    if (!hoten || !sodienthoai) {
+      throw new BadRequestException(
+        'Vui lòng nhập họ tên và số điện thoại',
+      );
+    }
+
+    if (hoten.length > 100 || sodienthoai.length > 20) {
+      throw new BadRequestException('Thông tin nhập quá dài');
+    }
+
+    if (!/^[0-9+()\-\s]{8,20}$/.test(sodienthoai)) {
+      throw new BadRequestException('Số điện thoại không hợp lệ');
+    }
+
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new BadRequestException('Email không hợp lệ');
+    }
+
+    try {
+      const result = await this.pool.query(
+        `UPDATE "taikhoankhachhang"
+        SET hoten = $1,
+            sodienthoai = $2,
+            email = $3
+        WHERE makh = $4
+        RETURNING makh, hoten, email, sodienthoai, trangthai`,
+        [hoten, sodienthoai, email, makh],
+      );
+
+      if (!result.rowCount) {
+        throw new BadRequestException('Không tìm thấy tài khoản');
+      }
+
+      return {
+        message: 'Cập nhật thông tin thành công',
+        user: result.rows[0],
+      };
+    } catch (error) {
+      if ((error as { code?: string }).code === '23505') {
+        throw new ConflictException(
+          'Email hoặc số điện thoại đã được tài khoản khác sử dụng',
+        );
+      }
+
+      throw error;
+    }
+  }
 }
+

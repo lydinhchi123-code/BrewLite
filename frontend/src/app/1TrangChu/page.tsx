@@ -1,29 +1,126 @@
+
 "use client";
 
 import "./trang-chu.css";
+import { useEffect, useState } from "react";
 
-const monNoiBat = [
-  {
-    ten: "Cà phê sữa đá",
-    loai: "CÀ PHÊ",
-    gia: "35.000₫",
-    anh: "/images/caphesuada.jpg",
-  },
-  {
-    ten: "Caramel Macchiato",
-    loai: "CÀ PHÊ",
-    gia: "55.000₫",
-    anh: "/images/caramel-macchiato.jpg",
-  },
-  {
-    ten: "Trà sữa trân châu",
-    loai: "TRÀ SỮA",
-    gia: "42.000₫",
-    anh: "/images/trasuatranchau.jpg",
-  },
+type MonNoiBat = {
+  ten: string;
+  loai: string;
+  gia: number;
+  anh: string;
+};
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+const TEN_MON_NOI_BAT = [
+  "Cà phê sữa đá",
+  "Caramel Macchiato",
+  "Trà sữa trân châu",
 ];
 
 export default function TrangChu() {
+  const [monNoiBat, setMonNoiBat] = useState<MonNoiBat[]>([]);
+  const [dangTaiMon, setDangTaiMon] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function layMonNoiBat() {
+      try {
+        const response = await fetch(`${API_URL}/menu/products`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `Không lấy được danh sách món. HTTP ${response.status}`
+          );
+        }
+
+        const payload = await response.json();
+
+        const danhSach: any[] = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload.data)
+            ? payload.data
+            : Array.isArray(payload.items)
+              ? payload.items
+              : [];
+
+        const ketQua: MonNoiBat[] = TEN_MON_NOI_BAT
+          .map((tenMon) => {
+            const mon = danhSach.find((item: any) => {
+              const tenTrongDB = String(
+                item.name ?? item.product_name ?? item.productName ?? ""
+              )
+                .trim()
+                .toLocaleLowerCase("vi-VN");
+
+              return (
+                tenTrongDB === tenMon.toLocaleLowerCase("vi-VN")
+              );
+            });
+
+            if (!mon) {
+              console.warn(`Không tìm thấy món: ${tenMon}`);
+              return null;
+            }
+
+            const gia = Number(
+              mon.price ??
+                mon.basePrice ??
+                mon.base_price ??
+                mon.product_price ??
+                0
+            );
+
+            const category =
+              typeof mon.category === "object" && mon.category !== null
+                ? mon.category.name ?? mon.category.category_name ?? ""
+                : mon.category ?? mon.category_name ?? "";
+
+            return {
+              ten: String(
+                mon.name ?? mon.product_name ?? mon.productName ?? tenMon
+              ),
+              loai: String(category),
+              gia,
+              anh: String(
+                mon.image ??
+                  mon.image_url ??
+                  mon.imageUrl ??
+                  mon.imageUrlPath ??
+                  ""
+              ),
+            };
+          })
+          .filter((mon): mon is MonNoiBat => mon !== null);
+
+        if (!cancelled) {
+          setMonNoiBat(ketQua);
+        }
+      } catch (error) {
+        console.error("Lỗi tải món nổi bật:", error);
+
+        if (!cancelled) {
+          setMonNoiBat([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setDangTaiMon(false);
+        }
+      }
+    }
+
+    layMonNoiBat();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <main className="trang-chu">
       {/* Banner chính */}
@@ -70,11 +167,13 @@ export default function TrangChu() {
       {/* Giới thiệu */}
       <section className="tc-intro">
         <span className="tc-label">CÂU CHUYỆN BREWLITE</span>
+
         <h2>
           Không chỉ là cà phê,
           <br />
           mà còn là <em>khoảng nghỉ.</em>
         </h2>
+
         <p>
           BrewLite mang đến những thức uống chất lượng trong một
           không gian ấm áp, để mỗi ngày của bạn có thêm một khoảnh
@@ -82,7 +181,7 @@ export default function TrangChu() {
         </p>
       </section>
 
-      {/* Món nổi bật */}
+      {/* Món nổi bật lấy từ API */}
       <section className="tc-products" id="mon-noi-bat">
         <div className="tc-section-heading">
           <div>
@@ -96,24 +195,46 @@ export default function TrangChu() {
         </div>
 
         <div className="tc-product-grid">
-          {monNoiBat.map((mon) => (
-            <article className="tc-product-card" key={mon.ten}>
-              <a
-                href="/2TrangMenu"
-                className="tc-product-image"
-                aria-label={`Xem ${mon.ten}`}
-              >
-                <img src={mon.anh} alt={mon.ten} />
-                <span className="tc-product-arrow">↗</span>
-              </a>
+          {dangTaiMon ? (
+            <p>Đang tải món nổi bật...</p>
+          ) : monNoiBat.length > 0 ? (
+            monNoiBat.map((mon) => (
+              <article className="tc-product-card" key={mon.ten}>
+                <a
+                  href="/2TrangMenu"
+                  className="tc-product-image"
+                  aria-label={`Xem ${mon.ten}`}
+                >
+                  {mon.anh ? (
+                    <img src={mon.anh} alt={mon.ten} />
+                  ) : (
+                    <div className="tc-product-no-image">
+                      Chưa có hình ảnh
+                    </div>
+                  )}
 
-              <div className="tc-product-info">
-                <span className="tc-product-category">{mon.loai}</span>
-                <h3>{mon.ten}</h3>
-                <strong>{mon.gia}</strong>
-              </div>
-            </article>
-          ))}
+                  <span className="tc-product-arrow">↗</span>
+                </a>
+
+                <div className="tc-product-info">
+                  <span className="tc-product-category">
+                    {mon.loai}
+                  </span>
+
+                  <h3>{mon.ten}</h3>
+
+                  <strong>
+                    {mon.gia.toLocaleString("vi-VN")}₫
+                  </strong>
+                </div>
+              </article>
+            ))
+          ) : (
+            <p>
+              Chưa tải được món nổi bật. Vui lòng kiểm tra kết nối
+              máy chủ hoặc dữ liệu thực đơn.
+            </p>
+          )}
         </div>
       </section>
 

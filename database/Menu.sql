@@ -122,7 +122,6 @@ VALUES
 -- =====================================================
 -- 7. THEM SAN PHAM
 -- Anh su dung tu frontend/public/images/
--- Ten file anh viet dung theo thu muc images
 -- =====================================================
 
 INSERT INTO menu_products
@@ -162,21 +161,21 @@ FROM (
      'Trà thơm nhẹ cùng đào.',
      '/images/peach-tea.jpg', 39000::NUMERIC, TRUE, 1),
 
-	 ('tra', 'Trà dâu', 'tra-dau',
+    ('tra', 'Trà dâu', 'tra-dau',
      'Trà thơm nhẹ cùng dâu.',
-     '/images/tradau.jpg', 39000::NUMERIC, TRUE, 1),
+     '/images/tradau.jpg', 39000::NUMERIC, TRUE, 2),
 
     ('tra', 'Trà vải lài', 'tra-vai-lai',
      'Trà lài thơm nhẹ kết hợp vị vải.',
-     '/images/travailai.jpg', 39000::NUMERIC, FALSE, 2),
+     '/images/travailai.jpg', 39000::NUMERIC, FALSE, 3),
 
     ('tra', 'Trà chanh', 'tra-chanh',
      'Trà kết hợp vị chanh tươi.',
-     '/images/hongtrachanh.jpg', 35000::NUMERIC, FALSE, 3),
+     '/images/hongtrachanh.jpg', 35000::NUMERIC, FALSE, 4),
 
     ('tra', 'Trà lựu đỏ', 'tra-luu-do',
      'Trà trái cây vị lựu.',
-     '/images/traluudo.jpg', 39000::NUMERIC, FALSE, 4),
+     '/images/traluudo.jpg', 39000::NUMERIC, FALSE, 5),
 
     -- TRA SUA
     ('tra-sua', 'Trà sữa dâu', 'tra-sua-dau',
@@ -228,27 +227,31 @@ FROM (
 JOIN menu_categories c ON c.slug = p.category_slug;
 
 -- =====================================================
--- 8. SIZE CHO CAC MON CO SIZE
+-- 8. TAO SIZE S, M, L CHO TAT CA CAC MON NUOC
+-- S = GIA GOC
+-- M = GIA GOC + 5.000
+-- L = GIA GOC + 10.000
+-- KHONG TAO SIZE CHO CAC MON BANH
 -- =====================================================
 
 INSERT INTO menu_product_sizes
     (product_id, size_code, size_name, price, display_order)
-SELECT p.id, s.size_code, s.size_name, s.price, s.display_order
-FROM (
+SELECT
+    p.id,
+    s.size_code,
+    s.size_name,
+    p.base_price + s.price_increment,
+    s.display_order
+FROM menu_products p
+JOIN menu_categories c ON c.id = p.category_id
+CROSS JOIN (
     VALUES
-    ('ca-phe-sua-da', 'S', 'Nhỏ', 35000::NUMERIC, 1),
-    ('ca-phe-sua-da', 'M', 'Vừa', 40000::NUMERIC, 2),
-    ('ca-phe-sua-da', 'L', 'Lớn', 45000::NUMERIC, 3),
-
-    ('caramel-macchiato', 'S', 'Nhỏ', 55000::NUMERIC, 1),
-    ('caramel-macchiato', 'M', 'Vừa', 60000::NUMERIC, 2),
-    ('caramel-macchiato', 'L', 'Lớn', 65000::NUMERIC, 3),
-
-    ('matcha-da-xay', 'S', 'Nhỏ', 55000::NUMERIC, 1),
-    ('matcha-da-xay', 'M', 'Vừa', 60000::NUMERIC, 2),
-    ('matcha-da-xay', 'L', 'Lớn', 65000::NUMERIC, 3)
-) AS s(slug, size_code, size_name, price, display_order)
-JOIN menu_products p ON p.slug = s.slug;
+        ('S', 'Nhỏ', 0::NUMERIC, 1),
+        ('M', 'Vừa', 5000::NUMERIC, 2),
+        ('L', 'Lớn', 10000::NUMERIC, 3)
+) AS s(size_code, size_name, price_increment, display_order)
+WHERE c.slug IN ('ca-phe', 'tra', 'tra-sua', 'da-xay')
+ORDER BY p.id, s.display_order;
 
 -- =====================================================
 -- 9. DANH SACH TOPPING
@@ -269,7 +272,6 @@ VALUES
 -- =====================================================
 -- 10. GAN TOPPING CHO DO UONG
 -- KHONG GAN TOPPING CHO BAT KY MON BANH NAO
--- Khong co Matcha Latte
 -- =====================================================
 
 INSERT INTO menu_product_toppings (product_id, topping_id)
@@ -295,8 +297,8 @@ FROM (
     ('tra-vai-lai', 'Trân châu hoàng kim'),
     ('tra-vai-lai', 'Pudding trứng'),
 
-    ('hong-tra-chanh', 'Trân châu trắng'),
-    ('hong-tra-chanh', 'Trân châu đen'),
+    ('tra-chanh', 'Trân châu trắng'),
+    ('tra-chanh', 'Trân châu đen'),
 
     ('tra-luu-do', 'Trân châu trắng'),
     ('tra-luu-do', 'Trân châu hoàng kim'),
@@ -354,7 +356,7 @@ SELECT
     p.id,
     p.name AS ten_mon,
     c.name AS danh_muc,
-    p.base_price AS gia,
+    p.base_price AS gia_goc,
     p.image_url AS hinh_anh,
     p.is_featured AS mon_noi_bat,
     p.is_available AS dang_ban
@@ -385,7 +387,7 @@ ORDER BY p.name, t.display_order;
 
 -- =====================================================
 -- 15. KIEM TRA BANH KHONG CO TOPPING
--- Ket qua mong doi: 0 dong
+-- KET QUA MONG DOI: 0 DONG
 -- =====================================================
 
 SELECT p.name AS ten_banh, t.name AS topping
@@ -395,6 +397,34 @@ JOIN menu_categories c ON c.id = p.category_id
 JOIN menu_toppings t ON t.id = pt.topping_id
 WHERE c.slug = 'banh';
 
+-- =====================================================
+-- 16. KIEM TRA SIZE CUA TAT CA CAC MON
+-- Mon nuoc mong doi co 3 size; mon banh khong co size
+-- =====================================================
+
+SELECT
+    c.name AS danh_muc,
+    p.name AS ten_mon,
+    s.size_code,
+    s.size_name,
+    s.price AS gia_size
+FROM menu_products p
+JOIN menu_categories c ON c.id = p.category_id
+LEFT JOIN menu_product_sizes s ON s.product_id = p.id
+ORDER BY c.display_order, p.display_order, s.display_order;
+
+-- Kiem tra tong so size theo mon nuoc
+SELECT
+    p.name AS ten_mon,
+    COUNT(s.id) AS so_size
+FROM menu_products p
+JOIN menu_categories c ON c.id = p.category_id
+LEFT JOIN menu_product_sizes s ON s.product_id = p.id
+WHERE c.slug IN ('ca-phe', 'tra', 'tra-sua', 'da-xay')
+GROUP BY p.id, p.name
+ORDER BY p.name;
+
 SELECT * FROM menu_categories;
 SELECT * FROM menu_products;
-SELECT * FROM  menu_toppings;
+SELECT * FROM menu_product_sizes;
+SELECT * FROM menu_toppings;
