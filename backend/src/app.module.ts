@@ -6,6 +6,8 @@ import { MenuController } from './2TrangMenu/menu.controller';
 import { MenuService } from './2TrangMenu/menu.service';
 import { TaiKhoanController } from './tai-khoan/tai-khoan.controller';
 import { TaiKhoanService } from './tai-khoan/tai-khoan.service';
+import { DonHangController } from './don_hang/don_hang.controller';
+import { DonHangService } from './don_hang/don_hang.service';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -17,7 +19,12 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       serviceId: 'backend',
     }),
   ],
-  controllers: [AppController, MenuController, TaiKhoanController],
-  providers: [AppService, MenuService, TaiKhoanService],
+  controllers: [
+    AppController,
+    MenuController,
+    TaiKhoanController,
+    DonHangController,
+  ],
+  providers: [AppService, MenuService, TaiKhoanService, DonHangService],
 })
 export class AppModule {}
