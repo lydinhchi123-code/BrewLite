@@ -4,27 +4,25 @@ import {
   UnauthorizedException,
   BadRequestException,
   ForbiddenException,
-} from '@nestjs/common';
-import { Pool } from 'pg';
-import * as bcrypt from 'bcrypt';
+} from "@nestjs/common";
+import { Pool } from "pg";
+import * as bcrypt from "bcrypt";
+import { JwtService } from "@nestjs/jwt";
 
 @Injectable()
 export class TaiKhoanService {
   private readonly pool: Pool;
 
-  constructor() {
+  constructor(private readonly jwtService: JwtService) {
     const connectionString = process.env.DATABASE_URL;
 
     if (!connectionString) {
-      throw new Error('Thiếu DATABASE_URL trong file .env');
+      throw new Error("Thiếu DATABASE_URL trong file .env");
     }
 
     this.pool = new Pool({
       connectionString,
-      ssl:
-        process.env.PGSSL === 'true'
-          ? { rejectUnauthorized: false }
-          : false,
+      ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : false,
     });
   }
 
@@ -41,25 +39,25 @@ export class TaiKhoanService {
 
     if (!hoten || !sodienthoai || !matkhau) {
       throw new BadRequestException(
-        'Vui lòng nhập họ tên, số điện thoại và mật khẩu',
+        "Vui lòng nhập họ tên, số điện thoại và mật khẩu",
       );
     }
 
     if (hoten.length > 100 || sodienthoai.length > 20) {
-      throw new BadRequestException('Thông tin nhập quá dài');
+      throw new BadRequestException("Thông tin nhập quá dài");
     }
 
     if (!/^[0-9+()\-\s]{8,20}$/.test(sodienthoai)) {
-      throw new BadRequestException('Số điện thoại không hợp lệ');
+      throw new BadRequestException("Số điện thoại không hợp lệ");
     }
 
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new BadRequestException('Email không hợp lệ');
+      throw new BadRequestException("Email không hợp lệ");
     }
 
-    if (matkhau.length < 8 || Buffer.byteLength(matkhau, 'utf8') > 72) {
+    if (matkhau.length < 8 || Buffer.byteLength(matkhau, "utf8") > 72) {
       throw new BadRequestException(
-        'Mật khẩu phải có ít nhất 8 ký tự và tối đa 72 byte',
+        "Mật khẩu phải có ít nhất 8 ký tự và tối đa 72 byte",
       );
     }
 
@@ -67,7 +65,7 @@ export class TaiKhoanService {
     const client = await this.pool.connect();
 
     try {
-      await client.query('BEGIN');
+      await client.query("BEGIN");
 
       const existing = await client.query(
         `SELECT makh FROM "taikhoankhachhang"
@@ -78,9 +76,7 @@ export class TaiKhoanService {
       );
 
       if (existing.rowCount) {
-        throw new ConflictException(
-          'Email hoặc số điện thoại đã được đăng ký',
-        );
+        throw new ConflictException("Email hoặc số điện thoại đã được đăng ký");
       }
 
       const result = await client.query(
@@ -91,19 +87,17 @@ export class TaiKhoanService {
         [hoten, email, sodienthoai, matkhauhash],
       );
 
-      await client.query('COMMIT');
+      await client.query("COMMIT");
 
       return {
-        message: 'Đăng ký thành công',
+        message: "Đăng ký thành công",
         user: result.rows[0],
       };
     } catch (error) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
 
-      if ((error as { code?: string }).code === '23505') {
-        throw new ConflictException(
-          'Email hoặc số điện thoại đã được đăng ký',
-        );
+      if ((error as { code?: string }).code === "23505") {
+        throw new ConflictException("Email hoặc số điện thoại đã được đăng ký");
       }
 
       throw error;
@@ -118,7 +112,7 @@ export class TaiKhoanService {
 
     if (!taikhoan || !matkhau) {
       throw new BadRequestException(
-        'Vui lòng nhập email/số điện thoại và mật khẩu',
+        "Vui lòng nhập email/số điện thoại và mật khẩu",
       );
     }
 
@@ -132,27 +126,38 @@ export class TaiKhoanService {
 
     if (!result.rowCount) {
       throw new UnauthorizedException(
-        'Tài khoản hoặc mật khẩu không chính xác',
+        "Tài khoản hoặc mật khẩu không chính xác",
       );
     }
 
     const user = result.rows[0];
 
     if (user.trangthai === 1) {
-      throw new ForbiddenException('Tài khoản đã bị khóa');
+      throw new ForbiddenException("Tài khoản đã bị khóa");
     }
 
     const isMatch = await bcrypt.compare(matkhau, user.matkhauhash);
 
     if (!isMatch) {
       throw new UnauthorizedException(
-        'Tài khoản hoặc mật khẩu không chính xác',
+        "Tài khoản hoặc mật khẩu không chính xác",
       );
     }
 
     // Trả thông tin tài khoản, tuyệt đối không trả mật khẩu hash.
+    // Tạo JWT sau khi xác thực mật khẩu thành công
+    const payload = {
+      sub: user.makh,
+      sodienthoai: user.sodienthoai,
+    };
+
+    const accessToken = await this.jwtService.signAsync(payload, {
+      expiresIn: "1h",
+    });
+
     return {
-      message: 'Đăng nhập thành công',
+      message: "Đăng nhập thành công",
+      accessToken,
       user: {
         makh: user.makh,
         hoten: user.hoten,
@@ -176,21 +181,19 @@ export class TaiKhoanService {
     const email = data.email?.trim().toLowerCase() || null;
 
     if (!hoten || !sodienthoai) {
-      throw new BadRequestException(
-        'Vui lòng nhập họ tên và số điện thoại',
-      );
+      throw new BadRequestException("Vui lòng nhập họ tên và số điện thoại");
     }
 
     if (hoten.length > 100 || sodienthoai.length > 20) {
-      throw new BadRequestException('Thông tin nhập quá dài');
+      throw new BadRequestException("Thông tin nhập quá dài");
     }
 
     if (!/^[0-9+()\-\s]{8,20}$/.test(sodienthoai)) {
-      throw new BadRequestException('Số điện thoại không hợp lệ');
+      throw new BadRequestException("Số điện thoại không hợp lệ");
     }
 
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new BadRequestException('Email không hợp lệ');
+      throw new BadRequestException("Email không hợp lệ");
     }
 
     try {
@@ -205,17 +208,17 @@ export class TaiKhoanService {
       );
 
       if (!result.rowCount) {
-        throw new BadRequestException('Không tìm thấy tài khoản');
+        throw new BadRequestException("Không tìm thấy tài khoản");
       }
 
       return {
-        message: 'Cập nhật thông tin thành công',
+        message: "Cập nhật thông tin thành công",
         user: result.rows[0],
       };
     } catch (error) {
-      if ((error as { code?: string }).code === '23505') {
+      if ((error as { code?: string }).code === "23505") {
         throw new ConflictException(
-          'Email hoặc số điện thoại đã được tài khoản khác sử dụng',
+          "Email hoặc số điện thoại đã được tài khoản khác sử dụng",
         );
       }
 
@@ -223,4 +226,3 @@ export class TaiKhoanService {
     }
   }
 }
-
