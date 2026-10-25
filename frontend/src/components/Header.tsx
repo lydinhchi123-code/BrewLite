@@ -74,6 +74,18 @@ export default function Header() {
     };
   }, []);
 
+  useEffect(() => {
+    const duLieu = localStorage.getItem("brewlite_user");
+
+    if (duLieu) {
+      try {
+        setTaiKhoan(JSON.parse(duLieu));
+      } catch {
+        localStorage.removeItem("brewlite_user");
+      }
+    }
+  }, []);
+
   async function xuLySubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setThongBao("");
@@ -129,6 +141,9 @@ export default function Header() {
         setNhapLaiMatKhau("");
       } else {
         setTaiKhoan(data.user);
+
+        localStorage.setItem("brewlite_user", JSON.stringify(data.user));
+
         setThongBao(`Xin chào ${data.user.hoten}! Đăng nhập thành công.`);
         setMatkhau("");
         setNhapLaiMatKhau("");
@@ -146,6 +161,7 @@ export default function Header() {
 
   function dangXuat() {
     setTaiKhoan(null);
+    localStorage.removeItem("brewlite_user");
     setThongBao("");
     setMatkhau("");
   }
@@ -185,6 +201,7 @@ export default function Header() {
       }
 
       setTaiKhoan(data.user);
+      localStorage.setItem("brewlite_user", JSON.stringify(data.user));
       setHoten(data.user.hoten);
       setSodienthoai(data.user.sodienthoai);
       setEmail(data.user.email ?? "");
@@ -219,7 +236,7 @@ export default function Header() {
             <Link href="/2TrangMenu" className="nav-link">
               Thực đơn
             </Link>
-            <Link href="/orders" className="nav-link">
+            <Link href="/8TrangLichSuDonHang" className="nav-link">
               Lịch sử đơn hàng
             </Link>
           </nav>
