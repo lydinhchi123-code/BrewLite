@@ -1,11 +1,9 @@
-
 "use client";
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 type CheDo = "dang-nhap" | "dang-ky" | "thong-tin";
 
@@ -64,10 +62,7 @@ export default function Header() {
 
   useEffect(() => {
     function xuLyClickBenNgoai(e: MouseEvent) {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(e.target as Node)
-      ) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMoMenuTaiKhoan(false);
       }
     }
@@ -142,9 +137,7 @@ export default function Header() {
     } catch (error) {
       setLoi(true);
       setThongBao(
-        error instanceof Error
-          ? error.message
-          : "Không thể kết nối máy chủ.",
+        error instanceof Error ? error.message : "Không thể kết nối máy chủ.",
       );
     } finally {
       setDangXuLy(false);
@@ -188,9 +181,7 @@ export default function Header() {
           ? data.message.join(", ")
           : data.message;
 
-        throw new Error(
-          message || "Không thể cập nhật thông tin cá nhân.",
-        );
+        throw new Error(message || "Không thể cập nhật thông tin cá nhân.");
       }
 
       setTaiKhoan(data.user);
@@ -205,9 +196,7 @@ export default function Header() {
     } catch (error) {
       setLoi(true);
       setThongBao(
-        error instanceof Error
-          ? error.message
-          : "Không thể kết nối máy chủ.",
+        error instanceof Error ? error.message : "Không thể kết nối máy chủ.",
       );
     } finally {
       setDangXuLy(false);
@@ -248,17 +237,11 @@ export default function Header() {
 
                 {moMenuTaiKhoan && (
                   <div className="account-dropdown">
-                    <button
-                      type="button"
-                      onClick={moThongTinCaNhan}
-                    >
+                    <button type="button" onClick={moThongTinCaNhan}>
                       Thông tin cá nhân
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={dangXuat}
-                    >
+                    <button type="button" onClick={dangXuat}>
                       Đăng xuất
                     </button>
                   </div>
@@ -274,7 +257,7 @@ export default function Header() {
               </button>
             )}
 
-            <Link href="/cart" className="btn btn-primary cart-button">
+            <Link href="/4TrangGioHang" className="btn btn-primary cart-button">
               Giỏ hàng
             </Link>
           </div>
@@ -455,11 +438,7 @@ export default function Header() {
                 </p>
               )}
 
-              <button
-                type="submit"
-                className="auth-submit"
-                disabled={dangXuLy}
-              >
+              <button type="submit" className="auth-submit" disabled={dangXuLy}>
                 {dangXuLy
                   ? "Đang xử lý..."
                   : cheDo === "thong-tin"
@@ -489,9 +468,7 @@ export default function Header() {
                 <button
                   type="button"
                   onClick={() => {
-                    setCheDo(
-                      cheDo === "dang-nhap" ? "dang-ky" : "dang-nhap",
-                    );
+                    setCheDo(cheDo === "dang-nhap" ? "dang-ky" : "dang-nhap");
                     setThongBao("");
                     setLoi(false);
                   }}

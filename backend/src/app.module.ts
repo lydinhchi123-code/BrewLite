@@ -6,6 +6,7 @@ import { MenuController } from './2TrangMenu/menu.controller';
 import { MenuService } from './2TrangMenu/menu.service';
 import { TaiKhoanController } from './tai-khoan/tai-khoan.controller';
 import { TaiKhoanService } from './tai-khoan/tai-khoan.service';
+import { OrdersModule } from './orders/orders.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -16,6 +17,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       appSecret: 'YOUR_APP_SECRET',
       serviceId: 'backend',
     }),
+    OrdersModule,
   ],
   controllers: [AppController, MenuController, TaiKhoanController],
   providers: [AppService, MenuService, TaiKhoanService],

@@ -7,7 +7,7 @@ async function bootstrap() {
     instrument: ObserveInstrument,
   });
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:8443',
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   });
   await app.listen(process.env.PORT ?? 3001);
 }

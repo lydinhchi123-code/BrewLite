@@ -34,8 +34,7 @@ type Product = {
   toppings: ToppingOption[];
 };
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 const DEFAULT_CATEGORIES: Category[] = [
   { name: "Tất cả", slug: "all" },
@@ -55,31 +54,17 @@ function unwrapArray(payload: any): any[] {
 
 function normalizeProduct(raw: any): Product {
   const categoryData =
-    raw.category ??
-    raw.menu_category ??
-    raw.menu_categories ??
-    {};
+    raw.category ?? raw.menu_category ?? raw.menu_categories ?? {};
 
   const category =
     typeof categoryData === "object"
-      ? categoryData.name ??
-        raw.categoryName ??
-        raw.category_name ??
-        "Khác"
-      : raw.categoryName ??
-        raw.category_name ??
-        categoryData ??
-        "Khác";
+      ? (categoryData.name ?? raw.categoryName ?? raw.category_name ?? "Khác")
+      : (raw.categoryName ?? raw.category_name ?? categoryData ?? "Khác");
 
   const categorySlug =
     typeof categoryData === "object"
-      ? categoryData.slug ??
-        raw.categorySlug ??
-        raw.category_slug ??
-        ""
-      : raw.categorySlug ??
-        raw.category_slug ??
-        "";
+      ? (categoryData.slug ?? raw.categorySlug ?? raw.category_slug ?? "")
+      : (raw.categorySlug ?? raw.category_slug ?? "");
 
   // SQL: menu_product_sizes(product_id, size_code, size_name, price)
   // Backend nên gộp các dòng size thành mảng raw.sizes cho từng sản phẩm.
@@ -112,9 +97,7 @@ function normalizeProduct(raw: any): Product {
         .map((item: any) => {
           const s = item.size ?? item.menu_product_size ?? item;
           return {
-            code: String(
-              s.code ?? s.size_code ?? s.sizeCode ?? s.size ?? ""
-            ),
+            code: String(s.code ?? s.size_code ?? s.sizeCode ?? s.size ?? ""),
             name: String(
               s.name ??
                 s.size_name ??
@@ -122,14 +105,10 @@ function normalizeProduct(raw: any): Product {
                 s.size_code ??
                 s.sizeCode ??
                 s.code ??
-                ""
+                "",
             ),
             price: Number(
-              s.price ??
-                s.size_price ??
-                s.sizePrice ??
-                item.price ??
-                0
+              s.price ?? s.size_price ?? s.sizePrice ?? item.price ?? 0,
             ),
           };
         })
@@ -162,24 +141,23 @@ function normalizeProduct(raw: any): Product {
                 t.toppingName ??
                 item.topping_name ??
                 item.name ??
-                ""
+                "",
             ).trim(),
             price: Number(
               t.price ??
                 t.topping_price ??
                 t.toppingPrice ??
                 item.topping_price ??
-                0
+                0,
             ),
           };
         })
         .filter(
-          (t: ToppingOption) =>
-            t.name.length > 0 && Number.isFinite(t.price)
+          (t: ToppingOption) => t.name.length > 0 && Number.isFinite(t.price),
         )
         .filter(
           (t: ToppingOption, index: number, arr: ToppingOption[]) =>
-            arr.findIndex((other) => other.name === t.name) === index
+            arr.findIndex((other) => other.name === t.name) === index,
         )
     : [];
 
@@ -189,34 +167,21 @@ function normalizeProduct(raw: any): Product {
     category: String(category),
     categorySlug: String(categorySlug),
     price: Number(
-      raw.price ??
-        raw.basePrice ??
-        raw.base_price ??
-        raw.product_price ??
-        0
+      raw.price ?? raw.basePrice ?? raw.base_price ?? raw.product_price ?? 0,
     ),
     image: String(
-      raw.image ??
-        raw.imageUrl ??
-        raw.image_url ??
-        raw.imageUrlPath ??
-        ""
+      raw.image ?? raw.imageUrl ?? raw.image_url ?? raw.imageUrlPath ?? "",
     ),
-    description: String(
-      raw.description ?? raw.product_description ?? ""
-    ),
+    description: String(raw.description ?? raw.product_description ?? ""),
     tag:
       raw.tag ??
-      (raw.is_featured ?? raw.isFeatured
-        ? "Được yêu thích"
-        : undefined),
+      ((raw.is_featured ?? raw.isFeatured) ? "Được yêu thích" : undefined),
     sizes,
     toppings,
   };
 }
 
-const money = (value: number) =>
-  value.toLocaleString("vi-VN") + "₫";
+const money = (value: number) => value.toLocaleString("vi-VN") + "₫";
 
 function isCake(product: Product) {
   return (
@@ -230,8 +195,7 @@ export default function MenuPage() {
   const [category, setCategory] = useState("all");
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] =
-    useState<Category[]>(DEFAULT_CATEGORIES);
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
@@ -263,7 +227,7 @@ export default function MenuPage() {
 
         if (!productResponse.ok) {
           throw new Error(
-            `Không tải được sản phẩm (HTTP ${productResponse.status}).`
+            `Không tải được sản phẩm (HTTP ${productResponse.status}).`,
           );
         }
 
@@ -273,17 +237,14 @@ export default function MenuPage() {
           .map(normalizeProduct)
           .filter((p) => p.id && p.name)
           .filter(
-            (p) =>
-              p.name.trim().toLocaleLowerCase("vi-VN") !== "matcha latte"
+            (p) => p.name.trim().toLocaleLowerCase("vi-VN") !== "matcha latte",
           )
           .filter((p) => p.categorySlug !== "latte");
 
         setProducts(loadedProducts);
 
         if (categoryResponse.ok) {
-          const categoryPayload = unwrapArray(
-            await categoryResponse.json()
-          );
+          const categoryPayload = unwrapArray(await categoryResponse.json());
 
           const allowedSlugs = [
             "ca-phe",
@@ -301,9 +262,7 @@ export default function MenuPage() {
             }))
             .filter((c: Category) => allowedSlugs.includes(c.slug))
             .map((c: Category) =>
-              c.slug === "banh-ngot"
-                ? { ...c, name: "Bánh" }
-                : c
+              c.slug === "banh-ngot" ? { ...c, name: "Bánh" } : c,
             );
 
           const ordered = DEFAULT_CATEGORIES.filter(
@@ -311,14 +270,14 @@ export default function MenuPage() {
               c.slug === "all" ||
               loadedCategories.some((item) => item.slug === c.slug) ||
               (c.slug === "banh" &&
-                loadedCategories.some((item) => item.slug === "banh-ngot"))
+                loadedCategories.some((item) => item.slug === "banh-ngot")),
           ).map((c) => {
             if (c.slug === "all") return c;
 
             return (
               loadedCategories.find((item) => item.slug === c.slug) ??
               loadedCategories.find(
-                (item) => c.slug === "banh" && item.slug === "banh-ngot"
+                (item) => c.slug === "banh" && item.slug === "banh-ngot",
               ) ??
               c
             );
@@ -330,9 +289,7 @@ export default function MenuPage() {
         if (error instanceof Error && error.name === "AbortError") return;
 
         setLoadError(
-          error instanceof Error
-            ? error.message
-            : "Có lỗi khi tải thực đơn."
+          error instanceof Error ? error.message : "Có lỗi khi tải thực đơn.",
         );
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -357,14 +314,12 @@ export default function MenuPage() {
 
         return matchesCategory && matchesSearch;
       }),
-    [products, category, search]
+    [products, category, search],
   );
 
   const selectedSize = selected?.sizes.find((s) => s.code === size);
 
-  const productPrice = selected
-    ? selectedSize?.price ?? selected.price
-    : 0;
+  const productPrice = selected ? (selectedSize?.price ?? selected.price) : 0;
 
   const availableToppings =
     selected && !isCake(selected) ? selected.toppings : [];
@@ -380,7 +335,7 @@ export default function MenuPage() {
     setSize(
       product.sizes.some((s) => s.code === "M")
         ? "M"
-        : product.sizes[0]?.code ?? "M"
+        : (product.sizes[0]?.code ?? "M"),
     );
     setSugar("100%");
     setIce("100%");
@@ -397,7 +352,7 @@ export default function MenuPage() {
 
     const chosenSize = selected.sizes.find((s) => s.code === size);
     const selectedToppings = availableToppings.filter((t) =>
-      toppings.includes(t.name)
+      toppings.includes(t.name),
     );
 
     const cartItem = {
@@ -419,12 +374,10 @@ export default function MenuPage() {
     };
 
     try {
-      const oldCart = JSON.parse(
-        localStorage.getItem("brewlite_cart") || "[]"
-      );
+      const oldCart = JSON.parse(localStorage.getItem("brewlite_cart") || "[]");
 
       const exists = oldCart.findIndex(
-        (item: { key: string }) => item.key === cartItem.key
+        (item: { key: string }) => item.key === cartItem.key,
       );
 
       if (exists >= 0) {
@@ -457,8 +410,8 @@ export default function MenuPage() {
           </h1>
 
           <p>
-            Từ cà phê đậm đà đến trà trái cây tươi mát — chọn món yêu thích
-            và để BrewLite chăm chút phần còn lại.
+            Từ cà phê đậm đà đến trà trái cây tươi mát — chọn món yêu thích và
+            để BrewLite chăm chút phần còn lại.
           </p>
 
           <a className="bl-menu-hero-button" href="#menu-list">
@@ -548,10 +501,7 @@ export default function MenuPage() {
               {loadError} Hãy kiểm tra NestJS API và cấu hình
               NEXT_PUBLIC_API_URL.
             </p>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-            >
+            <button type="button" onClick={() => window.location.reload()}>
               Thử lại
             </button>
           </div>
@@ -737,7 +687,7 @@ export default function MenuPage() {
                                 setToppings((old) =>
                                   old.includes(t.name)
                                     ? old.filter((x) => x !== t.name)
-                                    : [...old, t.name]
+                                    : [...old, t.name],
                                 )
                               }
                             >
@@ -750,10 +700,10 @@ export default function MenuPage() {
                       </div>
                     ) : (
                       <p className="bl-menu-topping-hint">
-                        Chưa nhận được danh sách topping từ API cho món này.
-                        Nếu đây không phải món bánh, hãy kiểm tra API
-                        /menu/products đã trả trường toppings chưa và kiểm tra
-                        liên kết trong bảng menu_product_toppings.
+                        Chưa nhận được danh sách topping từ API cho món này. Nếu
+                        đây không phải món bánh, hãy kiểm tra API /menu/products
+                        đã trả trường toppings chưa và kiểm tra liên kết trong
+                        bảng menu_product_toppings.
                       </p>
                     )}
                   </>
@@ -783,7 +733,7 @@ export default function MenuPage() {
         <div className="bl-menu-toast">
           <span>✓</span>
           {notice}
-          <Link href="/cart">Xem giỏ hàng →</Link>
+          <Link href="/4TrangGioHang">Xem giỏ hàng →</Link>
         </div>
       )}
     </main>
