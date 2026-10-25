@@ -135,18 +135,20 @@ export default function Header() {
 
       if (dangKy) {
         setThongBao("Đăng ký thành công! Mời bạn đăng nhập.");
-        setCheDo("dang-nhap");
-        setTaiKhoanDangNhap(email.trim() || sodienthoai);
         setMatkhau("");
         setNhapLaiMatKhau("");
+        setCheDo("dang-nhap");
       } else {
-        setTaiKhoan(data.user);
+        if (!data.accessToken || !data.user) {
+          throw new Error("Đăng nhập thành công nhưng không nhận được token.");
+        }
 
+        localStorage.setItem("brewlite_accessToken", data.accessToken);
         localStorage.setItem("brewlite_user", JSON.stringify(data.user));
 
-        setThongBao(`Xin chào ${data.user.hoten}! Đăng nhập thành công.`);
+        setTaiKhoan(data.user);
+        setThongBao("Đăng nhập thành công!");
         setMatkhau("");
-        setNhapLaiMatKhau("");
         setMoForm(false);
       }
     } catch (error) {
@@ -162,6 +164,7 @@ export default function Header() {
   function dangXuat() {
     setTaiKhoan(null);
     localStorage.removeItem("brewlite_user");
+    localStorage.removeItem("brewlite_accessToken");
     setThongBao("");
     setMatkhau("");
   }

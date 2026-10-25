@@ -121,6 +121,14 @@ export default function CartPage() {
     e.preventDefault();
 
     if (submitting || items.length === 0) return;
+    const token = localStorage.getItem("brewlite_accessToken");
+
+    if (!token) {
+      setOrderError(
+        "Bạn cần đăng nhập trước khi đặt hàng. Hãy đăng nhập bằng nút tài khoản ở đầu trang, sau đó quay lại bấm đặt hàng.",
+      );
+      return;
+    }
 
     setSubmitting(true);
     setOrderError("");
@@ -160,6 +168,7 @@ export default function CartPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(payload),
         },
