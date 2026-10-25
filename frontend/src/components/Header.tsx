@@ -274,7 +274,7 @@ export default function Header() {
               </button>
             )}
 
-            <Link href="/cart" className="btn btn-primary cart-button">
+            <Link href="/4TrangGioHang" className="btn btn-primary cart-button">
               Giỏ hàng
             </Link>
           </div>

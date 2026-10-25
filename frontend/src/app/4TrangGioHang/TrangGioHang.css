@@ -1,0 +1,455 @@
+/* BrewLite - Trang Giỏ hàng */
+.bl-menu-page {
+  min-height: 100vh;
+  color: #35251d;
+  background: #fffdfb;
+}
+
+.bl-cart-loading {
+  padding: 24px;
+}
+.bl-cart-container {
+  width: 100%;
+  max-width: 896px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.bl-cart-title {
+  margin: 0 0 24px;
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+  font-weight: 700;
+}
+.bl-cart-items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.bl-cart-item {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.bl-cart-product {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  flex: 1 1 0%;
+}
+.bl-cart-product-image {
+  width: 80px;
+  height: 80px;
+  flex: 0 0 80px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.bl-cart-product-info {
+  min-width: 0;
+}
+.bl-cart-product-name {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.bl-cart-detail {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+.bl-cart-unit-price {
+  margin: 6px 0 0;
+  color: #2563eb;
+  font-weight: 500;
+}
+.bl-cart-quantity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.bl-cart-quantity-button {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #e5e7eb;
+  cursor: pointer;
+  font: inherit;
+}
+.bl-cart-quantity-button:hover:not(:disabled) {
+  background: #d1d5db;
+}
+.bl-cart-quantity-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.bl-cart-quantity-value {
+  width: 32px;
+  text-align: center;
+  font-weight: 600;
+}
+.bl-cart-line-total {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.bl-cart-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.bl-cart-edit-button,
+.bl-cart-remove-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.bl-cart-edit-button {
+  color: #76513a;
+}
+.bl-cart-edit-button:hover {
+  color: #4d3024;
+}
+.bl-cart-remove-button {
+  color: #ef4444;
+}
+.bl-cart-remove-button:hover {
+  color: #b91c1c;
+}
+.bl-cart-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+.bl-cart-section-title {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 700;
+}
+.bl-cart-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.bl-cart-field {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+.bl-cart-field:focus {
+  outline: 2px solid #a8795c;
+  outline-offset: 1px;
+  border-color: #76513a;
+}
+.bl-cart-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 16px;
+}
+.bl-cart-total {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 700;
+}
+.bl-cart-total-amount {
+  color: #dc2626;
+}
+.bl-cart-success {
+  margin: 0;
+  color: #15803d;
+  font-weight: 500;
+}
+.bl-cart-error {
+  margin: 0;
+  color: #dc2626;
+}
+.bl-cart-submit {
+  padding: 12px 24px;
+  border: 0;
+  border-radius: 8px;
+  background: #16a34a;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.bl-cart-submit:hover:not(:disabled) {
+  background: #15803d;
+}
+.bl-cart-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.bl-cart-empty {
+  display: flex;
+  min-height: 60vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+}
+.bl-cart-empty-title {
+  margin: 0 0 8px;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 700;
+}
+.bl-cart-muted {
+  color: #6b7280;
+}
+.bl-cart-back-link {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 12px 20px;
+  border-radius: 6px;
+  background: #4d3024;
+  color: #fff;
+  text-decoration: none;
+}
+.bl-cart-back-link:hover {
+  background: #382219;
+}
+
+/* Hộp thoại chỉnh sửa món */
+.bl-menu-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 20px;
+  background: rgb(0 0 0 / 55%);
+}
+.bl-menu-modal {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  width: min(900px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  border-radius: 16px;
+  background: #fffdfb;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 25%);
+}
+.bl-menu-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 1;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #f3eee9;
+  color: #4d3024;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+.bl-menu-modal-image {
+  display: flex;
+  min-height: 280px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #f4ece5;
+}
+.bl-menu-modal-image img {
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+  object-fit: cover;
+}
+.bl-menu-no-image {
+  font-size: 64px;
+}
+.bl-menu-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+}
+.bl-menu-category {
+  color: #76513a;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.bl-menu-modal-content h2 {
+  margin: 0;
+  color: #35251d;
+  font-size: 1.5rem;
+  line-height: 1.9rem;
+}
+.bl-menu-modal-content > p {
+  margin: 0;
+  color: #6b625c;
+}
+.bl-menu-modal-options {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.bl-menu-option {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.bl-menu-option-title {
+  font-weight: 700;
+}
+.bl-menu-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bl-menu-choice button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid #ded2c8;
+  border-radius: 8px;
+  background: #fff;
+  color: #4d3024;
+  font: inherit;
+  cursor: pointer;
+}
+.bl-menu-choice button:hover {
+  border-color: #a8795c;
+}
+.bl-menu-choice button.selected {
+  border-color: #4d3024;
+  background: #4d3024;
+  color: #fff;
+}
+.bl-menu-choice button small {
+  font-size: 0.75rem;
+}
+.bl-menu-modal-footer {
+  margin-top: auto;
+  padding-top: 12px;
+}
+.bl-menu-modal-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.bl-menu-total {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bl-menu-total small,
+.bl-menu-cart-hint {
+  color: #766b63;
+}
+.bl-menu-total strong {
+  color: #4d3024;
+  font-size: 1.25rem;
+}
+.bl-menu-modal-bottom > button {
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #4d3024;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bl-menu-modal-bottom > button:hover {
+  background: #382219;
+}
+.bl-menu-cart-hint {
+  display: block;
+  margin-top: 10px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+@media (min-width: 768px) {
+  .bl-cart-container {
+    padding: 24px;
+  }
+  .bl-cart-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 767px) {
+  .bl-cart-container {
+    padding: 16px;
+  }
+  .bl-cart-title {
+    font-size: 1.6rem;
+  }
+  .bl-cart-item {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .bl-cart-product {
+    flex-basis: calc(100% - 4px);
+  }
+  .bl-cart-quantity {
+    margin-left: 96px;
+  }
+  .bl-cart-line-total {
+    margin-left: auto;
+  }
+  .bl-cart-actions {
+    width: 100%;
+  }
+  .bl-cart-summary {
+    align-items: stretch;
+  }
+  .bl-cart-total {
+    font-size: 1.25rem;
+  }
+  .bl-cart-submit {
+    width: 100%;
+  }
+  .bl-menu-modal {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bl-menu-modal-image,
+  .bl-menu-modal-image img {
+    min-height: 180px;
+    max-height: 220px;
+  }
+  .bl-menu-modal-content {
+    padding: 20px;
+  }
+}
