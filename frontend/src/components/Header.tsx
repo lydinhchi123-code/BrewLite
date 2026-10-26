@@ -239,7 +239,7 @@ export default function Header() {
             <Link href="/2TrangMenu" className="nav-link">
               Thực đơn
             </Link>
-            <Link href="/8TrangLichSuDonHang" className="nav-link">
+            <Link href="/6TrangLichSuDonHang" className="nav-link">
               Lịch sử đơn hàng
             </Link>
           </nav>
@@ -277,7 +277,7 @@ export default function Header() {
               </button>
             )}
 
-            <Link href="/4TrangGioHang" className="btn btn-primary cart-button">
+            <Link href="/3TrangGioHang" className="btn btn-primary cart-button">
               Giỏ hàng
             </Link>
           </div>

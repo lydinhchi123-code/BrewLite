@@ -218,7 +218,7 @@ export default function CartPage() {
 
       // Task 6 chỉ tạo đơn. Chuyển sang trang thanh toán; không tuyên bố đã thanh toán.
       router.push(
-        `/5TrangThanhToan?orderId=${encodeURIComponent(String(orderId))}`,
+        `/4TrangThanhToan?orderId=${encodeURIComponent(String(orderId))}`,
       );
     } catch (error) {
       setOrderError(

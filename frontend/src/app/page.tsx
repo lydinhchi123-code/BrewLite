@@ -1,4 +1,4 @@
-import TrangChu from "./TrangChu/page";
+import TrangChu from "./1TrangChu/page";
 
 export default function Home() {
   return <TrangChu />;

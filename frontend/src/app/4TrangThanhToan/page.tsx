@@ -132,7 +132,7 @@ export default function ThanhToanPage() {
           <h1>Không tìm thấy đơn hàng cần thanh toán</h1>
           <p>Hãy quay lại giỏ hàng và tạo đơn hàng trước khi tiếp tục.</p>
           <div className="payment-success-actions">
-            <Link href="/4TrangGioHang" className="payment-button primary">
+            <Link href="/3TrangGioHang" className="payment-button primary">
               Quay lại giỏ hàng
             </Link>
             <Link href="/2TrangMenu" className="payment-button secondary">
@@ -192,7 +192,7 @@ export default function ThanhToanPage() {
     <main className="payment-page">
       <div className="container">
         <div className="payment-breadcrumb">
-          <Link href="/4TrangGioHang">Giỏ hàng</Link>
+          <Link href="/3TrangGioHang">Giỏ hàng</Link>
           <span aria-hidden="true">/</span>
           <strong>Thanh toán</strong>
         </div>
@@ -351,7 +351,7 @@ export default function ThanhToanPage() {
             <div className="payment-card">
               <div className="summary-heading">
                 <h2>Đơn hàng của bạn</h2>
-                <Link href="/4TrangGioHang">Chỉnh sửa</Link>
+                <Link href="/3TrangGioHang">Chỉnh sửa</Link>
               </div>
 
               <div className="summary-items">
