@@ -30,7 +30,23 @@ type Order = {
   date: string;
   status: OrderStatus;
   items: OrderItem[];
+  subtotal: number;
   shippingFee: number;
+  discount: number;
+  totalAmount: number;
+};
+
+type ApiOrder = {
+  madonhang: string | number;
+  madonhanghienthi?: string;
+  makh: string | number | null;
+  ngaydat: string;
+  trangthai: string;
+  tongtien: number;
+  tamtinh: number;
+  phigiaohang: number;
+  giamgia: number;
+  items: ApiOrderItem[];
 };
 
 type ApiOrderItem = {
@@ -46,27 +62,17 @@ type ApiOrderItem = {
   thanhtien: number;
 };
 
-type ApiOrder = {
-  madh: string;
-  makh: string;
-  ngaydat: string;
-  trangthai: string;
-  tongtien: number;
-  chitiet: ApiOrderItem[];
-};
-
 function mapOrderStatus(status: string): OrderStatus {
   const value = status.trim().toLowerCase();
 
-  if (value === "hoàn thành" || value === "hoan thanh") {
+  if (
+    ["da_giao", "hoàn thành", "hoan thanh"].includes(value)
+  ) {
     return "Hoàn thành";
   }
 
   if (
-    value === "đã hủy" ||
-    value === "da huy" ||
-    value === "đã huỷ" ||
-    value === "da huỷ"
+    ["da_huy", "đã hủy", "da huy", "đã huỷ", "da huỷ"].includes(value)
   ) {
     return "Đã hủy";
   }
@@ -75,27 +81,43 @@ function mapOrderStatus(status: string): OrderStatus {
 }
 
 function mapApiOrder(order: ApiOrder): Order {
+  const items = (order.items ?? []).map((item) => ({
+    id: Number(item.mactdh),
+    name: item.tenmon,
+    image: item.image_url || "☕",
+    size: item.kichco || "Mặc định",
+    sugar: item.duong || "Chưa chọn",
+    ice: item.da || "Chưa chọn",
+    toppings: item.topping
+      ? item.topping
+          .split(",")
+          .map((name) => name.trim())
+          .filter(Boolean)
+      : [],
+    quantity: Number(item.soluong),
+    price: Number(item.dongia),
+  }));
+
+  const subtotal = Number(
+    order.tamtinh ??
+      items.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0,
+      ),
+  );
+
+  const shippingFee = Number(order.phigiaohang ?? 0);
+  const discount = Number(order.giamgia ?? 0);
+
   return {
-    id: order.madh,
+    id: order.madonhanghienthi || String(order.madonhang),
     date: new Date(order.ngaydat).toLocaleString("vi-VN"),
     status: mapOrderStatus(order.trangthai),
-    shippingFee: 0,
-    items: order.chitiet.map((item, index) => ({
-      id: item.mactdh,
-      name: item.tenmon,
-      image: item.image_url || "☕",
-      size: item.kichco || "Mặc định",
-      sugar: item.duong || "Chưa chọn",
-      ice: item.da || "Chưa chọn",
-      toppings: item.topping
-        ? item.topping
-            .split(",")
-            .map((name) => name.trim())
-            .filter(Boolean)
-        : [],
-      quantity: Number(item.soluong),
-      price: Number(item.dongia),
-    })),
+    items,
+    subtotal,
+    shippingFee,
+    discount,
+    totalAmount: Number(order.tongtien),
   };
 }
 
@@ -108,18 +130,21 @@ function formatPrice(price: number) {
 }
 
 function getOrderTotal(order: Order) {
-  const itemsTotal = order.items.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0,
-  );
-
-  return itemsTotal + order.shippingFee;
+  return order.totalAmount;
 }
 
 function getStatusClass(status: OrderStatus) {
   if (status === "Hoàn thành") return "status-success";
   if (status === "Đang xử lý") return "status-pending";
   return "status-cancelled";
+}
+
+function isImageSource(image: string) {
+  return (
+    image.startsWith("/") ||
+    image.startsWith("https://") ||
+    image.startsWith("http://")
+  );
 }
 
 export default function OrderHistoryPage() {
@@ -158,7 +183,7 @@ export default function OrderHistoryPage() {
 
       try {
         const response = await fetch(
-          `http://localhost:3001/don_hang/khach-hang/${taiKhoan!.makh}`,
+          `http://localhost:3001/orders/khach-hang/${taiKhoan!.makh}`,
           { signal: controller.signal },
         );
 
@@ -191,10 +216,8 @@ export default function OrderHistoryPage() {
     return () => controller.abort();
   }, [taiKhoan]);
 
-  const visibleOrders =
-    activeFilter === "Tất cả"
-      ? orders
-      : orders.filter((order) => order.status === activeFilter);
+  const visibleOrders = activeFilter === "Tất cả"
+      ? orders : orders.filter((order) => order.status === activeFilter);
 
   function getCount(filter: Filter) {
     if (filter === "Tất cả") return orders.length;
@@ -295,6 +318,17 @@ export default function OrderHistoryPage() {
             </div>
           ) : (
             visibleOrders.map((order) => {
+              if (order.items.length === 0) {
+                return (
+                  <article className="history-card" key={order.id}>
+                    <h2>#{order.id}</h2>
+                    <p>Đơn hàng chưa có thông tin chi tiết món.</p>
+                    <p>Trạng thái: {order.status}</p>
+                    <p>Tổng thanh toán: {formatPrice(order.totalAmount)}</p>
+                  </article>
+                );
+              }
+
               const itemCount = order.items.reduce(
                 (sum, item) => sum + item.quantity,
                 0,
@@ -320,7 +354,7 @@ export default function OrderHistoryPage() {
 
                   <div className="history-product">
                     <div className="history-product-icon">
-                      {order.items[0].image.startsWith("/") ? (
+                      {isImageSource(order.items[0].image) ? (
                         <img
                           src={order.items[0].image}
                           alt={order.items[0].name}
@@ -421,7 +455,7 @@ export default function OrderHistoryPage() {
               {selectedOrder.items.map((item) => (
                 <article className="history-detail-item" key={item.id}>
                   <div className="history-product-icon">
-                    {item.image.startsWith("/") ? (
+                    {isImageSource(item.image) ? (
                       <img
                         src={item.image}
                         alt={item.name}
@@ -454,19 +488,17 @@ export default function OrderHistoryPage() {
             <div className="history-payment">
               <div>
                 <span>Tiền sản phẩm</span>
-                <span>
-                  {formatPrice(
-                    selectedOrder.items.reduce(
-                      (sum, item) => sum + item.price * item.quantity,
-                      0,
-                    ),
-                  )}
-                </span>
+                <span>{formatPrice(selectedOrder.subtotal)}</span>
               </div>
 
               <div>
                 <span>Phí giao hàng</span>
                 <span>{formatPrice(selectedOrder.shippingFee)}</span>
+              </div>
+
+              <div>
+                <span>Giảm giá</span>
+                <span>-{formatPrice(selectedOrder.discount)}</span>
               </div>
 
               <div className="history-payment-total">

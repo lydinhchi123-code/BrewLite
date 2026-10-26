@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -84,7 +85,13 @@ export class CreateOrderDto {
   @Min(0)
   totalAmount: number;
 
-  @IsOptional()
+    @IsOptional()
   @IsString()
   note?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  makh?: number;
 }

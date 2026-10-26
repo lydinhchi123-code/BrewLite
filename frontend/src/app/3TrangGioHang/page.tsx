@@ -122,6 +122,30 @@ export default function CartPage() {
 
     if (submitting || items.length === 0) return;
     const token = localStorage.getItem("brewlite_accessToken");
+    const savedUser = localStorage.getItem("brewlite_user");
+
+    if (!token) {
+      setOrderError(
+        "Bạn cần đăng nhập trước khi đặt hàng. Hãy đăng nhập bằng nút tài khoản ở đầu trang, sau đó quay lại bấm đặt hàng.",
+      );
+      return;
+    }
+
+    let makh: number;
+
+    try {
+      const user = savedUser ? JSON.parse(savedUser) : null;
+      makh = Number(user?.makh);
+
+      if (!Number.isInteger(makh) || makh < 1) {
+        throw new Error("Mã khách hàng không hợp lệ.");
+      }
+    } catch {
+      setOrderError(
+        "Không xác định được tài khoản khách hàng. Vui lòng đăng xuất và đăng nhập lại.",
+      );
+      return;
+    }
 
     if (!token) {
       setOrderError(
@@ -140,6 +164,7 @@ export default function CartPage() {
     );
 
     const payload = {
+      makh,
       items: items.map((item) => ({
         id: String(item.product.id),
         name: item.product.name,

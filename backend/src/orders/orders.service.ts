@@ -1,4 +1,9 @@
-import { Inject, Injectable, BadRequestException } from '@nestjs/common';
+
+import {
+  Inject,
+  Injectable,
+  BadRequestException,
+} from '@nestjs/common';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.module';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -22,20 +27,38 @@ export class OrdersService {
       discount = 0,
       totalAmount,
       note,
+      makh,
     } = createOrderDto;
 
-    if (!items || items.length === 0) {
-      throw new BadRequestException('Đơn hàng phải có ít nhất một món.');
+    if (
+      makh == null ||
+      !Number.isInteger(Number(makh)) ||
+      Number(makh) < 1
+    ) {
+      throw new BadRequestException(
+        'Không xác định được khách hàng. Vui lòng đăng nhập lại.',
+      );
     }
 
-    // Kiểm tra tổng tiền trước khi ghi database
+    if (!items || items.length === 0) {
+      throw new BadRequestException(
+        'Đơn hàng phải có ít nhất một món.',
+      );
+    }
+
+    // Kiểm tra tổng tiền
     const expectedTotal = subtotal + deliveryFee - discount;
 
-    if (expectedTotal < 0 || Math.abs(expectedTotal - totalAmount) > 0.001) {
-      throw new BadRequestException('Tổng tiền không hợp lệ.');
+    if (
+      expectedTotal < 0 ||
+      Math.abs(expectedTotal - totalAmount) > 0.001
+    ) {
+      throw new BadRequestException(
+        'Tổng tiền không hợp lệ.',
+      );
     }
 
-    // Kiểm tra giá trị tạm tính khớp với các món
+    // Kiểm tra tạm tính
     const calculatedSubtotal = items.reduce(
       (sum, item) => sum + item.price * item.quantity,
       0,
@@ -54,9 +77,12 @@ export class OrdersService {
 
       const displayOrderId = `ORD-${Date.now()}`;
 
+      // Tạo đơn hàng
       const orderResult = await client.query(
-        `INSERT INTO donhang (
+        `
+        INSERT INTO donhang (
           madonhanghienthi,
+          makh,
           hotennguoinhan,
           sodienthoainguoinhan,
           diachigiaohang,
@@ -67,10 +93,15 @@ export class OrdersService {
           giamgia,
           tongtien
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        RETURNING *`,
+        VALUES (
+          $1, $2, $3, $4, $5, $6,
+          $7, $8, $9, $10, $11
+        )
+        RETURNING *
+        `,
         [
           displayOrderId,
+          Number(makh),
           customerName,
           customerPhone,
           address,
@@ -85,37 +116,37 @@ export class OrdersService {
 
       const order = orderResult.rows[0];
 
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-
-        const options = [
-          item.size ? `Size: ${item.size}` : null,
-          item.sugar ? `Đường: ${item.sugar}` : null,
-          item.ice ? `Đá: ${item.ice}` : null,
-          item.topping?.length ? `Topping: ${item.topping.join(', ')}` : null,
-        ]
-          .filter(Boolean)
-          .join('; ');
+      // Tạo chi tiết từng món
+      for (const item of items) {
+        const topping = item.topping?.length
+          ? item.topping.join(', ')
+          : null;
 
         await client.query(
-          `INSERT INTO chitietdonhang (
+          `
+          INSERT INTO chitietdonhang (
             madonhang,
-            stt,
             tenmon,
-            tuychon,
+            image_url,
+            kichco,
+            duong,
+            da,
+            topping,
             soluong,
-            dongia,
-            thanhtien
+            dongia
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          `,
           [
             order.madonhang,
-            i + 1,
             item.name,
-            options || null,
+            null,
+            item.size ?? null,
+            item.sugar ?? null,
+            item.ice ?? null,
+            topping,
             item.quantity,
             item.price,
-            item.price * item.quantity,
           ],
         );
       }
@@ -135,30 +166,71 @@ export class OrdersService {
     }
   }
 
+  // Lấy danh sách đơn hàng kèm chi tiết
   async findAll() {
     const result = await this.pool.query(`
-    SELECT
-      d.*,
-      COALESCE(
-        json_agg(
-          json_build_object(
-            'stt', c.stt,
-            'tenmon', c.tenmon,
-            'tuychon', c.tuychon,
-            'soluong', c.soluong,
-            'dongia', c.dongia,
-            'thanhtien', c.thanhtien
-          )
-          ORDER BY c.stt
-        ) FILTER (WHERE c.madonhang IS NOT NULL),
-        '[]'::json
-      ) AS items
-    FROM donhang d
-    LEFT JOIN chitietdonhang c
-      ON c.madonhang = d.madonhang
-    GROUP BY d.madonhang
-    ORDER BY d.ngaydat DESC
-  `);
+      SELECT
+        d.*,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'mactdh', c.mactdh,
+              'tenmon', c.tenmon,
+              'image_url', c.image_url,
+              'kichco', c.kichco,
+              'duong', c.duong,
+              'da', c.da,
+              'topping', c.topping,
+              'soluong', c.soluong,
+              'dongia', c.dongia,
+              'thanhtien', c.thanhtien
+            )
+            ORDER BY c.mactdh
+          ) FILTER (WHERE c.mactdh IS NOT NULL),
+          '[]'::json
+        ) AS items
+      FROM donhang d
+      LEFT JOIN chitietdonhang c
+        ON c.madonhang = d.madonhang
+      GROUP BY d.madonhang
+      ORDER BY d.ngaydat DESC
+    `);
+
+    return result.rows;
+  }
+
+  async findByCustomerId(makh: number) {
+    const result = await this.pool.query(
+      `
+      SELECT
+        d.*,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'mactdh', c.mactdh,
+              'tenmon', c.tenmon,
+              'image_url', c.image_url,
+              'kichco', c.kichco,
+              'duong', c.duong,
+              'da', c.da,
+              'topping', c.topping,
+              'soluong', c.soluong,
+              'dongia', c.dongia,
+              'thanhtien', c.thanhtien
+            )
+            ORDER BY c.mactdh
+          ) FILTER (WHERE c.mactdh IS NOT NULL),
+          '[]'::json
+        ) AS items
+      FROM donhang d
+      LEFT JOIN chitietdonhang c
+        ON c.madonhang = d.madonhang
+      WHERE d.makh = $1
+      GROUP BY d.madonhang
+      ORDER BY d.ngaydat DESC
+      `,
+      [makh],
+    );
 
     return result.rows;
   }

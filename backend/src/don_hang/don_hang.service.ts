@@ -11,7 +11,9 @@ export class DonHangService implements OnModuleInit, OnModuleDestroy {
   private readonly pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl:
-      process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : undefined,
+      process.env.PGSSL === 'true'
+        ? { rejectUnauthorized: false }
+        : undefined,
   });
 
   async onModuleInit(): Promise<void> {
@@ -23,7 +25,6 @@ export class DonHangService implements OnModuleInit, OnModuleDestroy {
       await this.pool.query('SELECT 1');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-
       throw new Error(`Không thể kết nối PostgreSQL: ${message}`);
     }
   }
@@ -37,23 +38,23 @@ export class DonHangService implements OnModuleInit, OnModuleDestroy {
       const result = await this.pool.query(
         `
         SELECT
-          dh.madh,
+          dh.madonhang AS madh,
+          dh.madonhanghienthi,
           dh.makh,
           dh.ngaydat,
           dh.trangthai,
           dh.tongtien,
+          dh.phigiaohang,
+          dh.giamgia,
+          dh.tamtinh,
+
           COALESCE(
             (
               SELECT json_agg(
                 json_build_object(
                   'mactdh', ct.mactdh,
                   'tenmon', ct.tenmon,
-                  'image_url', (
-                    SELECT p.image_url
-                    FROM menu_products p
-                    WHERE LOWER(TRIM(p.name)) = LOWER(TRIM(ct.tenmon))
-                    LIMIT 1
-                    ),
+                  'image_url', ct.image_url,
                   'kichco', ct.kichco,
                   'duong', ct.duong,
                   'da', ct.da,
@@ -65,13 +66,14 @@ export class DonHangService implements OnModuleInit, OnModuleDestroy {
                 ORDER BY ct.mactdh
               )
               FROM chitietdonhang ct
-              WHERE ct.madh = dh.madh
+              WHERE ct.madonhang = dh.madonhang
             ),
             '[]'::json
           ) AS chitiet
+
         FROM donhang dh
         WHERE dh.makh = $1
-        ORDER BY dh.ngaydat DESC, dh.madh DESC
+        ORDER BY dh.ngaydat DESC, dh.madonhang DESC
         `,
         [makh],
       );
@@ -79,11 +81,21 @@ export class DonHangService implements OnModuleInit, OnModuleDestroy {
       return result.rows.map((row) => ({
         ...row,
         madh: String(row.madh),
-        makh: String(row.makh),
+        madonhanghienthi: row.madonhanghienthi,
+        makh: row.makh === null ? null : String(row.makh),
         tongtien: Number(row.tongtien),
+        tamtinh: Number(row.tamtinh),
+        phigiaohang: Number(row.phigiaohang),
+        giamgia: Number(row.giamgia),
+
         chitiet: (row.chitiet ?? []).map(
-          (ct: { dongia: string | number; thanhtien: string | number }) => ({
+          (ct: {
+            mactdh: string | number;
+            dongia: string | number;
+            thanhtien: string | number;
+          }) => ({
             ...ct,
+            mactdh: String(ct.mactdh),
             dongia: Number(ct.dongia),
             thanhtien: Number(ct.thanhtien),
           }),

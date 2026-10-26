@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   Post,
+  Param,
+  ParseIntPipe,
   UseGuards,
   UsePipes,
   ValidationPipe,
@@ -26,5 +28,12 @@ export class OrdersController {
   @Get()
   findAll() {
     return this.ordersService.findAll();
+  }
+
+  @Get("khach-hang/:makh")
+  findByCustomerId(
+    @Param("makh", ParseIntPipe) makh: number,
+  ) {
+    return this.ordersService.findByCustomerId(makh);
   }
 }
