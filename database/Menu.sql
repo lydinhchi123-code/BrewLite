@@ -1,14 +1,9 @@
 
 BEGIN;
 
--- Xoa bang lien ket topping truoc
 DROP TABLE IF EXISTS menu_product_toppings CASCADE;
-
--- Xoa bang size va topping
 DROP TABLE IF EXISTS menu_product_sizes CASCADE;
 DROP TABLE IF EXISTS menu_toppings CASCADE;
-
--- Xoa bang san pham truoc danh muc
 DROP TABLE IF EXISTS menu_products CASCADE;
 DROP TABLE IF EXISTS menu_categories CASCADE;
 
@@ -48,15 +43,28 @@ CREATE TABLE IF NOT EXISTS menu_products (
     is_featured BOOLEAN NOT NULL DEFAULT FALSE,
     is_available BOOLEAN NOT NULL DEFAULT TRUE,
     display_order INTEGER NOT NULL DEFAULT 0,
+
+	-- QUẢN LÝ TỒN KHO
+    stock_quantity INTEGER NOT NULL DEFAULT 0
+        CHECK (stock_quantity >= 0),
+    -- Khi tồn kho <= ngưỡng này thì Admin có thể cảnh báo
+    low_stock_threshold INTEGER NOT NULL DEFAULT 10
+        CHECK (low_stock_threshold >= 0),
+    -- FALSE nếu món không quản lý số lượng tồn kho
+    track_inventory BOOLEAN NOT NULL DEFAULT TRUE,
+	
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_menu_products_category
     ON menu_products(category_id);
-
 CREATE INDEX IF NOT EXISTS idx_menu_products_available
     ON menu_products(is_available);
+CREATE INDEX IF NOT EXISTS idx_menu_products_stock
+    ON menu_products(stock_quantity);
+CREATE INDEX IF NOT EXISTS idx_menu_categories_active
+    ON menu_categories(is_active);
 
 -- =====================================================
 -- 3. TAO BANG SIZE
@@ -71,8 +79,12 @@ CREATE TABLE IF NOT EXISTS menu_product_sizes (
     price NUMERIC(12,2) NOT NULL CHECK (price >= 0),
     is_available BOOLEAN NOT NULL DEFAULT TRUE,
     display_order INTEGER NOT NULL DEFAULT 0,
-    UNIQUE (product_id, size_code)
+    CONSTRAINT uq_menu_product_size
+        UNIQUE (product_id, size_code)
 );
+
+CREATE INDEX IF NOT EXISTS idx_menu_product_sizes_product
+    ON menu_product_sizes(product_id);
 
 -- =====================================================
 -- 4. TAO BANG TOPPING
@@ -86,6 +98,9 @@ CREATE TABLE IF NOT EXISTS menu_toppings (
     display_order INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE INDEX IF NOT EXISTS idx_menu_toppings_available
+    ON menu_toppings(is_available);
+
 CREATE TABLE IF NOT EXISTS menu_product_toppings (
     product_id BIGINT NOT NULL
         REFERENCES menu_products(id) ON DELETE CASCADE,
@@ -96,17 +111,16 @@ CREATE TABLE IF NOT EXISTS menu_product_toppings (
 
 -- =====================================================
 -- 5. LAM SACH DU LIEU MENU CU
--- Chi xoa du lieu trong cac bang menu
 -- =====================================================
-
+/*
 DELETE FROM menu_product_toppings;
 DELETE FROM menu_product_sizes;
 DELETE FROM menu_products;
 DELETE FROM menu_categories;
-
+DELETE FROM menu_toppings;
+*/
 -- =====================================================
 -- 6. DANH MUC MENU
--- Khong co danh muc Latte
 -- =====================================================
 
 INSERT INTO menu_categories
@@ -121,22 +135,16 @@ VALUES
 
 -- =====================================================
 -- 7. THEM SAN PHAM
--- Anh su dung tu frontend/public/images/
 -- =====================================================
 
 INSERT INTO menu_products
     (category_id, name, slug, description, image_url,
-     base_price, is_featured, is_available, display_order)
+     base_price, is_featured, is_available, display_order,
+	 stock_quantity, low_stock_threshold, track_inventory)
 SELECT
-    c.id,
-    p.name,
-    p.slug,
-    p.description,
-    p.image_url,
-    p.base_price,
-    p.is_featured,
-    TRUE,
-    p.display_order
+    c.id, p.name, p.slug, p.description, p.image_url,
+    p.base_price, p.is_featured, TRUE, p.display_order,
+    100, 10, TRUE
 FROM (
     VALUES
     -- CA PHE
@@ -231,17 +239,13 @@ JOIN menu_categories c ON c.slug = p.category_slug;
 -- S = GIA GOC
 -- M = GIA GOC + 5.000
 -- L = GIA GOC + 10.000
--- KHONG TAO SIZE CHO CAC MON BANH
 -- =====================================================
 
 INSERT INTO menu_product_sizes
     (product_id, size_code, size_name, price, display_order)
 SELECT
-    p.id,
-    s.size_code,
-    s.size_name,
-    p.base_price + s.price_increment,
-    s.display_order
+    p.id, s.size_code, s.size_name,
+    p.base_price + s.price_increment, s.display_order
 FROM menu_products p
 JOIN menu_categories c ON c.id = p.category_id
 CROSS JOIN (
@@ -423,6 +427,28 @@ LEFT JOIN menu_product_sizes s ON s.product_id = p.id
 WHERE c.slug IN ('ca-phe', 'tra', 'tra-sua', 'da-xay')
 GROUP BY p.id, p.name
 ORDER BY p.name;
+
+-- =====================================================
+-- 17. Kiểm tra món và tồn kho
+-- =====================================================
+SELECT
+    p.id,
+    p.name,
+    c.name AS category_name,
+    p.stock_quantity,
+    p.low_stock_threshold,
+    p.track_inventory,
+    p.is_available,
+    CASE
+        WHEN NOT p.track_inventory THEN 'KHONG_QUAN_LY_TON'
+        WHEN p.stock_quantity = 0 THEN 'HET_HANG'
+        WHEN p.stock_quantity <= p.low_stock_threshold THEN 'SAP_HET_HANG'
+        ELSE 'CON_HANG'
+    END AS stock_status
+FROM menu_products p
+JOIN menu_categories c ON c.id = p.category_id
+ORDER BY c.display_order, p.display_order;
+
 
 SELECT * FROM menu_categories;
 SELECT * FROM menu_products;

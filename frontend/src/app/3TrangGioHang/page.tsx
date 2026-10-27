@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type SubmitEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import "./TrangGioHang.css";
 
 type SizeOption = {
@@ -40,6 +40,31 @@ type CartItem = {
   unitPrice: number;
 };
 
+type PendingCheckout = {
+  orderId: string;
+  makh: number;
+  items: {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    size?: string;
+    sugar?: string;
+    ice?: string;
+    topping?: string[];
+  }[];
+  customerName: string;
+  customerPhone: string;
+  address: string;
+  province: string;
+  note?: string;
+  subtotal: number;
+  deliveryFee: number;
+  discount: number;
+  totalAmount: number;
+  status: "PENDING";
+};
+
 const money = (value: number) => value.toLocaleString("vi-VN") + " đ";
 
 function isCake(product: Product) {
@@ -70,27 +95,83 @@ export default function CartPage() {
   const [editIce, setEditIce] = useState("100%");
   const [editToppings, setEditToppings] = useState<string[]>([]);
 
+  
   useEffect(() => {
-    try {
-      const savedCart = localStorage.getItem("brewlite_cart");
-      console.log("Dữ liệu giỏ hàng:", savedCart);
+    function loadCart() {
+      try {
+        const savedCart = localStorage.getItem("brewlite_cart");
 
-      if (savedCart) {
-        const parsed = JSON.parse(savedCart);
-        console.log("Số món đọc được:", parsed.length);
+        if (savedCart) {
+          const parsed = JSON.parse(savedCart);
+          setItems(Array.isArray(parsed) ? parsed : []);
+        } else {
+          setItems([]);
+        }
 
-        if (Array.isArray(parsed)) setItems(parsed);
+        const savedCheckout = localStorage.getItem("brewlite_checkout");
+
+        if (savedCheckout) {
+          const checkout = JSON.parse(savedCheckout);
+
+          if (
+            checkout?.status === "PENDING" &&
+            String(checkout.orderId).startsWith("TEMP-")
+          ) {
+            setCustomerName(checkout.customerName ?? "");
+            setCustomerPhone(checkout.customerPhone ?? "");
+            setAddress(checkout.address ?? "");
+            setProvince(checkout.province ?? "");
+            setNote(checkout.note ?? "");
+          }
+        }
+      } catch (error) {
+        console.error("Không thể đọc giỏ hàng:", error);
+        setItems([]);
+      } finally {
+        setLoaded(true);
       }
-    } catch (error) {
-      console.error("Không thể đọc giỏ hàng:", error);
-    } finally {
-      setLoaded(true);
     }
+
+    // Đọc giỏ hàng khi mở trang.
+    loadCart();
+
+    // Đọc lại khi quay về tab/trang sau khi thanh toán.
+    window.addEventListener("focus", loadCart);
+    window.addEventListener("pageshow", loadCart);
+
+    // Nhận thông báo khi giỏ hàng được cập nhật.
+    window.addEventListener("brewlite-cart-updated", loadCart);
+
+    return () => {
+      window.removeEventListener("focus", loadCart);
+      window.removeEventListener("pageshow", loadCart);
+      window.removeEventListener("brewlite-cart-updated", loadCart);
+    };
   }, []);
 
   useEffect(() => {
     console.log("STATE ITEMS HIỆN TẠI:", items.length);
   }, [items]);
+
+
+  useEffect(() => {
+    function handleCartUpdated() {
+      setItems([]);
+      localStorage.removeItem("brewlite_cart");
+    }
+
+    window.addEventListener(
+      "brewlite-cart-updated",
+      handleCartUpdated
+    );
+
+    return () => {
+      window.removeEventListener(
+        "brewlite-cart-updated",
+        handleCartUpdated
+      );
+    };
+  }, []);
 
   function saveCart(newItems: CartItem[]) {
     setItems(newItems);
@@ -117,16 +198,17 @@ export default function CartPage() {
     }
   }
 
-  async function handlePlaceOrder(e: SubmitEvent<HTMLFormElement>) {
+  function handlePlaceOrder(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     if (submitting || items.length === 0) return;
+
     const token = localStorage.getItem("brewlite_accessToken");
     const savedUser = localStorage.getItem("brewlite_user");
 
     if (!token) {
       setOrderError(
-        "Bạn cần đăng nhập trước khi đặt hàng. Hãy đăng nhập bằng nút tài khoản ở đầu trang, sau đó quay lại bấm đặt hàng.",
+        "Bạn cần đăng nhập trước khi đặt hàng. Hãy đăng nhập rồi quay lại."
       );
       return;
     }
@@ -142,28 +224,22 @@ export default function CartPage() {
       }
     } catch {
       setOrderError(
-        "Không xác định được tài khoản khách hàng. Vui lòng đăng xuất và đăng nhập lại.",
+        "Không xác định được tài khoản khách hàng. Vui lòng đăng nhập lại."
       );
       return;
     }
 
-    if (!token) {
-      setOrderError(
-        "Bạn cần đăng nhập trước khi đặt hàng. Hãy đăng nhập bằng nút tài khoản ở đầu trang, sau đó quay lại bấm đặt hàng.",
-      );
-      return;
-    }
-
-    setSubmitting(true);
     setOrderError("");
     setOrderMessage("");
 
     const subtotal = items.reduce(
       (sum, item) => sum + item.unitPrice * item.qty,
-      0,
+      0
     );
 
-    const payload = {
+    const checkoutData: PendingCheckout = {
+      // Đây chỉ là mã tạm, KHÔNG phải mã đơn trong database.
+      orderId: `TEMP-${Date.now()}`,
       makh,
       items: items.map((item) => ({
         id: String(item.product.id),
@@ -179,78 +255,27 @@ export default function CartPage() {
       customerPhone: customerPhone.trim(),
       address: address.trim(),
       province: province.trim(),
+      note: note.trim() || undefined,
       subtotal,
       deliveryFee: 0,
       discount: 0,
       totalAmount: subtotal,
-      note: note.trim() || undefined,
+      status: "PENDING",
     };
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/orders`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        },
+      // Chỉ lưu dữ liệu tạm, tuyệt đối chưa gọi POST /orders.
+      localStorage.setItem(
+        "brewlite_checkout",
+        JSON.stringify(checkoutData)
       );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          typeof data.message === "string"
-            ? data.message
-            : Array.isArray(data.message)
-              ? data.message.join(", ")
-              : "Không thể tạo đơn hàng.",
-        );
-      }
-
-      // Hỗ trợ một số kiểu response phổ biến từ NestJS.
-      const orderId =
-        data.orderId ?? data.id ?? data.data?.orderId ?? data.data?.id;
-
-      if (orderId == null) {
-        throw new Error(
-          "API đã phản hồi thành công nhưng chưa có mã đơn hàng. Hãy kiểm tra response của POST /orders.",
-        );
-      }
-
-      // Lưu thông tin đơn vừa tạo để trang thanh toán hiển thị đúng món và tổng tiền.
-      const checkoutData = {
-        orderId: String(orderId),
-        items: payload.items,
-        customerName: payload.customerName,
-        customerPhone: payload.customerPhone,
-        address: payload.address,
-        province: payload.province,
-        note: payload.note ?? "",
-        subtotal: payload.subtotal,
-        deliveryFee: payload.deliveryFee,
-        discount: payload.discount,
-        totalAmount: payload.totalAmount,
-        status: "PENDING",
-      };
-
-      localStorage.setItem("brewlite_checkout", JSON.stringify(checkoutData));
-      localStorage.removeItem("brewlite_cart");
-      setItems([]);
-
-      // Task 6 chỉ tạo đơn. Chuyển sang trang thanh toán; không tuyên bố đã thanh toán.
       router.push(
-        `/4TrangThanhToan?orderId=${encodeURIComponent(String(orderId))}`,
+        `/4TrangThanhToan?orderId=${encodeURIComponent(checkoutData.orderId)}`
       );
     } catch (error) {
-      setOrderError(
-        error instanceof Error ? error.message : "Có lỗi xảy ra khi đặt hàng.",
-      );
-    } finally {
-      setSubmitting(false);
+      console.error("Không thể lưu thông tin thanh toán:", error);
+      setOrderError("Không thể lưu thông tin đơn hàng. Vui lòng thử lại.");
     }
   }
 
@@ -527,7 +552,7 @@ export default function CartPage() {
               disabled={submitting || items.length === 0}
               className="bl-cart-submit"
             >
-              {submitting ? "Đang đặt hàng..." : "Tiến hành đặt hàng"}
+              {submitting ? "Đang xử lý..." : "Tiếp tục thanh toán"}
             </button>
           </div>
         </form>

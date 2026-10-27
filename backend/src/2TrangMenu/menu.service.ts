@@ -3,6 +3,8 @@ import {
   OnModuleDestroy,
   OnModuleInit,
   ServiceUnavailableException,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { Pool } from 'pg';
 
@@ -216,6 +218,114 @@ export class MenuService implements OnModuleInit, OnModuleDestroy {
         })),
       }));
     } catch (error: unknown) {
+      this.handleDatabaseError(error);
+    }
+  }
+
+   /**
+   * Lấy toàn bộ sản phẩm và thông tin tồn kho dành cho Admin.
+   * Không lọc is_available để Admin vẫn thấy món ngừng bán.
+   */
+  async getInventory() {
+    try {
+      const result = await this.pool.query(`
+        SELECT
+          p.id,
+          p.name,
+          p.slug,
+          p.image_url,
+          p.is_available,
+          p.stock_quantity,
+          p.low_stock_threshold,
+          p.track_inventory,
+          c.name AS category_name,
+          CASE
+            WHEN p.track_inventory = FALSE THEN 'KHONG_QUAN_LY_TON'
+            WHEN p.stock_quantity = 0 THEN 'HET_HANG'
+            WHEN p.stock_quantity <= p.low_stock_threshold
+              THEN 'SAP_HET_HANG'
+            ELSE 'CON_HANG'
+          END AS inventory_status
+        FROM menu_products p
+        LEFT JOIN menu_categories c
+          ON c.id = p.category_id
+        ORDER BY c.display_order ASC, p.display_order ASC, p.name ASC
+      `);
+
+      return result.rows.map((row) => ({
+        id: Number(row.id),
+        name: row.name,
+        slug: row.slug,
+        imageUrl: row.image_url,
+        categoryName: row.category_name,
+        isAvailable: row.is_available,
+        stockQuantity: Number(row.stock_quantity),
+        lowStockThreshold: Number(row.low_stock_threshold),
+        trackInventory: row.track_inventory,
+        inventoryStatus: row.inventory_status,
+      }));
+    } catch (error: unknown) {
+      this.handleDatabaseError(error);
+    }
+  }
+
+  /**
+   * Cập nhật số lượng tồn kho của một sản phẩm.
+   */
+  async updateInventory(id: number, stockQuantity: number) {
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      throw new BadRequestException('ID sản phẩm không hợp lệ.');
+    }
+
+    if (
+      !Number.isSafeInteger(stockQuantity) ||
+      stockQuantity < 0
+    ) {
+      throw new BadRequestException(
+        'Số lượng tồn kho phải là số nguyên không âm.',
+      );
+    }
+
+    try {
+      const result = await this.pool.query(
+        `
+          UPDATE menu_products
+          SET stock_quantity = $1
+          WHERE id = $2
+          RETURNING
+            id,
+            name,
+            stock_quantity,
+            low_stock_threshold,
+            track_inventory
+        `,
+        [stockQuantity, id],
+      );
+
+      if (result.rowCount === 0) {
+        throw new NotFoundException('Không tìm thấy sản phẩm.');
+      }
+
+      const product = result.rows[0];
+
+      return {
+        message: 'Cập nhật tồn kho thành công.',
+        product: {
+          id: Number(product.id),
+          name: product.name,
+          stockQuantity: Number(product.stock_quantity),
+          lowStockThreshold: Number(product.low_stock_threshold),
+          trackInventory: product.track_inventory,
+        },
+      };
+    } catch (error: unknown) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+
       this.handleDatabaseError(error);
     }
   }

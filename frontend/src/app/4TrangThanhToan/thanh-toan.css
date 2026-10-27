@@ -108,3 +108,121 @@
   .payment-success h1 { font-size: 38px; }
   .payment-success-actions { flex-direction: column; }
 }
+
+
+.mock-payment-panel {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid #e6d4c5;
+  border-radius: 14px;
+  background: #fffaf6;
+}
+
+.mock-payment-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.mock-payment-heading h3 {
+  margin: 0 0 6px;
+  color: #503322;
+  font-size: 18px;
+}
+
+.mock-payment-heading p {
+  margin: 0;
+  color: #76665d;
+  font-size: 13px;
+}
+
+.mock-payment-badge {
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: #f0e1d5;
+  color: #75472e;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mock-payment-content {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.mock-qr-wrapper {
+  flex-shrink: 0;
+  padding: 10px;
+  border: 1px solid #e6e0da;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.mock-qr-wrapper img {
+  display: block;
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+}
+
+.mock-payment-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mock-payment-info > p:not(.mock-payment-warning) {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0 0 14px;
+}
+
+.mock-payment-info > p > span {
+  color: #796d65;
+  font-size: 13px;
+}
+
+.mock-payment-info strong {
+  overflow-wrap: anywhere;
+  color: #38271e;
+}
+
+.mock-payment-info .mock-payment-amount {
+  color: #9a542d;
+  font-size: 22px;
+}
+
+.mock-payment-warning {
+  margin: 12px 0 0;
+  color: #98602e;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .mock-payment-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mock-qr-wrapper {
+    align-self: center;
+  }
+
+  .mock-payment-info {
+    width: 100%;
+  }
+}
+
+.payment-error {
+  color: #b42318;
+  background: #fef3f2;
+  border: 1px solid #fecdca;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 12px 0;
+  font-size: 14px;
+}

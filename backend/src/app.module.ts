@@ -9,6 +9,7 @@ import { TaiKhoanController } from "./tai-khoan/tai-khoan.controller";
 import { TaiKhoanService } from "./tai-khoan/tai-khoan.service";
 import { JwtModule } from "@nestjs/jwt";
 import { OrdersModule } from "./orders/orders.module";
+import { PaymentsModule } from "./payments/payments.module";
 import { DonHangController } from "./don_hang/don_hang.controller";
 import { DonHangService } from "./don_hang/don_hang.service";
 
@@ -32,6 +33,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     }),
 
     OrdersModule,
+    PaymentsModule,
   ],
   controllers: [
     AppController,
