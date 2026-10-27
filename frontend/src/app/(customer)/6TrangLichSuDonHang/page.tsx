@@ -63,16 +63,21 @@ type ApiOrderItem = {
 };
 
 function mapOrderStatus(status: string): OrderStatus {
-  const value = status.trim().toLowerCase();
+  const value = status.trim().toLowerCase().normalize("NFC").replace(/[\s-]+/g, "_");
 
   if (
-    ["da_giao", "hoàn thành", "hoan thanh"].includes(value)
+    ["da_giao", "hoàn_thành", "hoan_thanh", 
+      "completed", "complete", "delivered",
+    ].includes(value)
   ) {
     return "Hoàn thành";
   }
 
   if (
-    ["da_huy", "đã hủy", "da huy", "đã huỷ", "da huỷ"].includes(value)
+    [
+      "da_huy", "đã_hủy", "đã_huỷ",
+      "canceled", "cancelled",
+    ].includes(value)
   ) {
     return "Đã hủy";
   }
@@ -192,6 +197,13 @@ export default function OrderHistoryPage() {
         }
 
         const data: ApiOrder[] = await response.json();
+        console.log(
+          "Trạng thái đơn hàng từ backend:",
+          data.map((order) => ({
+            id: order.madonhanghienthi || order.madonhang,
+            trangthai: order.trangthai,
+          }))
+        );
 
         setOrders(data.map(mapApiOrder));
       } catch (error) {
