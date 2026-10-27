@@ -733,7 +733,7 @@ export default function MenuPage() {
         <div className="bl-menu-toast">
           <span>✓</span>
           {notice}
-          <Link href="/4TrangGioHang">Xem giỏ hàng →</Link>
+          <Link href="/3TrangGioHang">Xem giỏ hàng →</Link>
         </div>
       )}
     </main>

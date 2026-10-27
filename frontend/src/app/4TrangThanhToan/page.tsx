@@ -9,6 +9,7 @@ type PaymentMethod = "cod" | "banking" | "momo";
 type CheckoutItem = {
   id: string | number;
   name: string;
+  image?: string;
   price: number;
   quantity: number;
   size?: string;
@@ -18,7 +19,7 @@ type CheckoutItem = {
 };
 
 type CheckoutData = {
-  orderId: string;
+  orderId?: string;
   items: CheckoutItem[];
   customerName: string;
   customerPhone: string;
@@ -55,6 +56,8 @@ export default function ThanhToanPage() {
   const [discount, setDiscount] = useState(0);
   const [discountMessage, setDiscountMessage] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [checkout, setCheckout] = useState<CheckoutData | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [urlOrderId, setUrlOrderId] = useState("");
@@ -83,6 +86,63 @@ export default function ThanhToanPage() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!checkout || !checkout.items.some((item) => !item.image)) return;
+
+    const controller = new AbortController();
+    async function loadMissingImages() {
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/menu/products`,
+          { signal: controller.signal, cache: "no-store" },
+        );
+        if (!response.ok) return;
+
+        const payload = await response.json();
+        const products = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : [];
+        const items = checkout.items.map((item) => {
+          if (item.image) return item;
+          const product = products.find(
+            (candidate: {
+              id?: string | number;
+              name?: string;
+              imageUrl?: string;
+              image_url?: string;
+              image?: string;
+            }) =>
+              String(candidate.id) === String(item.id) ||
+              candidate.name?.toLocaleLowerCase("vi-VN") ===
+                item.name.toLocaleLowerCase("vi-VN"),
+          );
+          const image = product?.imageUrl ?? product?.image_url ?? product?.image;
+          return typeof image === "string" && image
+            ? { ...item, image }
+            : item;
+        });
+
+        if (items.some((item, index) => item.image !== checkout.items[index].image)) {
+          const updatedCheckout = { ...checkout, items };
+          setCheckout(updatedCheckout);
+          localStorage.setItem(
+            "brewlite_checkout",
+            JSON.stringify(updatedCheckout),
+          );
+        }
+      } catch (error) {
+        if (!(error instanceof Error && error.name === "AbortError")) {
+          console.error("Không tải được ảnh món trong đơn hàng:", error);
+        }
+      }
+    }
+
+    void loadMissingImages();
+    return () => controller.abort();
+  }, [checkout]);
+
   const orderItems = checkout?.items ?? [];
   const subtotal =
     checkout?.subtotal ??
@@ -105,15 +165,97 @@ export default function ThanhToanPage() {
     );
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!checkout) return;
+    if (!checkout || isSubmitting) return;
 
-    // Task thanh toán hiện chỉ lưu lựa chọn mô phỏng; chưa tích hợp cổng thanh toán thật.
-    const updatedCheckout = { ...checkout, paymentMethod, status: "PENDING" };
-    localStorage.setItem("brewlite_checkout", JSON.stringify(updatedCheckout));
-    setCheckout(updatedCheckout);
-    setIsSubmitted(true);
+    const token = localStorage.getItem("brewlite_accessToken");
+    if (!token) {
+      setSubmitError("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại để đặt hàng.");
+      return;
+    }
+
+    const formData = new FormData(event.currentTarget);
+    const customerName = String(formData.get("name") ?? "").trim();
+    const customerPhone = String(formData.get("phone") ?? "").trim();
+    const address = String(formData.get("address") ?? "").trim();
+    const province = String(formData.get("city") ?? "").trim();
+    const note = String(formData.get("note") ?? "").trim();
+
+    setIsSubmitting(true);
+    setSubmitError("");
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const isEditingExistingOrder = Boolean(checkout.orderId);
+      const response = await fetch(
+        `${apiUrl}/orders${
+          isEditingExistingOrder
+            ? `/${encodeURIComponent(checkout.orderId!)}`
+            : ""
+        }`,
+        {
+          method: isEditingExistingOrder ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            items: checkout.items,
+            customerName,
+            customerPhone,
+            address,
+            province,
+            subtotal,
+            deliveryFee,
+            discount,
+            totalAmount: total,
+            note: note || undefined,
+          }),
+        },
+      );
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          typeof data.message === "string"
+            ? data.message
+            : Array.isArray(data.message)
+              ? data.message.join(", ")
+              : "Không thể tạo đơn hàng.",
+        );
+      }
+
+      const orderId =
+        data.orderId ?? data.id ?? data.data?.orderId ?? data.data?.id;
+      if (orderId == null) {
+        throw new Error("Máy chủ chưa trả về mã đơn hàng.");
+      }
+
+      const updatedCheckout: CheckoutData = {
+        ...checkout,
+        orderId: String(orderId),
+        customerName,
+        customerPhone,
+        address,
+        province,
+        note,
+        discount,
+        totalAmount: total,
+        paymentMethod,
+        status: "SUBMITTED",
+      };
+      localStorage.setItem("brewlite_checkout", JSON.stringify(updatedCheckout));
+      localStorage.removeItem("brewlite_cart");
+      setCheckout(updatedCheckout);
+      setIsSubmitted(true);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Có lỗi xảy ra khi đặt hàng.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (!loaded) {
@@ -124,7 +266,7 @@ export default function ThanhToanPage() {
     );
   }
 
-  if (!checkout || !urlOrderId || String(checkout.orderId) !== urlOrderId) {
+  if (!checkout || checkout.items.length === 0) {
     return (
       <main className="payment-page">
         <section className="payment-success container">
@@ -132,7 +274,7 @@ export default function ThanhToanPage() {
           <h1>Không tìm thấy đơn hàng cần thanh toán</h1>
           <p>Hãy quay lại giỏ hàng và tạo đơn hàng trước khi tiếp tục.</p>
           <div className="payment-success-actions">
-            <Link href="/4TrangGioHang" className="payment-button primary">
+            <Link href="/3TrangGioHang" className="payment-button primary">
               Quay lại giỏ hàng
             </Link>
             <Link href="/2TrangMenu" className="payment-button secondary">
@@ -192,7 +334,7 @@ export default function ThanhToanPage() {
     <main className="payment-page">
       <div className="container">
         <div className="payment-breadcrumb">
-          <Link href="/4TrangGioHang">Giỏ hàng</Link>
+          <Link href="/3TrangGioHang">Giỏ hàng</Link>
           <span aria-hidden="true">/</span>
           <strong>Thanh toán</strong>
         </div>
@@ -232,7 +374,11 @@ export default function ThanhToanPage() {
                     type="tel"
                     defaultValue={checkout.customerPhone}
                     placeholder="090 123 4567"
-                    pattern="[0-9 +()-]{9,}"
+                    inputMode="numeric"
+                    minLength={10}
+                    maxLength={10}
+                    pattern="[0-9]{10}"
+                    title="Số điện thoại phải gồm đúng 10 chữ số."
                     required
                   />
                 </label>
@@ -257,7 +403,10 @@ export default function ThanhToanPage() {
                   />
                 </label>
                 <label>
-                  Ghi chú đơn hàng <span className="optional">(tuỳ chọn)</span>
+                  <span>
+                    Ghi chú đơn hàng{" "}
+                    <span className="optional">(tuỳ chọn)</span>
+                  </span>
                   <input
                     name="note"
                     type="text"
@@ -351,14 +500,18 @@ export default function ThanhToanPage() {
             <div className="payment-card">
               <div className="summary-heading">
                 <h2>Đơn hàng của bạn</h2>
-                <Link href="/4TrangGioHang">Chỉnh sửa</Link>
+                <Link href="/3TrangGioHang">Chỉnh sửa</Link>
               </div>
 
               <div className="summary-items">
                 {orderItems.map((item, index) => (
                   <div className="summary-item" key={`${item.id}-${index}`}>
-                    <div className="summary-item-image" aria-hidden="true">
-                      ☕
+                    <div className="summary-item-image">
+                      {item.image ? (
+                        <img src={item.image} alt="" loading="lazy" />
+                      ) : (
+                        <span aria-hidden="true">☕</span>
+                      )}
                     </div>
                     <div className="summary-item-copy">
                       <strong>{item.name}</strong>
@@ -415,8 +568,20 @@ export default function ThanhToanPage() {
                 </div>
               </div>
 
-              <button type="submit" className="payment-submit">
-                Xác nhận phương thức · {formatPrice(total)}
+              {submitError && (
+                <p className="discount-invalid" role="alert">
+                  {submitError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                className="payment-submit"
+                disabled={isSubmitting}
+              >
+                {isSubmitting
+                  ? "Đang tạo đơn..."
+                  : `Xác nhận phương thức · ${formatPrice(total)}`}
                 <span aria-hidden="true">→</span>
               </button>
               <p className="secure-note">

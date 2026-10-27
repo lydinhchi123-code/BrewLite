@@ -211,7 +211,7 @@ function EmptyState({
       <p>{description}</p>
       <div className="confirm-actions">
         {retry && <button type="button" className="confirm-btn confirm-btn-primary" onClick={retry}>Thử lại</button>}
-        <Link href="/8TrangLichSuDonHang" className="confirm-btn confirm-btn-primary">Xem lịch sử đơn hàng</Link>
+        <Link href="/6TrangLichSuDonHang" className="confirm-btn confirm-btn-primary">Xem lịch sử đơn hàng</Link>
         <Link href="/" className="confirm-btn confirm-btn-outline">Về trang chủ</Link>
       </div>
     </section>
@@ -418,7 +418,7 @@ export default function XacNhanDonHangPage() {
         </aside>
 
         <div className="confirm-actions">
-          <Link href="/8TrangLichSuDonHang" className="confirm-btn confirm-btn-primary">Xem lịch sử đơn hàng</Link>
+          <Link href="/6TrangLichSuDonHang" className="confirm-btn confirm-btn-primary">Xem lịch sử đơn hàng</Link>
           <Link href="/" className="confirm-btn confirm-btn-outline">Quay về trang chủ</Link>
         </div>
       </div>

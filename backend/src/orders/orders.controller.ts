@@ -3,7 +3,9 @@ import {
   Controller,
   Get,
   Param,
+  ParseIntPipe,
   Post,
+  Put,
   Req,
   UnauthorizedException,
   UseGuards,
@@ -16,7 +18,6 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 // JwtAuthGuard sets request.user from the signed login JWT.
-// TaiKhoanService signs the customer's ID in payload.sub.
 interface AuthenticatedRequest {
   user?: { sub?: string | number };
 }
@@ -48,17 +49,36 @@ export class OrdersController {
     @Body() createOrderDto: CreateOrderDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    // Save the authenticated owner; never accept makh from the request body.
+    // Never accept makh from the request body.
     return this.ordersService.create(
       createOrderDto,
       this.customerIdFromJwt(request),
     );
   }
 
+  @Put(':orderId')
+  @UseGuards(JwtAuthGuard)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  update(
+    @Param('orderId') orderId: string,
+    @Body() updateOrderDto: CreateOrderDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.ordersService.update(
+      orderId,
+      updateOrderDto,
+      this.customerIdFromJwt(request),
+    );
+  }
+
   @Get()
   findAll() {
-    // Existing endpoint retained for compatibility with other team members.
     return this.ordersService.findAll();
+  }
+
+  @Get('khach-hang/:makh')
+  findByCustomerId(@Param('makh', ParseIntPipe) makh: number) {
+    return this.ordersService.findByCustomerId(makh);
   }
 
   @Get(':orderId')
@@ -67,9 +87,6 @@ export class OrdersController {
     @Param('orderId') orderId: string,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.ordersService.findOne(
-      orderId,
-      this.customerIdFromJwt(request),
-    );
+    return this.ordersService.findOne(orderId, this.customerIdFromJwt(request));
   }
 }

@@ -18,6 +18,7 @@ type TaiKhoan = {
 export default function Header() {
   const [moForm, setMoForm] = useState(false);
   const [moMenuTaiKhoan, setMoMenuTaiKhoan] = useState(false);
+  const [moMenuMobile, setMoMenuMobile] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [cheDo, setCheDo] = useState<CheDo>("dang-nhap");
   const [taiKhoan, setTaiKhoan] = useState<TaiKhoan | null>(null);
@@ -227,19 +228,37 @@ export default function Header() {
     <>
       <header className="header">
         <div className="container header-inner">
-          <Link href="/" className="logo">
+          <Link
+            href="/"
+            className="logo"
+            onClick={() => setMoMenuMobile(false)}
+          >
             <span className="logo-mark">☕</span>
             <strong>BrewLite</strong>
           </Link>
 
-          <nav className="nav">
-            <Link href="/" className="nav-link">
+          <nav className={`nav ${moMenuMobile ? "nav-open" : ""}`}>
+            <Link
+              href="/"
+              className="nav-link"
+              onClick={() => setMoMenuMobile(false)}
+            >
               Trang chủ
             </Link>
-            <Link href="/2TrangMenu" className="nav-link">
+
+            <Link
+              href="/2TrangMenu"
+              className="nav-link"
+              onClick={() => setMoMenuMobile(false)}
+            >
               Thực đơn
             </Link>
-            <Link href="/8TrangLichSuDonHang" className="nav-link">
+
+            <Link
+              href="/6TrangLichSuDonHang"
+              className="nav-link"
+              onClick={() => setMoMenuMobile(false)}
+            >
               Lịch sử đơn hàng
             </Link>
           </nav>
@@ -252,7 +271,8 @@ export default function Header() {
                   className="auth-button"
                   onClick={() => setMoMenuTaiKhoan(!moMenuTaiKhoan)}
                 >
-                  {taiKhoan.hoten} ▾
+                  <span className="account-name">{taiKhoan.hoten}</span>
+                  <span aria-hidden="true"> ▾</span>
                 </button>
 
                 {moMenuTaiKhoan && (
@@ -277,9 +297,22 @@ export default function Header() {
               </button>
             )}
 
-            <Link href="/4TrangGioHang" className="btn btn-primary cart-button">
+            <Link
+              href="/3TrangGioHang"
+              className="btn btn-primary cart-button"
+            >
               Giỏ hàng
             </Link>
+
+            <button
+              type="button"
+              className="mobile-menu"
+              aria-label={moMenuMobile ? "Đóng menu" : "Mở menu"}
+              aria-expanded={moMenuMobile}
+              onClick={() => setMoMenuMobile(!moMenuMobile)}
+            >
+              {moMenuMobile ? "✕" : "☰"}
+            </button>
           </div>
         </div>
       </header>

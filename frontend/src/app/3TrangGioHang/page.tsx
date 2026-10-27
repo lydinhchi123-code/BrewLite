@@ -81,6 +81,56 @@ export default function CartPage() {
 
         if (Array.isArray(parsed)) setItems(parsed);
       }
+
+      const savedCheckout = localStorage.getItem("brewlite_checkout");
+      if (savedCheckout) {
+        const draft = JSON.parse(savedCheckout);
+        setCustomerName(draft.customerName ?? "");
+        setCustomerPhone(draft.customerPhone ?? "");
+        setAddress(draft.address ?? "");
+        setProvince(draft.province ?? "");
+        setNote(draft.note ?? "");
+
+        // Restore a pending order created by the previous checkout flow.
+        if (
+          (!savedCart || JSON.parse(savedCart).length === 0) &&
+          draft.orderId &&
+          draft.status === "PENDING" &&
+          Array.isArray(draft.items)
+        ) {
+          const restoredItems: CartItem[] = draft.items.map(
+            (item: {
+              id: string | number;
+              name: string;
+              price: number;
+              quantity: number;
+              size?: string;
+              sugar?: string;
+              ice?: string;
+              topping?: string[];
+            }, index: number) => ({
+              key: `restored-${draft.orderId}-${index}`,
+              product: {
+                id: Number(item.id),
+                name: item.name,
+                price: item.price,
+              },
+              size: item.size,
+              sizeName: item.size,
+              sugar: item.sugar,
+              ice: item.ice,
+              toppings: (item.topping ?? []).map((name) => ({
+                name,
+                price: 0,
+              })),
+              qty: item.quantity,
+              unitPrice: item.price,
+            }),
+          );
+          setItems(restoredItems);
+          localStorage.setItem("brewlite_cart", JSON.stringify(restoredItems));
+        }
+      }
     } catch (error) {
       console.error("Không thể đọc giỏ hàng:", error);
     } finally {
@@ -117,15 +167,29 @@ export default function CartPage() {
     }
   }
 
-  async function handlePlaceOrder(e: SubmitEvent<HTMLFormElement>) {
+  function handlePlaceOrder(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
 
     if (submitting || items.length === 0) return;
     const token = localStorage.getItem("brewlite_accessToken");
+    const savedUser = localStorage.getItem("brewlite_user");
 
     if (!token) {
       setOrderError(
         "Bạn cần đăng nhập trước khi đặt hàng. Hãy đăng nhập bằng nút tài khoản ở đầu trang, sau đó quay lại bấm đặt hàng.",
+      );
+      return;
+    }
+
+    try {
+      const user = savedUser ? JSON.parse(savedUser) : null;
+      const makh = Number(user?.makh);
+      if (!Number.isInteger(makh) || makh < 1) {
+        throw new Error("Mã khách hàng không hợp lệ.");
+      }
+    } catch {
+      setOrderError(
+        "Không xác định được tài khoản khách hàng. Vui lòng đăng xuất và đăng nhập lại.",
       );
       return;
     }
@@ -139,10 +203,11 @@ export default function CartPage() {
       0,
     );
 
-    const payload = {
+    const checkoutDraft = {
       items: items.map((item) => ({
         id: String(item.product.id),
         name: item.product.name,
+        image: item.product.image,
         price: item.unitPrice,
         quantity: item.qty,
         size: item.sizeName ?? item.size ?? "M",
@@ -162,68 +227,23 @@ export default function CartPage() {
     };
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/orders`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        },
+      const previousCheckout = JSON.parse(
+        localStorage.getItem("brewlite_checkout") || "null",
       );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          typeof data.message === "string"
-            ? data.message
-            : Array.isArray(data.message)
-              ? data.message.join(", ")
-              : "Không thể tạo đơn hàng.",
-        );
-      }
-
-      // Hỗ trợ một số kiểu response phổ biến từ NestJS.
-      const orderId =
-        data.orderId ?? data.id ?? data.data?.orderId ?? data.data?.id;
-
-      if (orderId == null) {
-        throw new Error(
-          "API đã phản hồi thành công nhưng chưa có mã đơn hàng. Hãy kiểm tra response của POST /orders.",
-        );
-      }
-
-      // Lưu thông tin đơn vừa tạo để trang thanh toán hiển thị đúng món và tổng tiền.
-      const checkoutData = {
-        orderId: String(orderId),
-        items: payload.items,
-        customerName: payload.customerName,
-        customerPhone: payload.customerPhone,
-        address: payload.address,
-        province: payload.province,
-        note: payload.note ?? "",
-        subtotal: payload.subtotal,
-        deliveryFee: payload.deliveryFee,
-        discount: payload.discount,
-        totalAmount: payload.totalAmount,
-        status: "PENDING",
-      };
-
-      localStorage.setItem("brewlite_checkout", JSON.stringify(checkoutData));
-      localStorage.removeItem("brewlite_cart");
-      setItems([]);
-
-      // Task 6 chỉ tạo đơn. Chuyển sang trang thanh toán; không tuyên bố đã thanh toán.
-      router.push(
-        `/5TrangThanhToan?orderId=${encodeURIComponent(String(orderId))}`,
+      localStorage.setItem(
+        "brewlite_checkout",
+        JSON.stringify({
+          ...checkoutDraft,
+          orderId:
+            previousCheckout?.status === "PENDING"
+              ? previousCheckout.orderId
+              : undefined,
+          status: "DRAFT",
+        }),
       );
-    } catch (error) {
-      setOrderError(
-        error instanceof Error ? error.message : "Có lỗi xảy ra khi đặt hàng.",
-      );
+      router.push("/4TrangThanhToan");
+    } catch {
+      setOrderError("Không thể lưu thông tin thanh toán trên trình duyệt này.");
     } finally {
       setSubmitting(false);
     }
@@ -443,10 +463,16 @@ export default function CartPage() {
 
             <input
               required
-              maxLength={20}
+              minLength={10}
+              maxLength={10}
               type="tel"
+              inputMode="numeric"
+              pattern="[0-9]{10}"
+              title="Số điện thoại phải gồm đúng 10 chữ số."
               value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
+              onChange={(e) =>
+                setCustomerPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
+              }
               placeholder="Số điện thoại"
               className="bl-cart-field"
             />

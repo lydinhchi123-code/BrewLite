@@ -1,9 +1,11 @@
 import {
   IsArray,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -56,6 +58,9 @@ export class CreateOrderDto {
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/^[0-9]{10}$/, {
+    message: 'Số điện thoại phải gồm đúng 10 chữ số.',
+  })
   customerPhone: string;
 
   @IsString()
@@ -84,7 +89,13 @@ export class CreateOrderDto {
   @Min(0)
   totalAmount: number;
 
-  @IsOptional()
+    @IsOptional()
   @IsString()
   note?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  makh?: number;
 }
