@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -57,6 +58,9 @@ export class CreateOrderDto {
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/^[0-9]{10}$/, {
+    message: 'Số điện thoại phải gồm đúng 10 chữ số.',
+  })
   customerPhone: string;
 
   @IsString()
