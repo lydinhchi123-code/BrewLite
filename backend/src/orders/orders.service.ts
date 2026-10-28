@@ -27,7 +27,7 @@ export class OrdersService {
       customerName,
       customerPhone,
       address,
-      province,
+      phuong,
       subtotal,
       deliveryFee = 0,
       discount = 0,
@@ -92,7 +92,7 @@ export class OrdersService {
           hotennguoinhan,
           sodienthoainguoinhan,
           diachigiaohang,
-          tinhthanh,
+          phuong,
           ghichu,
           tamtinh,
           phigiaohang,
@@ -111,7 +111,7 @@ export class OrdersService {
           customerName,
           customerPhone,
           address,
-          province,
+          phuong,
           note ?? null,
           subtotal,
           deliveryFee,
@@ -248,13 +248,41 @@ export class OrdersService {
         orderId: order.madonhanghienthi,
         order,
       };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+    } catch (error: unknown) {
+        // In lỗi gốc để xác định câu SQL nào thất bại.
+        if (error instanceof Error) {
+          const dbError = error as Error & {
+            code?: string;
+            detail?: string;
+            constraint?: string;
+            table?: string;
+            column?: string;
+          };
+
+          console.error("LỖI GỐC KHI TẠO ĐƠN HÀNG:", {
+            message: dbError.message,
+            code: dbError.code,
+            detail: dbError.detail,
+            constraint: dbError.constraint,
+            table: dbError.table,
+            column: dbError.column,
+            stack: dbError.stack,
+          });
+        } else {
+          console.error("LỖI KHÔNG XÁC ĐỊNH KHI TẠO ĐƠN HÀNG:", error);
+        }
+
+        try {
+          await client.query("ROLLBACK");
+        } catch (rollbackError) {
+          console.error("LỖI ROLLBACK ĐƠN HÀNG:", rollbackError);
+        }
+
+        throw error;
+      } finally {
+        client.release();
+      }
     }
-  }
 
   // Lấy danh sách đơn hàng kèm chi tiết
   async findAll() {

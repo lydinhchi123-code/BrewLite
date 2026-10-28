@@ -9,6 +9,11 @@ const menuItems = [
   { label: "Tổng quan", href: "/admin", icon: "▦" },
   { label: "Đơn hàng", href: "/admin/don-hang", icon: "▤" },
   { label: "Tồn kho", href: "/admin/ton-kho", icon: "▣" },
+  {
+    label: "Công thức pha chế",
+    href: "/admin/cong-thuc-pha-che",
+    icon: "♨",
+  },
 ];
 
 export default function AdminLayout({

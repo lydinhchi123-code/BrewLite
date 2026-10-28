@@ -19,7 +19,7 @@
 .confirm-status-refunded { background: #6f7589; border-color: #e9eaf0; }
 .confirm-eyebrow { margin: 0 auto; display: flex; align-items: center; justify-content: center; gap: 9px; color: var(--caramel-dark); font-size: 11px; font-weight: 800; letter-spacing: 2px; }
 .confirm-eyebrow span { height: 1px; width: 31px; background: var(--caramel); }
-.confirm-hero h1 { margin: 18px 0 9px; color: var(--coffee); font: 400 clamp(34px, 4vw, 48px)/1.12 "DM Serif Display", Georgia, serif; letter-spacing: -.9px; }
+.confirm-hero h1 { margin: 18px 0 9px; color: var(--coffee); font-family: "Segoe UI", Arial, sans-serif;font-weight: 700;font-size: 40px; letter-spacing: -.9px; }
 .confirm-subtitle { margin: 0 auto; max-width: 580px; color: var(--muted); font-size: 13px; line-height: 1.7; }
 .confirm-summary-card, .confirm-detail-card { background: white; border: 1px solid var(--line); border-radius: 17px; }
 .confirm-summary-card { margin-top: 30px; min-height: 91px; display: flex; justify-content: center; align-items: center; padding: 17px 25px; }

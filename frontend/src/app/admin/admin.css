@@ -630,4 +630,36 @@
   .admin-search {
     width: 100%;
   }
+
+/* Sửa lỗi khoảng cách chữ tiếng Việt trong trang admin */
+.admin-shell,
+.admin-shell * {
+  font-family: "Segoe UI", Arial, sans-serif;
+  word-spacing: normal;
+}
+}
+/* Đưa khoảng cách ký tự về bình thường */
+.admin-shell h1,
+.admin-shell h2,
+.admin-shell h3,
+.admin-shell p,
+.admin-shell span,
+.admin-shell a,
+.admin-shell button,
+.admin-shell th,
+.admin-shell td,
+.admin-shell input,
+.admin-shell label,
+.admin-shell strong,
+.admin-shell small {
+  letter-spacing: normal;
+  word-spacing: normal;
+}
+
+/* Font cho tiêu đề */
+.admin-topbar h2,
+.admin-page-heading h1,
+.admin-panel-header h3 {
+  font-family: "Segoe UI", Arial, sans-serif;
+  font-weight: 700;
 }

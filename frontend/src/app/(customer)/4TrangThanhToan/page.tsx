@@ -25,7 +25,8 @@ type CheckoutData = {
   customerName: string;
   customerPhone: string;
   address: string;
-  province: string;
+  phuong?: string;
+  ward?: string;
   note?: string;
   subtotal: number;
   deliveryFee: number;
@@ -203,18 +204,34 @@ export default function ThanhToanPage() {
     const formData = new FormData(event.currentTarget);
 
     const customerName = String(formData.get("name") ?? "").trim();
-    const customerPhone = String(formData.get("phone") ?? "").trim();
+    const rawPhone = String(formData.get("phone") ?? "").trim();
+    // Bỏ dấu cách và ký tự phân cách nếu người dùng nhập số có định dạng.
+    const customerPhone = rawPhone.replace(/[\s()-]/g, "");
+
+    if (!/^[0-9]{10}$/.test(customerPhone)) {
+      setSubmitError("Số điện thoại phải gồm đúng 10 chữ số, ví dụ 1234567890.");
+      return;
+    }
     const address = String(formData.get("address") ?? "").trim();
-    const province = String(formData.get("city") ?? "").trim();
     const note = String(formData.get("note") ?? "").trim();
 
-    if (!customerName || !customerPhone || !address || !province) {
+    if (!customerName || !customerPhone || !address) {
       setSubmitError("Vui lòng nhập đầy đủ thông tin nhận hàng.");
       return;
     }
 
     setSubmitting(true);
     setSubmitError("");
+
+    const phuong = checkout.phuong ?? checkout.ward ?? "";
+
+    if (!phuong.trim()) {
+      setSubmitError(
+        "Không tìm thấy phường giao hàng. Vui lòng quay lại giỏ hàng và chọn lại phường."
+      );
+      setSubmitting(false);
+      return;
+    }
 
     const payload = {
       makh: checkout.makh,
@@ -231,13 +248,18 @@ export default function ThanhToanPage() {
       customerName,
       customerPhone,
       address,
-      province,
+      phuong,
       subtotal,
       deliveryFee,
       discount: appliedDiscount,
       totalAmount: total,
       note: note || undefined,
     };
+
+    console.log("CHECKOUT ĐỌC ĐƯỢC:", checkout);
+    console.log("PAYLOAD TẠO ĐƠN HÀNG:", payload);
+
+    console.log("PAYLOAD TẠO ĐƠN HÀNG:", payload);
 
     try {
       const response = await fetch(
@@ -252,15 +274,29 @@ export default function ThanhToanPage() {
         }
       );
 
-      const data = await response.json();
+      const responseText = await response.text();
+
+      let data: any;
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        data = { message: responseText || "Backend trả về phản hồi không hợp lệ." };
+      }
+
+      console.log("Kết quả API tạo đơn hàng:", {
+        status: response.status,
+        data,
+      });
 
       if (!response.ok) {
-        throw new Error(
-          typeof data.message === "string"
+        const message = Array.isArray(data.message)
+          ? data.message.join(", ")
+          : typeof data.message === "string"
             ? data.message
-            : Array.isArray(data.message)
-              ? data.message.join(", ")
-              : "Không thể tạo đơn hàng."
+            : JSON.stringify(data);
+
+        throw new Error(
+          `Lỗi ${response.status}: ${message || "Không thể tạo đơn hàng"}`
         );
       }
 
@@ -281,10 +317,10 @@ export default function ThanhToanPage() {
       const updatedCheckout: CheckoutData = {
         ...checkout,
         orderId: String(realOrderId),
+        phuong: checkout.phuong ?? checkout.ward ?? "",
         customerName,
         customerPhone,
         address,
-        province,
         note,
         paymentMethod,
         subtotal,
@@ -495,8 +531,10 @@ export default function ThanhToanPage() {
                     name="phone"
                     type="tel"
                     defaultValue={checkout.customerPhone}
-                    placeholder="090 123 4567"
-                    pattern="[0-9 +()-]{9,}"
+                    placeholder="0901234567"
+                    pattern="[0-9]{10}"
+                    maxLength={10}
+                    inputMode="numeric"
                     required
                   />
                 </label>
@@ -507,28 +545,13 @@ export default function ThanhToanPage() {
                     name="address"
                     type="text"
                     defaultValue={checkout.address}
-                    placeholder="Số nhà, tên đường"
+                    placeholder="Số nhà, tên đường, phường"
                     required
                   />
                 </label>
 
-                <label>
-                  Tỉnh / Thành phố
-                  <input
-                    name="city"
-                    type="text"
-                    defaultValue={checkout.province}
-                    placeholder="Tỉnh / thành phố"
-                    required
-                  />
-                </label>
-
-                <label>
+                <label  className="field-wide">
                   Ghi chú đơn hàng{" "}
-                  <span className="optional">
-                    (tuỳ chọn)
-                  </span>
-
                   <input
                     name="note"
                     type="text"

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -56,7 +57,8 @@ type PendingCheckout = {
   customerName: string;
   customerPhone: string;
   address: string;
-  province: string;
+  phuong: string;
+  addressDetail: string;
   note?: string;
   subtotal: number;
   deliveryFee: number;
@@ -65,7 +67,61 @@ type PendingCheckout = {
   status: "PENDING";
 };
 
-const money = (value: number) => value.toLocaleString("vi-VN") + " đ";
+const money = (value: number | null | undefined) =>
+  (Number(value) || 0).toLocaleString("vi-VN") + " đ";
+
+const HO_CHI_MINH_WARDS = [
+  "Phường Sài Gòn",
+  "Phường Tân Định",
+  "Phường Bến Thành",
+  "Phường Cầu Ông Lãnh",
+  "Phường Bàn Cờ",
+  "Phường Xuân Hòa",
+  "Phường Nhiêu Lộc",
+  "Phường Xóm Chiếu",
+  "Phường Khánh Hội",
+  "Phường Vĩnh Hội",
+  "Phường Tân Hưng",
+  "Phường Tân Mỹ",
+  "Phường Tân Thuận",
+  "Phường Chợ Lớn",
+  "Phường Bình Tây",
+  "Phường Bình Tiên",
+  "Phường Bình Phú",
+  "Phường Phú Lâm",
+  "Phường An Đông",
+  "Phường Chợ Quán",
+  "Phường An Lạc",
+  "Phường Bình Trị Đông",
+  "Phường Bình Hưng Hòa",
+  "Phường Tân Tạo",
+  "Phường Gia Định",
+  "Phường Bình Thạnh",
+  "Phường Thạnh Mỹ Tây",
+  "Phường Bình Lợi Trung",
+  "Phường Hiệp Bình",
+  "Phường Thủ Đức",
+  "Phường Tam Bình",
+  "Phường Linh Xuân",
+  "Phường Linh Đông",
+  "Phường Long Bình",
+  "Phường Tăng Nhơn Phú",
+  "Phường Phước Long",
+  "Phường Long Trường",
+  "Phường Phú Thọ Hòa",
+  "Phường Tân Sơn Nhì",
+  "Phường Tân Sơn",
+  "Phường Bảy Hiền",
+  "Phường Tân Bình",
+  "Phường Tân Sơn Nhất",
+  "Phường Đức Nhuận",
+  "Phường Cầu Kiệu",
+  "Phường Phú Nhuận",
+  "Phường Gò Vấp",
+  "Phường An Hội Đông",
+  "Phường An Hội Tây",
+  "Phường Thông Tây Hội",
+];
 
 function isCake(product: Product) {
   return (
@@ -77,12 +133,13 @@ function isCake(product: Product) {
 
 export default function CartPage() {
   const router = useRouter();
+
   const [items, setItems] = useState<CartItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [province, setProvince] = useState("");
+  const [ward, setWard] = useState("");
   const [note, setNote] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
@@ -95,7 +152,6 @@ export default function CartPage() {
   const [editIce, setEditIce] = useState("100%");
   const [editToppings, setEditToppings] = useState<string[]>([]);
 
-  
   useEffect(() => {
     function loadCart() {
       try {
@@ -119,8 +175,10 @@ export default function CartPage() {
           ) {
             setCustomerName(checkout.customerName ?? "");
             setCustomerPhone(checkout.customerPhone ?? "");
-            setAddress(checkout.address ?? "");
-            setProvince(checkout.province ?? "");
+            setAddress(
+              checkout.addressDetail ?? checkout.address ?? ""
+            );
+            setWard(checkout.phuong ?? checkout.ward ?? "");
             setNote(checkout.note ?? "");
           }
         }
@@ -132,14 +190,10 @@ export default function CartPage() {
       }
     }
 
-    // Đọc giỏ hàng khi mở trang.
     loadCart();
 
-    // Đọc lại khi quay về tab/trang sau khi thanh toán.
     window.addEventListener("focus", loadCart);
     window.addEventListener("pageshow", loadCart);
-
-    // Nhận thông báo khi giỏ hàng được cập nhật.
     window.addEventListener("brewlite-cart-updated", loadCart);
 
     return () => {
@@ -149,35 +203,12 @@ export default function CartPage() {
     };
   }, []);
 
-  useEffect(() => {
-    console.log("STATE ITEMS HIỆN TẠI:", items.length);
-  }, [items]);
-
-
-  useEffect(() => {
-    function handleCartUpdated() {
-      setItems([]);
-      localStorage.removeItem("brewlite_cart");
-    }
-
-    window.addEventListener(
-      "brewlite-cart-updated",
-      handleCartUpdated
-    );
-
-    return () => {
-      window.removeEventListener(
-        "brewlite-cart-updated",
-        handleCartUpdated
-      );
-    };
-  }, []);
-
   function saveCart(newItems: CartItem[]) {
     setItems(newItems);
 
     try {
       localStorage.setItem("brewlite_cart", JSON.stringify(newItems));
+      window.dispatchEvent(new Event("brewlite-cart-updated"));
     } catch (error) {
       console.error("Không thể lưu giỏ hàng:", error);
       alert("Không thể lưu giỏ hàng. Bạn hãy thử lại nhé!");
@@ -187,7 +218,11 @@ export default function CartPage() {
   function updateQuantity(key: string, qty: number) {
     if (qty < 1) return;
 
-    saveCart(items.map((item) => (item.key === key ? { ...item, qty } : item)));
+    saveCart(
+      items.map((item) =>
+        item.key === key ? { ...item, qty } : item
+      )
+    );
   }
 
   function removeItem(key: string) {
@@ -229,6 +264,16 @@ export default function CartPage() {
       return;
     }
 
+    if (!ward) {
+      setOrderError("Vui lòng chọn phường hoặc xã giao hàng.");
+      return;
+    }
+
+    if (!address.trim()) {
+      setOrderError("Vui lòng nhập số nhà và tên đường.");
+      return;
+    }
+
     setOrderError("");
     setOrderMessage("");
 
@@ -237,8 +282,10 @@ export default function CartPage() {
       0
     );
 
+    const fullAddress =
+      `${address.trim()}, ${ward}, TP. Hồ Chí Minh`;
+    
     const checkoutData: PendingCheckout = {
-      // Đây chỉ là mã tạm, KHÔNG phải mã đơn trong database.
       orderId: `TEMP-${Date.now()}`,
       makh,
       items: items.map((item) => ({
@@ -253,8 +300,9 @@ export default function CartPage() {
       })),
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
-      address: address.trim(),
-      province: province.trim(),
+      address: fullAddress,
+      phuong: ward,
+      addressDetail: address.trim(),
       note: note.trim() || undefined,
       subtotal,
       deliveryFee: 0,
@@ -264,14 +312,15 @@ export default function CartPage() {
     };
 
     try {
-      // Chỉ lưu dữ liệu tạm, tuyệt đối chưa gọi POST /orders.
       localStorage.setItem(
         "brewlite_checkout",
         JSON.stringify(checkoutData)
       );
 
       router.push(
-        `/4TrangThanhToan?orderId=${encodeURIComponent(checkoutData.orderId)}`
+        `/4TrangThanhToan?orderId=${encodeURIComponent(
+          checkoutData.orderId
+        )}`
       );
     } catch (error) {
       console.error("Không thể lưu thông tin thanh toán:", error);
@@ -299,16 +348,27 @@ export default function CartPage() {
     setEditingKey(null);
   }
 
-  const editingItem = items.find((item) => item.key === editingKey);
+  const editingItem = items.find(
+    (item) => item.key === editingKey
+  );
   const editingProduct = editingItem?.product;
 
-  const editingCake = editingProduct ? isCake(editingProduct) : false;
+  const editingCake = editingProduct
+    ? isCake(editingProduct)
+    : false;
+
   const editingSizes = editingProduct?.sizes ?? [];
   const editingToppings =
-    editingProduct && !editingCake ? (editingProduct.toppings ?? []) : [];
+    editingProduct && !editingCake
+      ? editingProduct.toppings ?? []
+      : [];
 
-  const chosenSize = editingSizes.find((s) => s.code === editSize);
-  const editProductPrice = chosenSize?.price ?? editingProduct?.price ?? 0;
+  const chosenSize = editingSizes.find(
+    (s) => s.code === editSize
+  );
+
+  const editProductPrice =
+    chosenSize?.price ?? editingProduct?.price ?? 0;
 
   const editToppingPrice = editingToppings
     .filter((t) => editToppings.includes(t.name))
@@ -320,7 +380,7 @@ export default function CartPage() {
     if (!editingItem || !editingProduct) return;
 
     const selectedToppings = editingToppings.filter((t) =>
-      editToppings.includes(t.name),
+      editToppings.includes(t.name)
     );
 
     const newKey = `${editingProduct.id}-${editSize}-${editSugar}-${editIce}-${editToppings
@@ -343,11 +403,12 @@ export default function CartPage() {
       unitPrice: editUnitPrice,
     };
 
-    // Bỏ món cũ ra trước, sau đó gộp nếu cấu hình mới trùng món khác.
-    const remainingItems = items.filter((item) => item.key !== editingItem.key);
+    const remainingItems = items.filter(
+      (item) => item.key !== editingItem.key
+    );
 
     const duplicateIndex = remainingItems.findIndex(
-      (item) => item.key === newKey,
+      (item) => item.key === newKey
     );
 
     if (duplicateIndex >= 0) {
@@ -363,21 +424,31 @@ export default function CartPage() {
     closeEdit();
   }
 
+  const totalItems = items.reduce(
+    (sum, item) => sum + item.qty,
+    0
+  );
+
   const totalPrice = items.reduce(
     (sum, item) => sum + item.unitPrice * item.qty,
-    0,
+    0
   );
 
   if (!loaded) {
-    return <div className="bl-cart-loading">Đang tải giỏ hàng...</div>;
+    return (
+      <div className="bl-cart-loading">
+        Đang tải giỏ hàng...
+      </div>
+    );
   }
 
   if (items.length === 0) {
-    console.log("ĐANG KIỂM TRA NHÁNH GIỎ HÀNG TRỐNG");
     return (
       <main className="bl-menu-page">
         <div className="bl-cart-empty">
-          <h2 className="bl-cart-empty-title">Giỏ hàng của bạn đang trống</h2>
+          <h2 className="bl-cart-empty-title">
+            Giỏ hàng của bạn đang trống
+          </h2>
 
           <p className="bl-cart-muted">
             Hãy quay lại trang Menu để chọn món ngon nhé!
@@ -391,13 +462,15 @@ export default function CartPage() {
     );
   }
 
-  console.log("LOADED:", loaded);
-  console.log("ITEMS TRƯỚC KHI HIỂN THỊ:", items);
-
   return (
     <main className="bl-menu-page">
       <div className="bl-cart-container">
-        <h1 className="bl-cart-title">Giỏ hàng của bạn</h1>
+        <h1 className="bl-cart-title">
+          Giỏ hàng của bạn
+          <span className="bl-cart-item-count">
+            {totalItems} món
+          </span>
+        </h1>
 
         <div className="bl-cart-items">
           {items.map((item) => (
@@ -412,41 +485,60 @@ export default function CartPage() {
                 )}
 
                 <div className="bl-cart-product-info">
-                  <h3 className="bl-cart-product-name">{item.product.name}</h3>
+                  <h3 className="bl-cart-product-name">
+                    {item.product.name}
+                  </h3>
 
                   <p className="bl-cart-detail">
                     Size: {item.sizeName ?? item.size ?? "M"}
                   </p>
 
                   {item.sugar && (
-                    <p className="bl-cart-detail">Đường: {item.sugar}</p>
-                  )}
-
-                  {item.ice && <p className="bl-cart-detail">Đá: {item.ice}</p>}
-
-                  {item.toppings && item.toppings.length > 0 && (
                     <p className="bl-cart-detail">
-                      Topping: {item.toppings.map((t) => t.name).join(", ")}
+                      Đường: {item.sugar}
                     </p>
                   )}
 
-                  <p className="bl-cart-unit-price">{money(item.unitPrice)}</p>
+                  {item.ice && (
+                    <p className="bl-cart-detail">
+                      Đá: {item.ice}
+                    </p>
+                  )}
+
+                  {item.toppings && item.toppings.length > 0 && (
+                    <p className="bl-cart-detail">
+                      Topping:{" "}
+                      {item.toppings.map((t) => t.name).join(", ")}
+                    </p>
+                  )}
+
+                  <p className="bl-cart-unit-price">
+                    {money(item.unitPrice)}
+                  </p>
                 </div>
               </div>
 
               <div className="bl-cart-quantity">
                 <button
-                  onClick={() => updateQuantity(item.key, item.qty - 1)}
+                  type="button"
+                  onClick={() =>
+                    updateQuantity(item.key, item.qty - 1)
+                  }
                   disabled={item.qty <= 1}
                   className="bl-cart-quantity-button"
                 >
                   -
                 </button>
 
-                <span className="bl-cart-quantity-value">{item.qty}</span>
+                <span className="bl-cart-quantity-value">
+                  {item.qty}
+                </span>
 
                 <button
-                  onClick={() => updateQuantity(item.key, item.qty + 1)}
+                  type="button"
+                  onClick={() =>
+                    updateQuantity(item.key, item.qty + 1)
+                  }
                   className="bl-cart-quantity-button"
                 >
                   +
@@ -478,8 +570,13 @@ export default function CartPage() {
           ))}
         </div>
 
-        <form onSubmit={handlePlaceOrder} className="bl-cart-form">
-          <h2 className="bl-cart-section-title">Thông tin nhận hàng</h2>
+        <form
+          onSubmit={handlePlaceOrder}
+          className="bl-cart-form"
+        >
+          <h2 className="bl-cart-section-title">
+            Thông tin nhận hàng
+          </h2>
 
           <div className="bl-cart-form-grid">
             <input
@@ -502,22 +599,44 @@ export default function CartPage() {
             />
 
             <input
-              required
-              maxLength={100}
-              value={province}
-              onChange={(e) => setProvince(e.target.value)}
-              placeholder="Tỉnh / thành phố"
-              className="bl-cart-field"
+              value="TP. Hồ Chí Minh"
+              readOnly
+              aria-label="Tỉnh hoặc thành phố"
+              className="bl-cart-field bl-cart-field-readonly"
             />
+
+            <select
+              required
+              value={ward}
+              onChange={(e) => setWard(e.target.value)}
+              className="bl-cart-field"
+              aria-label="Phường hoặc xã"
+            >
+              <option value="">-- Chọn phường / xã --</option>
+              {HO_CHI_MINH_WARDS.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
 
             <input
               required
-              maxLength={500}
+              maxLength={300}
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="Địa chỉ giao hàng"
+              placeholder="Số nhà, tên đường, căn hộ..."
               className="bl-cart-field"
             />
+          </div>
+
+          <div className="bl-cart-address-preview">
+            <strong>Địa chỉ giao hàng:</strong>
+            <p>
+              {address.trim() || "Số nhà, tên đường"}
+              {ward ? `, ${ward}` : ", Phường / xã"}
+              , TP. Hồ Chí Minh
+            </p>
           </div>
 
           <textarea
@@ -532,7 +651,9 @@ export default function CartPage() {
           <div className="bl-cart-summary">
             <div className="bl-cart-total">
               Tổng thanh toán:{" "}
-              <span className="bl-cart-total-amount">{money(totalPrice)}</span>
+              <span className="bl-cart-total-amount">
+                {money(totalPrice)}
+              </span>
             </div>
 
             {orderMessage && (
@@ -552,7 +673,9 @@ export default function CartPage() {
               disabled={submitting || items.length === 0}
               className="bl-cart-submit"
             >
-              {submitting ? "Đang xử lý..." : "Tiếp tục thanh toán"}
+              {submitting
+                ? "Đang xử lý..."
+                : "Tiếp tục thanh toán"}
             </button>
           </div>
         </form>
@@ -582,30 +705,43 @@ export default function CartPage() {
 
             <div className="bl-menu-modal-image">
               {editingProduct.image ? (
-                <img src={editingProduct.image} alt={editingProduct.name} />
+                <img
+                  src={editingProduct.image}
+                  alt={editingProduct.name}
+                />
               ) : (
                 <span className="bl-menu-no-image">☕</span>
               )}
             </div>
 
             <div className="bl-menu-modal-content">
-              <span className="bl-menu-category">Chỉnh sửa món trong giỏ</span>
+              <span className="bl-menu-category">
+                Chỉnh sửa món trong giỏ
+              </span>
 
-              <h2 id="bl-cart-edit-title">{editingProduct.name}</h2>
+              <h2 id="bl-cart-edit-title">
+                {editingProduct.name}
+              </h2>
 
-              <p>Điều chỉnh lựa chọn của bạn rồi lưu thay đổi nhé.</p>
+              <p>
+                Điều chỉnh lựa chọn của bạn rồi lưu thay đổi nhé.
+              </p>
 
               <div className="bl-menu-modal-options">
                 {editingSizes.length > 0 && (
                   <div className="bl-menu-option">
-                    <div className="bl-menu-option-title">Chọn size</div>
+                    <div className="bl-menu-option-title">
+                      Chọn size
+                    </div>
 
                     <div className="bl-menu-choice">
                       {editingSizes.map((s) => (
                         <button
                           key={s.code}
                           type="button"
-                          className={editSize === s.code ? "selected" : ""}
+                          className={
+                            editSize === s.code ? "selected" : ""
+                          }
                           onClick={() => setEditSize(s.code)}
                         >
                           {s.name}
@@ -619,14 +755,18 @@ export default function CartPage() {
                 {!editingCake && (
                   <>
                     <div className="bl-menu-option">
-                      <div className="bl-menu-option-title">Đường</div>
+                      <div className="bl-menu-option-title">
+                        Đường
+                      </div>
 
                       <div className="bl-menu-choice">
                         {["0%", "50%", "100%"].map((s) => (
                           <button
                             key={s}
                             type="button"
-                            className={editSugar === s ? "selected" : ""}
+                            className={
+                              editSugar === s ? "selected" : ""
+                            }
                             onClick={() => setEditSugar(s)}
                           >
                             {s}
@@ -636,14 +776,18 @@ export default function CartPage() {
                     </div>
 
                     <div className="bl-menu-option">
-                      <div className="bl-menu-option-title">Đá</div>
+                      <div className="bl-menu-option-title">
+                        Đá
+                      </div>
 
                       <div className="bl-menu-choice">
                         {["Không đá", "50%", "100%"].map((s) => (
                           <button
                             key={s}
                             type="button"
-                            className={editIce === s ? "selected" : ""}
+                            className={
+                              editIce === s ? "selected" : ""
+                            }
                             onClick={() => setEditIce(s)}
                           >
                             {s}
@@ -654,7 +798,9 @@ export default function CartPage() {
 
                     {editingToppings.length > 0 && (
                       <div className="bl-menu-option">
-                        <div className="bl-menu-option-title">Topping</div>
+                        <div className="bl-menu-option-title">
+                          Topping
+                        </div>
 
                         <div className="bl-menu-choice">
                           {editingToppings.map((t) => (
@@ -662,19 +808,25 @@ export default function CartPage() {
                               key={t.id ?? t.name}
                               type="button"
                               className={
-                                editToppings.includes(t.name) ? "selected" : ""
+                                editToppings.includes(t.name)
+                                  ? "selected"
+                                  : ""
                               }
                               onClick={() =>
                                 setEditToppings((old) =>
                                   old.includes(t.name)
-                                    ? old.filter((x) => x !== t.name)
-                                    : [...old, t.name],
+                                    ? old.filter(
+                                        (x) => x !== t.name
+                                      )
+                                    : [...old, t.name]
                                 )
                               }
                             >
                               {t.name}
                               <small>{money(t.price)}</small>
-                              {editToppings.includes(t.name) ? " ✓" : " ＋"}
+                              {editToppings.includes(t.name)
+                                ? " ✓"
+                                : " ＋"}
                             </button>
                           ))}
                         </div>
@@ -691,14 +843,17 @@ export default function CartPage() {
                     <strong>{money(editUnitPrice)}</strong>
                   </div>
 
-                  <button type="button" onClick={saveEdit}>
+                  <button
+                    type="button"
+                    onClick={saveEdit}
+                  >
                     Lưu thay đổi <span>✓</span>
                   </button>
                 </div>
 
                 <small className="bl-menu-cart-hint">
-                  Số lượng hiện tại: {editingItem.qty}. Tổng tiền sẽ được cập
-                  nhật sau khi lưu.
+                  Số lượng hiện tại: {editingItem.qty}. Tổng tiền sẽ
+                  được cập nhật sau khi lưu.
                 </small>
               </div>
             </div>

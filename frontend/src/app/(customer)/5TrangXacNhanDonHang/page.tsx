@@ -422,7 +422,7 @@ export default function XacNhanDonHangPage() {
 
         <section className="confirm-detail-card" aria-labelledby="confirm-items-title">
           <div className="confirm-card-heading">
-            <h2 id="confirm-items-title">Chi tiết đơn hàng</h2>
+            <h2 id="confirm-items-title">Thông tin đơn hàng</h2>
             <span>{paymentMethodLabel(order.paymentMethod)}</span>
           </div>
           <div className="confirm-items">

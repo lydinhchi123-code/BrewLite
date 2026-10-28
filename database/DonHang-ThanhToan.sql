@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS donhang (
     hotennguoinhan VARCHAR(100) NOT NULL,
     sodienthoainguoinhan VARCHAR(20) NOT NULL,
     diachigiaohang TEXT NOT NULL,
-    tinhthanh VARCHAR(100) NOT NULL,
+    phuong VARCHAR(100) NOT NULL,
     ghichu TEXT,
 
     -- Thông tin tiền

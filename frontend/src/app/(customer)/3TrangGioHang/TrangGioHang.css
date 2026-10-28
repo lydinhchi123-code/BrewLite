@@ -453,3 +453,67 @@
     padding: 20px;
   }
 }
+
+/* Số lượng món cạnh tiêu đề giỏ hàng */
+.bl-cart-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.bl-cart-item-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #f4ece5;
+  color: #76513a;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* Tỉnh/thành phố cố định */
+.bl-cart-field-readonly {
+  background: #f7f3ef;
+  color: #76513a;
+  cursor: not-allowed;
+}
+
+/* Danh sách chọn phường/xã */
+select.bl-cart-field {
+  min-height: 48px;
+  cursor: pointer;
+}
+
+/* Xem trước địa chỉ giao hàng */
+.bl-cart-address-preview {
+  padding: 14px 16px;
+  border: 1px solid #eadfd5;
+  border-radius: 8px;
+  background: #fffaf5;
+  line-height: 1.7;
+}
+
+.bl-cart-address-preview strong {
+  color: #4d3024;
+}
+
+.bl-cart-address-preview p {
+  margin: 5px 0 0;
+  color: #6b625c;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+  .bl-cart-title {
+    gap: 8px;
+  }
+
+  .bl-cart-item-count {
+    font-size: 13px;
+  }
+}
+

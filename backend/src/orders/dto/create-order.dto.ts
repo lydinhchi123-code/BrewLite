@@ -69,7 +69,7 @@ export class CreateOrderDto {
 
   @IsString()
   @IsNotEmpty()
-  province: string;
+  phuong: string;
 
   @IsNumber()
   @Min(0)
