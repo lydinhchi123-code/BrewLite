@@ -9,6 +9,7 @@ import {
   UseGuards,
   UsePipes,
   ValidationPipe,
+  Req,
 } from '@nestjs/common';
 
 import { OrdersService } from './orders.service';
@@ -30,8 +31,8 @@ export class OrdersController {
       transform: true,
     }),
   )
-  create(@Body() createOrderDto: CreateOrderDto) {
-    return this.ordersService.create(createOrderDto);
+  create(@Body() createOrderDto: CreateOrderDto, @Req() req: any) {
+    return this.ordersService.create(createOrderDto, req.user?.sub);
   }
 
   @Get()
@@ -46,8 +47,8 @@ export class OrdersController {
   
   @Get(':orderId')
   @UseGuards(JwtAuthGuard)
-  findOne(@Param('orderId') orderId: string) {
-    return this.ordersService.findOne(orderId);
+  findOne(@Param('orderId') orderId: string, @Req() req: any) {
+    return this.ordersService.findOne(orderId, req.user?.sub);
   }
 
   @Get('khach-hang/:makh')

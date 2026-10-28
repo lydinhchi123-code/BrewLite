@@ -46,6 +46,7 @@ type PendingCheckout = {
   items: {
     id: string;
     name: string;
+    image?: string;
     price: number;
     quantity: number;
     size?: string;
@@ -244,6 +245,7 @@ export default function CartPage() {
       items: items.map((item) => ({
         id: String(item.product.id),
         name: item.product.name,
+        image: item.product.image ?? undefined,
         price: item.unitPrice,
         quantity: item.qty,
         size: item.sizeName ?? item.size ?? "M",

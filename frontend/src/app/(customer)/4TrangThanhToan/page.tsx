@@ -10,6 +10,7 @@ type PaymentMethod = "cod" | "banking" | "momo";
 type CheckoutItem = {
   id: string | number;
   name: string;
+  image?: string;
   price: number;
   quantity: number;
   size?: string;
@@ -221,6 +222,7 @@ export default function ThanhToanPage() {
       items: checkout.items.map((item) => ({
         id: String(item.id),
         name: item.name,
+        image_url: item.image ?? null,
         price: item.price,
         quantity: item.quantity,
         size: item.size ?? "M",
@@ -759,11 +761,12 @@ export default function ThanhToanPage() {
                     className="summary-item"
                     key={`${item.id}-${index}`}
                   >
-                    <div
-                      className="summary-item-image"
-                      aria-hidden="true"
-                    >
-                      ☕
+                    <div className="summary-item-image" aria-hidden="true">
+                      {item.image ? (
+                        <img src={item.image} alt={item.name} />
+                      ) : (
+                        "☕"
+                      )}
                     </div>
 
                     <div className="summary-item-copy">

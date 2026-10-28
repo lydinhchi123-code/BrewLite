@@ -58,6 +58,7 @@
 .summary-items { display: grid; gap: 17px; padding-bottom: 23px; border-bottom: 1px solid var(--line); }
 .summary-item { display: flex; align-items: center; gap: 11px; }
 .summary-item-image { display: grid; width: 49px; height: 49px; flex: 0 0 49px; place-items: center; border-radius: 10px; color: var(--coffee); background: var(--beige); font-size: 21px; }
+.summary-item-image img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .summary-item-copy { display: grid; flex: 1; gap: 3px; min-width: 0; }
 .summary-item-copy strong { overflow: hidden; color: var(--coffee); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .summary-item-copy small, .summary-item-copy span { color: var(--muted); font-size: 10px; }

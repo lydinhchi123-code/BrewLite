@@ -1,18 +1,15 @@
-
 import {
   Inject,
   Injectable,
   BadRequestException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.module';
 import { CreateOrderDto } from './dto/create-order.dto';
 
-import {
-  OrderStatus,
-  assertTransition,
-} from './order-state-machine';
+import { OrderStatus, assertTransition } from './order-state-machine';
 
 @Injectable()
 export class OrdersService {
@@ -21,7 +18,10 @@ export class OrdersService {
     private readonly pool: Pool,
   ) {}
 
-  async create(createOrderDto: CreateOrderDto) {
+  async create(
+    createOrderDto: CreateOrderDto,
+    authenticatedMakh?: string | number,
+  ) {
     const {
       items,
       customerName,
@@ -33,35 +33,25 @@ export class OrdersService {
       discount = 0,
       totalAmount,
       note,
-      makh,
     } = createOrderDto;
 
-    if (
-      makh == null ||
-      !Number.isInteger(Number(makh)) ||
-      Number(makh) < 1
-    ) {
-      throw new BadRequestException(
+    const makh = authenticatedMakh;
+
+    if (makh == null || !Number.isInteger(Number(makh)) || Number(makh) < 1) {
+      throw new UnauthorizedException(
         'Không xác định được khách hàng. Vui lòng đăng nhập lại.',
       );
     }
 
     if (!items || items.length === 0) {
-      throw new BadRequestException(
-        'Đơn hàng phải có ít nhất một món.',
-      );
+      throw new BadRequestException('Đơn hàng phải có ít nhất một món.');
     }
 
     // Kiểm tra tổng tiền
     const expectedTotal = subtotal + deliveryFee - discount;
 
-    if (
-      expectedTotal < 0 ||
-      Math.abs(expectedTotal - totalAmount) > 0.001
-    ) {
-      throw new BadRequestException(
-        'Tổng tiền không hợp lệ.',
-      );
+    if (expectedTotal < 0 || Math.abs(expectedTotal - totalAmount) > 0.001) {
+      throw new BadRequestException('Tổng tiền không hợp lệ.');
     }
 
     // Kiểm tra tạm tính
@@ -107,7 +97,7 @@ export class OrdersService {
         `,
         [
           displayOrderId,
-          Number(makh),
+          String(makh),
           customerName,
           customerPhone,
           address,
@@ -129,9 +119,7 @@ export class OrdersService {
         const productId = Number(item.id);
 
         if (!Number.isSafeInteger(productId) || productId <= 0) {
-          throw new BadRequestException(
-            `ID sản phẩm không hợp lệ: ${item.id}`,
-          );
+          throw new BadRequestException(`ID sản phẩm không hợp lệ: ${item.id}`);
         }
 
         // Khóa sản phẩm để các đơn đặt đồng thời không thể
@@ -194,9 +182,7 @@ export class OrdersService {
           hasStockDeduction = true;
         }
 
-        const topping = item.topping?.length
-          ? item.topping.join(', ')
-          : null;
+        const topping = item.topping?.length ? item.topping.join(', ') : null;
 
         await client.query(
           `
@@ -219,7 +205,7 @@ export class OrdersService {
             order.madonhang,
             productId,
             product.name,
-            null,
+            item.image_url,
             item.size ?? null,
             item.sugar ?? null,
             item.ice ?? null,
@@ -325,9 +311,17 @@ export class OrdersService {
     return result.rows;
   }
 
-  async findOne(orderId: string) {
+  async findOne(orderId: string, authenticatedMakh?: string | number) {
+    if (authenticatedMakh == null || !/^\d+$/.test(String(authenticatedMakh))) {
+      throw new UnauthorizedException(
+        'Không xác định được khách hàng đăng nhập.',
+      );
+    }
+    if (!/^ORD-[A-Za-z0-9-]+$/.test(orderId)) {
+      throw new BadRequestException('Mã đơn hàng không hợp lệ.');
+    }
     const result = await this.pool.query(
-    `
+      `
     SELECT
       d.madonhanghienthi AS "orderId",
       d.trangthai AS "orderStatus",
@@ -338,7 +332,14 @@ export class OrdersService {
       ) AS "paymentStatus",
 
       t.phuongthuc AS "paymentMethod",
+      t.ngaythanhtoan AS "paidAt",
       d.ngaydat AS "createdAt",
+
+      d.hotennguoinhan AS "recipientName",
+      d.sodienthoainguoinhan AS "recipientPhone",
+      d.diachigiaohang AS "deliveryAddress",
+      d.tinhthanh AS province,
+      d.ghichu AS note,
 
       d.tamtinh AS subtotal,
       d.phigiaohang AS "deliveryFee",
@@ -382,26 +383,24 @@ export class OrdersService {
     LEFT JOIN chitietdonhang c
       ON c.madonhang = d.madonhang
 
-    WHERE d.madonhanghienthi = $1
+      WHERE d.madonhanghienthi = $1
+        AND d.makh = $2::bigint
 
     GROUP BY
       d.madonhang,
       t.mathanhtoan
     `,
-    [orderId],
-  );
+      [orderId, String(authenticatedMakh)],
+    );
 
-  if (result.rows.length === 0) {
-    throw new NotFoundException('Không tìm thấy đơn hàng');
+    if (result.rows.length === 0) {
+      throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+
+    return result.rows[0];
   }
 
-  return result.rows[0];
-  }
-
-  async updateStatus(
-    madonhang: number,
-    nextStatus: OrderStatus,
-  ) {
+  async updateStatus(madonhang: number, nextStatus: OrderStatus) {
     const client = await this.pool.connect();
 
     try {
@@ -420,9 +419,7 @@ export class OrdersService {
       );
 
       if (result.rowCount === 0) {
-        throw new NotFoundException(
-          'Không tìm thấy đơn hàng.',
-        );
+        throw new NotFoundException('Không tìm thấy đơn hàng.');
       }
 
       const order = result.rows[0];
@@ -513,5 +510,3 @@ export class OrdersService {
     };
   }
 }
-
-
