@@ -226,3 +226,118 @@
   margin: 12px 0;
   font-size: 14px;
 }
+
+/* Đồng bộ toàn bộ font chữ với trang Admin BrewLite */
+.payment-page,
+.payment-page *,
+.payment-success,
+.payment-success * {
+  font-family: "Segoe UI", Arial, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tiêu đề trang */
+.payment-heading h1,
+.payment-success h1 {
+  font-size: 28px;
+  line-height: 1.4;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #16345b;
+}
+
+/* Tiêu đề các khung thông tin */
+.payment-card h2,
+.summary-heading h2 {
+  font-size: 20px;
+  line-height: 1.5;
+  font-weight: 700;
+  color: #16345b;
+}
+
+/* Tiêu đề và nội dung phụ */
+.payment-eyebrow {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.payment-heading p,
+.payment-card-heading p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.payment-fields label,
+.discount-form label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Ô nhập liệu */
+.payment-fields input,
+.payment-fields select,
+.discount-form input {
+  font-size: 14px;
+}
+
+/* Phương thức thanh toán và sản phẩm */
+.method-copy strong,
+.summary-item-copy strong,
+.summary-item > strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.method-copy small,
+.summary-item-copy small,
+.summary-item-copy span {
+  font-size: 12px;
+}
+
+/* Tổng tiền */
+.summary-totals > div {
+  font-size: 13px;
+}
+
+.summary-totals .summary-total strong {
+  font-size: 20px;
+  font-weight: 700;
+  color: #16345b;
+}
+
+/* Nút bấm */
+.payment-submit,
+.payment-button,
+.discount-form button {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Khu vực thanh toán mô phỏng */
+.mock-payment-heading h3 {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.mock-payment-info .mock-payment-amount {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.payment-error {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+@media (max-width: 520px) {
+  .payment-heading h1,
+  .payment-success h1 {
+    font-size: 24px;
+  }
+
+  .payment-card h2,
+  .summary-heading h2 {
+    font-size: 17px;
+  }
+}

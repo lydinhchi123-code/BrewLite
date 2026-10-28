@@ -1,3 +1,4 @@
+
 import {
   Injectable,
   OnModuleDestroy,
@@ -105,12 +106,6 @@ export class MenuService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Lấy danh sách sản phẩm, size và topping.
-   *
-   * Quy tắc:
-   * - Tất cả sản phẩm không thuộc danh mục Bánh đều có toàn bộ
-   *   topping đang hoạt động trong bảng menu_toppings.
-   * - Sản phẩm thuộc danh mục Bánh luôn có toppings = [].
-   * - Size lấy theo từng sản phẩm từ menu_product_sizes.
    */
   async getProducts() {
     try {
@@ -130,7 +125,6 @@ export class MenuService implements OnModuleInit, OnModuleDestroy {
           c.name AS category_name,
           c.slug AS category_slug,
 
-          -- Lấy size của từng sản phẩm
           COALESCE(
             (
               SELECT json_agg(
@@ -149,8 +143,6 @@ export class MenuService implements OnModuleInit, OnModuleDestroy {
             '[]'::json
           ) AS sizes,
 
-          -- Tất cả món nước lấy toàn bộ topping đang hoạt động.
-          -- Món thuộc danh mục Bánh không có topping.
           COALESCE(
             (
               SELECT json_agg(
@@ -180,8 +172,6 @@ export class MenuService implements OnModuleInit, OnModuleDestroy {
 
       return result.rows.map((row) => ({
         ...row,
-
-        // Giá từ PostgreSQL chuyển thành number để frontend dễ tính toán
         id: Number(row.id),
         basePrice: Number(row.base_price),
         imageUrl: row.image_url,
@@ -203,14 +193,12 @@ export class MenuService implements OnModuleInit, OnModuleDestroy {
             }
           : null,
 
-        // Chuẩn hóa giá size
         sizes: (row.sizes ?? []).map((size) => ({
           ...size,
           id: Number(size.id),
           price: Number(size.price),
         })),
 
-        // Chuẩn hóa giá topping
         toppings: (row.toppings ?? []).map((topping) => ({
           ...topping,
           id: Number(topping.id),
@@ -222,47 +210,92 @@ export class MenuService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-   /**
-   * Lấy toàn bộ sản phẩm và thông tin tồn kho dành cho Admin.
-   * Không lọc is_available để Admin vẫn thấy món ngừng bán.
+  /**
+   * Lấy danh sách nguyên liệu và tồn kho dành cho Admin.
    */
   async getInventory() {
     try {
       const result = await this.pool.query(`
         SELECT
-          p.id,
-          p.name,
-          p.slug,
-          p.image_url,
-          p.is_available,
-          p.stock_quantity,
-          p.low_stock_threshold,
-          p.track_inventory,
-          c.name AS category_name,
+          i.id,
+          i.name,
+          i.base_unit AS "baseUnit",
+          i.description,
+          i.is_active AS "isActive",
+
+          COALESCE(inv.stock_quantity, 0) AS "stockQuantity",
+          COALESCE(inv.low_stock_threshold, 0) AS "lowStockThreshold",
+
           CASE
-            WHEN p.track_inventory = FALSE THEN 'KHONG_QUAN_LY_TON'
-            WHEN p.stock_quantity = 0 THEN 'HET_HANG'
-            WHEN p.stock_quantity <= p.low_stock_threshold
+            WHEN i.is_active = FALSE THEN 'NGUNG_HOAT_DONG'
+            WHEN COALESCE(inv.stock_quantity, 0) = 0 THEN 'HET_HANG'
+            WHEN COALESCE(inv.stock_quantity, 0)
+                 <= COALESCE(inv.low_stock_threshold, 0)
               THEN 'SAP_HET_HANG'
             ELSE 'CON_HANG'
-          END AS inventory_status
-        FROM menu_products p
-        LEFT JOIN menu_categories c
-          ON c.id = p.category_id
-        ORDER BY c.display_order ASC, p.display_order ASC, p.name ASC
+          END AS "inventoryStatus",
+
+          COALESCE(
+            (
+              SELECT json_agg(
+                json_build_object(
+                  'id', ip.id,
+                  'packageName', ip.package_name,
+                  'quantityPerPackage', ip.quantity_per_package,
+                  'packageUnit', ip.package_unit,
+                  'isActive', ip.is_active
+                )
+                ORDER BY ip.id ASC
+              )
+              FROM ingredient_packaging ip
+              WHERE ip.ingredient_id = i.id
+                AND ip.is_active = TRUE
+                AND ip.package_unit = i.base_unit
+            ),
+            '[]'::json
+          ) AS packaging
+
+        FROM ingredients i
+
+        LEFT JOIN ingredient_inventory inv
+          ON inv.ingredient_id = i.id
+
+        ORDER BY i.name ASC
       `);
 
-      return result.rows.map((row) => ({
+      return result.rows.map((row: {
+        id: number | string;
+        name: string;
+        baseUnit: string;
+        description: string | null;
+        isActive: boolean;
+        stockQuantity: number | string;
+        lowStockThreshold: number | string;
+        inventoryStatus: string;
+        packaging: {
+          id: number | string;
+          packageName: string;
+          quantityPerPackage: number | string;
+          packageUnit: string;
+          isActive: boolean;
+        }[];
+      }) => ({
         id: Number(row.id),
         name: row.name,
-        slug: row.slug,
-        imageUrl: row.image_url,
-        categoryName: row.category_name,
-        isAvailable: row.is_available,
-        stockQuantity: Number(row.stock_quantity),
-        lowStockThreshold: Number(row.low_stock_threshold),
-        trackInventory: row.track_inventory,
-        inventoryStatus: row.inventory_status,
+        baseUnit: row.baseUnit,
+        description: row.description,
+        isActive: row.isActive,
+        stockQuantity: Number(row.stockQuantity),
+        lowStockThreshold: Number(row.lowStockThreshold),
+        inventoryStatus: row.inventoryStatus,
+
+        packaging: (row.packaging ?? []).map((item) => ({
+          id: Number(item.id),
+          packageName: item.packageName,
+          quantityPerPackage: Number(item.quantityPerPackage),
+          packageUnit: item.packageUnit,
+          isActive: item.isActive,
+        })),
       }));
     } catch (error: unknown) {
       this.handleDatabaseError(error);
@@ -270,55 +303,151 @@ export class MenuService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Cập nhật số lượng tồn kho của một sản phẩm.
+   * Cập nhật số lượng tồn kho của nguyên liệu.
+   *
+   * Ghi lịch sử điều chỉnh vào ingredient_transactions.
+   * Nếu cập nhật kho hoặc ghi lịch sử thất bại,
+   * toàn bộ transaction sẽ được rollback.
    */
   async updateInventory(id: number, stockQuantity: number) {
     if (!Number.isSafeInteger(id) || id <= 0) {
-      throw new BadRequestException('ID sản phẩm không hợp lệ.');
-    }
-
-    if (
-      !Number.isSafeInteger(stockQuantity) ||
-      stockQuantity < 0
-    ) {
       throw new BadRequestException(
-        'Số lượng tồn kho phải là số nguyên không âm.',
+        'ID nguyên liệu không hợp lệ.',
       );
     }
 
+    if (
+      typeof stockQuantity !== 'number' ||
+      !Number.isFinite(stockQuantity) ||
+      stockQuantity < 0 ||
+      !/^\d+(\.\d{1,3})?$/.test(String(stockQuantity))
+    ) {
+      throw new BadRequestException(
+        'Số lượng tồn kho phải là số không âm, tối đa 3 chữ số thập phân.',
+      );
+    }
+
+    const client = await this.pool.connect();
+
     try {
-      const result = await this.pool.query(
+      await client.query('BEGIN');
+
+      const ingredientResult = await client.query(
         `
-          UPDATE menu_products
-          SET stock_quantity = $1
-          WHERE id = $2
-          RETURNING
-            id,
-            name,
-            stock_quantity,
-            low_stock_threshold,
-            track_inventory
+        SELECT id, name, base_unit, is_active
+        FROM ingredients
+        WHERE id = $1
+        FOR UPDATE
+        `,
+        [id],
+      );
+
+      if (ingredientResult.rowCount === 0) {
+        throw new NotFoundException(
+          'Không tìm thấy nguyên liệu.',
+        );
+      }
+
+      const ingredient = ingredientResult.rows[0];
+
+      // Đảm bảo nguyên liệu có dòng tồn kho trước khi cập nhật.
+      // Giá trị mặc định của ngưỡng được lấy từ cấu trúc bảng.
+      await client.query(
+        `
+        INSERT INTO ingredient_inventory (
+          ingredient_id,
+          stock_quantity
+        )
+        VALUES ($1, 0)
+        ON CONFLICT (ingredient_id) DO NOTHING
+        `,
+        [id],
+      );
+
+      const inventoryResult = await client.query(
+        `
+        SELECT stock_quantity, low_stock_threshold
+        FROM ingredient_inventory
+        WHERE ingredient_id = $1
+        FOR UPDATE
+        `,
+        [id],
+      );
+
+      const oldQuantity = Number(
+        inventoryResult.rows[0].stock_quantity,
+      );
+
+      const lowStockThreshold = Number(
+        inventoryResult.rows[0].low_stock_threshold,
+      );
+
+      const difference = stockQuantity - oldQuantity;
+
+      await client.query(
+        `
+        UPDATE ingredient_inventory
+        SET stock_quantity = $1,
+            updated_at = NOW()
+        WHERE ingredient_id = $2
         `,
         [stockQuantity, id],
       );
 
-      if (result.rowCount === 0) {
-        throw new NotFoundException('Không tìm thấy sản phẩm.');
+      // Chỉ ghi lịch sử khi số lượng thực sự thay đổi.
+      if (difference !== 0) {
+        await client.query(
+          `
+          INSERT INTO ingredient_transactions (
+            ingredient_id,
+            transaction_type,
+            quantity,
+            unit,
+            reference_type,
+            reference_id,
+            note
+          )
+          VALUES ($1, $2, $3, $4, $5, NULL, $6)
+          `,
+          [
+            id,
+            difference > 0 ? 'ADJUST_IN' : 'ADJUST_OUT',
+            Math.abs(difference),
+            ingredient.base_unit,
+            'MANUAL_ADJUSTMENT',
+            `Điều chỉnh tồn kho từ ${oldQuantity} thành ${stockQuantity}.`,
+          ],
+        );
       }
 
-      const product = result.rows[0];
+      await client.query('COMMIT');
 
       return {
-        message: 'Cập nhật tồn kho thành công.',
-        product: {
-          id: Number(product.id),
-          name: product.name,
-          stockQuantity: Number(product.stock_quantity),
-          lowStockThreshold: Number(product.low_stock_threshold),
-          trackInventory: product.track_inventory,
+        message: 'Cập nhật tồn kho nguyên liệu thành công.',
+        ingredient: {
+          id: Number(ingredient.id),
+          name: ingredient.name,
+          baseUnit: ingredient.base_unit,
+          stockQuantity,
+          lowStockThreshold,
+          inventoryStatus:
+            stockQuantity === 0
+              ? 'HET_HANG'
+              : stockQuantity <= lowStockThreshold
+                ? 'SAP_HET_HANG'
+                : 'CON_HANG',
         },
       };
     } catch (error: unknown) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError: unknown) {
+        console.error(
+          'Lỗi rollback khi cập nhật tồn kho:',
+          rollbackError,
+        );
+      }
+
       if (
         error instanceof NotFoundException ||
         error instanceof BadRequestException
@@ -327,6 +456,8 @@ export class MenuService implements OnModuleInit, OnModuleDestroy {
       }
 
       this.handleDatabaseError(error);
+    } finally {
+      client.release();
     }
   }
 
@@ -338,7 +469,7 @@ export class MenuService implements OnModuleInit, OnModuleDestroy {
       error instanceof Error ? error.message : String(error);
 
     throw new ServiceUnavailableException(
-      `Không đọc được dữ liệu menu. Hãy kiểm tra bảng menu_categories, menu_products, menu_product_sizes và menu_toppings đã được tạo, có dữ liệu và DATABASE_URL trỏ đúng database. Chi tiết: ${message}`,
+      `Không thể xử lý dữ liệu menu hoặc tồn kho. Hãy kiểm tra DATABASE_URL và các bảng menu_categories, menu_products, menu_product_sizes, menu_toppings, ingredients, ingredient_inventory, ingredient_transactions. Chi tiết: ${message}`,
     );
   }
 }

@@ -22,6 +22,7 @@ export default function Header() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [cheDo, setCheDo] = useState<CheDo>("dang-nhap");
   const [taiKhoan, setTaiKhoan] = useState<TaiKhoan | null>(null);
+  const [soLuongGioHang, setSoLuongGioHang] = useState(0);
   const [dangXuLy, setDangXuLy] = useState(false);
   const [thongBao, setThongBao] = useState("");
   const [loi, setLoi] = useState(false);
@@ -61,6 +62,31 @@ export default function Header() {
     setMoForm(true);
   }
 
+  function capNhatSoLuongGioHang() {
+    try {
+      const duLieu = localStorage.getItem("brewlite_cart");
+      const gioHang = duLieu ? JSON.parse(duLieu) : [];
+
+      if (!Array.isArray(gioHang)) {
+        setSoLuongGioHang(0);
+        return;
+      }
+
+      const tongSoLuong = gioHang.reduce(
+        (tong: number, mon: { qty?: number }) => {
+          const qty = Number(mon.qty ?? 0);
+
+          return tong + (Number.isFinite(qty) && qty > 0 ? qty : 0);
+        },
+        0,
+      );
+
+      setSoLuongGioHang(tongSoLuong);
+    } catch {
+      setSoLuongGioHang(0);
+    }
+  }
+
   useEffect(() => {
     function xuLyClickBenNgoai(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -85,6 +111,25 @@ export default function Header() {
         localStorage.removeItem("brewlite_user");
       }
     }
+  }, []);
+
+  useEffect(() => {
+    capNhatSoLuongGioHang();
+
+    // Cập nhật khi chuyển tab hoặc quay lại trang
+    window.addEventListener("focus", capNhatSoLuongGioHang);
+
+    // Nhận thông báo khi trang khác cập nhật giỏ hàng
+    window.addEventListener("storage", capNhatSoLuongGioHang);
+
+    // Sự kiện tùy chỉnh dùng trong cùng một tab
+    window.addEventListener("brewlite-cart-updated", capNhatSoLuongGioHang);
+
+    return () => {
+      window.removeEventListener("focus", capNhatSoLuongGioHang);
+      window.removeEventListener("storage", capNhatSoLuongGioHang);
+      window.removeEventListener("brewlite-cart-updated", capNhatSoLuongGioHang);
+    };
   }, []);
 
   async function xuLySubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -301,7 +346,13 @@ export default function Header() {
               href="/3TrangGioHang"
               className="btn btn-primary cart-button"
             >
-              Giỏ hàng
+              <span>Giỏ hàng</span>
+
+              {soLuongGioHang > 0 && (
+                <span className="cart-count" aria-label={`${soLuongGioHang} món hàng`}>
+                  {soLuongGioHang}
+                </span>
+              )}
             </Link>
 
             <button
@@ -806,6 +857,27 @@ export default function Header() {
             opacity: 0.65;
             cursor: not-allowed;
           }
+        }
+          .cart-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        .cart-count {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 21px;
+          height: 21px;
+          padding: 0 5px;
+          border-radius: 50%;
+          background: #c94f36;
+          color: #ffffff;
+          font-size: 12px;
+          font-weight: 700;
+          line-height: 1;
         }
       `}</style>
     </>
