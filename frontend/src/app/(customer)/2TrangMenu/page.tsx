@@ -387,6 +387,10 @@ export default function MenuPage() {
       }
 
       localStorage.setItem("brewlite_cart", JSON.stringify(oldCart));
+
+      // Báo cho Header cập nhật số lượng giỏ hàng ngay lập tức
+      window.dispatchEvent(new Event("brewlite-cart-updated"));
+
       setNotice("Đã thêm món vào giỏ hàng!");
       closeProduct();
       window.setTimeout(() => setNotice(""), 2600);

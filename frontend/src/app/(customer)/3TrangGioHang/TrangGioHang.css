@@ -517,3 +517,174 @@ select.bl-cart-field {
   }
 }
 
+/* =========================================
+   FONT TRANG GIỎ HÀNG - ĐỒNG BỘ TRANG ADMIN
+   ========================================= */
+
+.bl-menu-page {
+  font-family: "Segoe UI", Arial, sans-serif;
+  font-size: 14px;
+  color: #263445;
+  -webkit-font-smoothing: antialiased;
+}
+
+.bl-menu-page button,
+.bl-menu-page input,
+.bl-menu-page select,
+.bl-menu-page textarea {
+  font-family: inherit;
+  font-size: 14px;
+}
+
+/* Tiêu đề trang */
+.bl-cart-title {
+  font-family: inherit;
+  font-size: 26px;
+  line-height: 1.4;
+  font-weight: 700;
+  color: #16345b;
+}
+
+/* Nhãn số lượng sản phẩm */
+.bl-cart-item-count {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Tên sản phẩm */
+.bl-cart-product-name {
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: #263445;
+}
+
+/* Mô tả size, đường, đá, topping */
+.bl-cart-detail,
+.bl-cart-muted,
+.bl-cart-address-preview p {
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 400;
+  color: #64748b;
+}
+
+/* Đơn giá và thành tiền */
+.bl-cart-unit-price,
+.bl-cart-line-total {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Tiêu đề thông tin giao hàng */
+.bl-cart-section-title {
+  font-size: 18px;
+  line-height: 1.5;
+  font-weight: 700;
+  color: #16345b;
+}
+
+/* Ô nhập thông tin */
+.bl-cart-field {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Tổng tiền */
+.bl-cart-total {
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.bl-cart-total-amount {
+  font-size: 20px;
+  font-weight: 700;
+  color: #16345b;
+}
+
+/* Nút chức năng */
+.bl-cart-submit,
+.bl-cart-edit-button,
+.bl-cart-remove-button,
+.bl-cart-quantity-button,
+.bl-cart-back-link {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Giỏ hàng trống */
+.bl-cart-empty-title {
+  font-size: 23px;
+  line-height: 1.5;
+  font-weight: 700;
+  color: #16345b;
+}
+
+/* Hộp thoại chỉnh sửa món */
+.bl-menu-modal-content {
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.bl-menu-modal-content h2 {
+  font-size: 22px;
+  line-height: 1.5;
+  font-weight: 700;
+  color: #16345b;
+}
+
+.bl-menu-modal-content > p {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.bl-menu-category {
+  font-size: 13px;
+}
+
+.bl-menu-option-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.bl-menu-choice button {
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.bl-menu-choice button small {
+  font-size: 12px;
+}
+
+.bl-menu-total strong {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.bl-menu-cart-hint {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Trên màn hình nhỏ */
+@media (max-width: 767px) {
+  .bl-cart-title {
+    font-size: 23px;
+  }
+
+  .bl-cart-product-name {
+    font-size: 15px;
+  }
+
+  .bl-cart-section-title {
+    font-size: 17px;
+  }
+
+  .bl-cart-total-amount {
+    font-size: 19px;
+  }
+}
+
+
