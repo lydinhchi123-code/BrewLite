@@ -1,689 +1,343 @@
-/* BrewLite - Trang Giỏ hàng */
-.bl-menu-page {
-  min-height: 100vh;
-  color: #35251d;
-  background: #fffdfb;
+.payment-page {
+  min-height: calc(100vh - 76px);
+  padding: 34px 0 90px;
+  background: var(--cream);
 }
 
-.bl-cart-loading {
-  padding: 24px;
-}
-.bl-cart-container {
-  width: 100%;
-  max-width: 896px;
-  margin: 0 auto;
-  padding: 24px;
-}
-.bl-cart-title {
-  margin: 0 0 24px;
-  font-size: 1.875rem;
-  line-height: 2.25rem;
-  font-weight: 700;
-}
-.bl-cart-items {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.bl-cart-item {
-  display: flex;
-  flex-flow: row nowrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #e5e7eb;
-}
-.bl-cart-product {
+.payment-breadcrumb {
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-width: 0;
-  flex: 1 1 0%;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
 }
-.bl-cart-product-image {
-  width: 80px;
-  height: 80px;
-  flex: 0 0 80px;
-  object-fit: cover;
-  border-radius: 8px;
-}
-.bl-cart-product-info {
-  min-width: 0;
-}
-.bl-cart-product-name {
-  margin: 0;
-  font-size: 1.125rem;
-  line-height: 1.75rem;
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-.bl-cart-detail {
-  margin: 4px 0 0;
-  color: #6b7280;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-}
-.bl-cart-unit-price {
-  margin: 6px 0 0;
-  color: #2563eb;
-  font-weight: 500;
-}
-.bl-cart-quantity {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.bl-cart-quantity-button {
-  padding: 4px 12px;
-  border: 0;
-  border-radius: 6px;
-  background: #e5e7eb;
-  cursor: pointer;
-  font: inherit;
-}
-.bl-cart-quantity-button:hover:not(:disabled) {
-  background: #d1d5db;
-}
-.bl-cart-quantity-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.bl-cart-quantity-value {
-  width: 32px;
-  text-align: center;
-  font-weight: 600;
-}
-.bl-cart-line-total {
-  font-size: 1.125rem;
-  line-height: 1.75rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.bl-cart-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-}
-.bl-cart-edit-button,
-.bl-cart-remove-button {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.bl-cart-edit-button {
-  color: #76513a;
-}
-.bl-cart-edit-button:hover {
-  color: #4d3024;
-}
-.bl-cart-remove-button {
-  color: #ef4444;
-}
-.bl-cart-remove-button:hover {
-  color: #b91c1c;
-}
-.bl-cart-form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid #e5e7eb;
-}
-.bl-cart-section-title {
-  margin: 0;
-  font-size: 1.25rem;
-  line-height: 1.75rem;
-  font-weight: 700;
-}
-.bl-cart-form-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-}
-.bl-cart-field {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  padding: 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #fff;
-  color: inherit;
-  font: inherit;
-}
-.bl-cart-field:focus {
-  outline: 2px solid #a8795c;
-  outline-offset: 1px;
-  border-color: #76513a;
-}
-.bl-cart-summary {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 16px;
-}
-.bl-cart-total {
-  margin: 0;
-  font-size: 1.5rem;
-  line-height: 2rem;
-  font-weight: 700;
-}
-.bl-cart-total-amount {
-  color: #dc2626;
-}
-.bl-cart-success {
-  margin: 0;
-  color: #15803d;
-  font-weight: 500;
-}
-.bl-cart-error {
-  margin: 0;
-  color: #dc2626;
-}
-.bl-cart-submit {
-  padding: 12px 24px;
-  border: 0;
-  border-radius: 8px;
-  background: #16a34a;
-  color: #fff;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-.bl-cart-submit:hover:not(:disabled) {
-  background: #15803d;
-}
-.bl-cart-submit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.bl-cart-empty {
-  display: flex;
-  min-height: 60vh;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  text-align: center;
-}
-.bl-cart-empty-title {
-  margin: 0 0 8px;
-  font-size: 1.5rem;
-  line-height: 2rem;
-  font-weight: 700;
-}
-.bl-cart-muted {
-  color: #6b7280;
-}
-.bl-cart-back-link {
-  display: inline-block;
-  margin-top: 20px;
-  padding: 12px 20px;
-  border-radius: 6px;
-  background: #4d3024;
-  color: #fff;
+
+.payment-breadcrumb a {
+  color: var(--muted);
   text-decoration: none;
 }
-.bl-cart-back-link:hover {
-  background: #382219;
+
+.payment-breadcrumb a:hover,
+.summary-heading a:hover {
+  color: var(--caramel-dark);
 }
 
-/* Hộp thoại chỉnh sửa món */
-.bl-menu-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow-y: auto;
+.payment-breadcrumb strong { color: var(--coffee); font-weight: 700; }
+.payment-heading { margin: 42px 0 34px; }
+.payment-eyebrow { color: var(--caramel-dark); font-size: 11px; font-weight: 800; letter-spacing: 1.7px; }
+.payment-heading h1 { margin: 12px 0 9px; color: var(--coffee); font: 400 clamp(38px, 5vw, 54px)/1.05 "DM Serif Display", serif; letter-spacing: -1.5px; }
+.payment-heading p { margin: 0; color: var(--muted); font-size: 14px; }
+.payment-layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(330px, .8fr); align-items: start; gap: 25px; }
+.payment-main { display: grid; gap: 20px; }
+.payment-card { padding: 30px; border: 1px solid var(--line); border-radius: 18px; background: var(--white); box-shadow: 0 5px 24px rgba(61,39,29,.04); }
+.payment-card-heading { display: flex; align-items: flex-start; gap: 15px; margin-bottom: 27px; }
+.payment-step { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 10px; color: white; background: var(--coffee); font-size: 11px; font-weight: 800; }
+.payment-card h2, .summary-heading h2 { margin: 0; color: var(--coffee); font: 400 25px/1.2 "DM Serif Display", serif; }
+.payment-card-heading p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.payment-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 15px; }
+.payment-fields label, .discount-form label { display: grid; gap: 8px; color: var(--coffee); font-size: 12px; font-weight: 700; }
+.field-wide { grid-column: 1 / -1; }
+.optional { color: var(--muted); font-weight: 400; }
+.payment-fields input, .payment-fields select, .discount-form input { width: 100%; height: 47px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; outline: 0; color: var(--ink); background: #fffdfa; font-size: 13px; }
+.payment-fields input:focus, .payment-fields select:focus, .discount-form input:focus { border-color: var(--caramel); box-shadow: 0 0 0 3px rgba(200,135,74,.11); }
+.payment-fields input::placeholder, .discount-form input::placeholder { color: #b0a79f; }
+.payment-methods { display: grid; gap: 11px; }
+.payment-method { position: relative; display: flex; align-items: center; gap: 13px; padding: 15px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; transition: border-color .2s, background .2s; }
+.payment-method:hover, .payment-method.selected { border-color: var(--caramel); background: #fffaf4; }
+.payment-method input { position: absolute; opacity: 0; }
+.method-icon { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border-radius: 10px; color: white; background: var(--coffee); font-weight: 800; }
+.momo-icon { background: #a7367b; }
+.method-copy { display: grid; gap: 4px; }
+.method-copy strong { color: var(--coffee); font-size: 13px; }
+.method-copy small { color: var(--muted); font-size: 11px; }
+.method-check { width: 21px; height: 21px; margin-left: auto; border: 1px solid var(--beige); border-radius: 50%; color: transparent; text-align: center; line-height: 19px; font-size: 12px; font-weight: 800; }
+.payment-method.selected .method-check { border-color: var(--caramel); color: white; background: var(--caramel); }
+.payment-summary { position: sticky; top: 96px; }
+.summary-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 24px; }
+.summary-heading a { color: var(--caramel-dark); font-size: 11px; font-weight: 700; text-decoration: none; }
+.summary-items { display: grid; gap: 17px; padding-bottom: 23px; border-bottom: 1px solid var(--line); }
+.summary-item { display: flex; align-items: center; gap: 11px; }
+.summary-item-image { display: grid; width: 49px; height: 49px; flex: 0 0 49px; place-items: center; border-radius: 10px; color: var(--coffee); background: var(--beige); font-size: 21px; }
+.summary-item-copy { display: grid; flex: 1; gap: 3px; min-width: 0; }
+.summary-item-copy strong { overflow: hidden; color: var(--coffee); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.summary-item-copy small, .summary-item-copy span { color: var(--muted); font-size: 10px; }
+.summary-item > strong { color: var(--coffee); font-size: 12px; }
+.discount-form { padding: 23px 0; border-bottom: 1px solid var(--line); }
+.discount-form > div { display: flex; gap: 8px; }
+.discount-form input { height: 43px; }
+.discount-form button { height: 43px; padding: 0 13px; border: 0; border-radius: 9px; color: var(--coffee); background: var(--beige); font-size: 11px; font-weight: 800; }
+.discount-form button:hover { background: #dccbb4; }
+.discount-form > small { display: block; margin-top: 8px; font-size: 10px; }
+.discount-valid { color: var(--green); }
+.discount-invalid { color: var(--red); }
+.summary-totals { display: grid; gap: 13px; padding: 22px 0; }
+.summary-totals > div { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+.summary-totals strong { color: var(--coffee); font-size: 12px; }
+.summary-totals .discount-row, .summary-totals .discount-row strong { color: var(--green); }
+.summary-totals .summary-total { align-items: center; padding-top: 17px; border-top: 1px solid var(--line); color: var(--coffee); font-size: 14px; font-weight: 800; }
+.summary-totals .summary-total strong { color: var(--caramel-dark); font-size: 21px; }
+.payment-submit, .payment-button { min-height: 49px; border: 0; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; gap: 14px; font-size: 13px; font-weight: 800; text-decoration: none; }
+.payment-submit { width: 100%; color: white; background: var(--coffee); box-shadow: 0 8px 20px rgba(75,46,36,.18); }
+.payment-submit:hover { background: var(--coffee-deep); }
+.payment-submit span { font-size: 20px; font-weight: 400; }
+.secure-note { margin: 15px 0 0; color: var(--muted); text-align: center; font-size: 10px; }
+.secure-note span { color: var(--green); font-size: 15px; vertical-align: -1px; }
+.payment-success { max-width: 670px; padding: 90px 24px; text-align: center; }
+.payment-success-icon { display: grid; width: 70px; height: 70px; margin: 0 auto 25px; place-items: center; border-radius: 50%; color: white; background: var(--green); font-size: 34px; }
+.payment-success h1 { margin: 14px 0; color: var(--coffee); font: 400 48px/1.1 "DM Serif Display", serif; }
+.payment-success p { max-width: 480px; margin: 0 auto; color: var(--muted); font-size: 14px; line-height: 1.8; }
+.payment-success p strong { color: var(--coffee); }
+.payment-success-actions { display: flex; justify-content: center; gap: 12px; margin-top: 30px; }
+.payment-button { padding: 0 22px; }
+.payment-button.primary { color: white; background: var(--coffee); }
+.payment-button.secondary { border: 1px solid var(--beige); color: var(--coffee); background: white; }
+
+@media (max-width: 800px) {
+  .payment-layout { grid-template-columns: 1fr; }
+  .payment-summary { position: static; }
+}
+
+@media (max-width: 520px) {
+  .payment-page { padding-top: 24px; }
+  .payment-heading { margin: 32px 0 25px; }
+  .payment-card { padding: 21px 18px; border-radius: 14px; }
+  .payment-fields { grid-template-columns: 1fr; }
+  .field-wide { grid-column: auto; }
+  .payment-card-heading { margin-bottom: 21px; }
+  .payment-card h2, .summary-heading h2 { font-size: 22px; }
+  .payment-success h1 { font-size: 38px; }
+  .payment-success-actions { flex-direction: column; }
+}
+
+
+.mock-payment-panel {
+  margin-top: 18px;
   padding: 20px;
-  background: rgb(0 0 0 / 55%);
+  border: 1px solid #e6d4c5;
+  border-radius: 14px;
+  background: #fffaf6;
 }
-.bl-menu-modal {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-  width: min(900px, 100%);
-  max-height: calc(100vh - 40px);
-  overflow-y: auto;
-  border-radius: 16px;
-  background: #fffdfb;
-  box-shadow: 0 20px 60px rgb(0 0 0 / 25%);
-}
-.bl-menu-modal-close {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  z-index: 1;
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border: 0;
-  border-radius: 50%;
-  background: #f3eee9;
-  color: #4d3024;
-  font-size: 26px;
-  line-height: 1;
-  cursor: pointer;
-}
-.bl-menu-modal-image {
+
+.mock-payment-heading {
   display: flex;
-  min-height: 280px;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background: #f4ece5;
-}
-.bl-menu-modal-image img {
-  width: 100%;
-  height: 100%;
-  min-height: 280px;
-  object-fit: cover;
-}
-.bl-menu-no-image {
-  font-size: 64px;
-}
-.bl-menu-modal-content {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 28px;
-}
-.bl-menu-category {
-  color: #76513a;
-  font-size: 0.875rem;
-  font-weight: 700;
-}
-.bl-menu-modal-content h2 {
-  margin: 0;
-  color: #35251d;
-  font-size: 1.5rem;
-  line-height: 1.9rem;
-}
-.bl-menu-modal-content > p {
-  margin: 0;
-  color: #6b625c;
-}
-.bl-menu-modal-options {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-.bl-menu-option {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-.bl-menu-option-title {
-  font-weight: 700;
-}
-.bl-menu-choice {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.bl-menu-choice button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border: 1px solid #ded2c8;
-  border-radius: 8px;
-  background: #fff;
-  color: #4d3024;
-  font: inherit;
-  cursor: pointer;
-}
-.bl-menu-choice button:hover {
-  border-color: #a8795c;
-}
-.bl-menu-choice button.selected {
-  border-color: #4d3024;
-  background: #4d3024;
-  color: #fff;
-}
-.bl-menu-choice button small {
-  font-size: 0.75rem;
-}
-.bl-menu-modal-footer {
-  margin-top: auto;
-  padding-top: 12px;
-}
-.bl-menu-modal-bottom {
-  display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  margin-bottom: 18px;
 }
-.bl-menu-total {
+
+.mock-payment-heading h3 {
+  margin: 0 0 6px;
+  color: #503322;
+  font-size: 18px;
+}
+
+.mock-payment-heading p {
+  margin: 0;
+  color: #76665d;
+  font-size: 13px;
+}
+
+.mock-payment-badge {
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: #f0e1d5;
+  color: #75472e;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mock-payment-content {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.mock-qr-wrapper {
+  flex-shrink: 0;
+  padding: 10px;
+  border: 1px solid #e6e0da;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.mock-qr-wrapper img {
+  display: block;
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+}
+
+.mock-payment-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mock-payment-info > p:not(.mock-payment-warning) {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-.bl-menu-total small,
-.bl-menu-cart-hint {
-  color: #766b63;
-}
-.bl-menu-total strong {
-  color: #4d3024;
-  font-size: 1.25rem;
-}
-.bl-menu-modal-bottom > button {
-  padding: 10px 14px;
-  border: 0;
-  border-radius: 8px;
-  background: #4d3024;
-  color: #fff;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-.bl-menu-modal-bottom > button:hover {
-  background: #382219;
-}
-.bl-menu-cart-hint {
-  display: block;
-  margin-top: 10px;
-  font-size: 0.8rem;
-  line-height: 1.35;
+  gap: 5px;
+  margin: 0 0 14px;
 }
 
-@media (min-width: 768px) {
-  .bl-cart-container {
-    padding: 24px;
-  }
-  .bl-cart-form-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.mock-payment-info > p > span {
+  color: #796d65;
+  font-size: 13px;
 }
-@media (max-width: 767px) {
-  .bl-cart-container {
-    padding: 16px;
-  }
-  .bl-cart-title {
-    font-size: 1.6rem;
-  }
-  .bl-cart-item {
-    flex-wrap: wrap;
-    align-items: flex-start;
-  }
-  .bl-cart-product {
-    flex-basis: calc(100% - 4px);
-  }
-  .bl-cart-quantity {
-    margin-left: 96px;
-  }
-  .bl-cart-line-total {
-    margin-left: auto;
-  }
-  .bl-cart-actions {
-    width: 100%;
-  }
-  .bl-cart-summary {
+
+.mock-payment-info strong {
+  overflow-wrap: anywhere;
+  color: #38271e;
+}
+
+.mock-payment-info .mock-payment-amount {
+  color: #9a542d;
+  font-size: 22px;
+}
+
+.mock-payment-warning {
+  margin: 12px 0 0;
+  color: #98602e;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .mock-payment-content {
+    flex-direction: column;
     align-items: stretch;
   }
-  .bl-cart-total {
-    font-size: 1.25rem;
+
+  .mock-qr-wrapper {
+    align-self: center;
   }
-  .bl-cart-submit {
+
+  .mock-payment-info {
     width: 100%;
   }
-  .bl-menu-modal {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .bl-menu-modal-image,
-  .bl-menu-modal-image img {
-    min-height: 180px;
-    max-height: 220px;
-  }
-  .bl-menu-modal-content {
-    padding: 20px;
-  }
 }
 
-/* Số lượng món cạnh tiêu đề giỏ hàng */
-.bl-cart-title {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  font-family: "Segoe UI", Arial, sans-serif;
-}
-
-.bl-cart-item-count {
-  display: inline-flex;
-  align-items: center;
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: #f4ece5;
-  color: #76513a;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.5;
-}
-
-/* Tỉnh/thành phố cố định */
-.bl-cart-field-readonly {
-  background: #f7f3ef;
-  color: #76513a;
-  cursor: not-allowed;
-}
-
-/* Danh sách chọn phường/xã */
-select.bl-cart-field {
-  min-height: 48px;
-  cursor: pointer;
-}
-
-/* Xem trước địa chỉ giao hàng */
-.bl-cart-address-preview {
-  padding: 14px 16px;
-  border: 1px solid #eadfd5;
+.payment-error {
+  color: #b42318;
+  background: #fef3f2;
+  border: 1px solid #fecdca;
   border-radius: 8px;
-  background: #fffaf5;
-  line-height: 1.7;
-}
-
-.bl-cart-address-preview strong {
-  color: #4d3024;
-}
-
-.bl-cart-address-preview p {
-  margin: 5px 0 0;
-  color: #6b625c;
-  overflow-wrap: anywhere;
-}
-
-@media (max-width: 767px) {
-  .bl-cart-title {
-    gap: 8px;
-  }
-
-  .bl-cart-item-count {
-    font-size: 13px;
-  }
-}
-
-/* =========================================
-   FONT TRANG GIỎ HÀNG - ĐỒNG BỘ TRANG ADMIN
-   ========================================= */
-
-.bl-menu-page {
-  font-family: "Segoe UI", Arial, sans-serif;
+  padding: 10px 12px;
+  margin: 12px 0;
   font-size: 14px;
-  color: #263445;
+}
+
+/* Đồng bộ toàn bộ font chữ với trang Admin BrewLite */
+.payment-page,
+.payment-page *,
+.payment-success,
+.payment-success * {
+  font-family: "Segoe UI", Arial, sans-serif !important;
   -webkit-font-smoothing: antialiased;
 }
 
-.bl-menu-page button,
-.bl-menu-page input,
-.bl-menu-page select,
-.bl-menu-page textarea {
-  font-family: inherit;
-  font-size: 14px;
-}
-
 /* Tiêu đề trang */
-.bl-cart-title {
-  font-family: inherit;
-  font-size: 26px;
+.payment-heading h1,
+.payment-success h1 {
+  font-size: 28px;
   line-height: 1.4;
   font-weight: 700;
+  letter-spacing: 0;
   color: #16345b;
 }
 
-/* Nhãn số lượng sản phẩm */
-.bl-cart-item-count {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-/* Tên sản phẩm */
-.bl-cart-product-name {
-  font-size: 16px;
-  line-height: 1.5;
-  font-weight: 600;
-  color: #263445;
-}
-
-/* Mô tả size, đường, đá, topping */
-.bl-cart-detail,
-.bl-cart-muted,
-.bl-cart-address-preview p {
-  font-size: 13px;
-  line-height: 1.6;
-  font-weight: 400;
-  color: #64748b;
-}
-
-/* Đơn giá và thành tiền */
-.bl-cart-unit-price,
-.bl-cart-line-total {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-/* Tiêu đề thông tin giao hàng */
-.bl-cart-section-title {
-  font-size: 18px;
+/* Tiêu đề các khung thông tin */
+.payment-card h2,
+.summary-heading h2 {
+  font-size: 20px;
   line-height: 1.5;
   font-weight: 700;
   color: #16345b;
 }
 
-/* Ô nhập thông tin */
-.bl-cart-field {
-  font-family: inherit;
+/* Tiêu đề và nội dung phụ */
+.payment-eyebrow {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.payment-heading p,
+.payment-card-heading p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.payment-fields label,
+.discount-form label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Ô nhập liệu */
+.payment-fields input,
+.payment-fields select,
+.discount-form input {
   font-size: 14px;
-  line-height: 1.5;
+}
+
+/* Phương thức thanh toán và sản phẩm */
+.method-copy strong,
+.summary-item-copy strong,
+.summary-item > strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.method-copy small,
+.summary-item-copy small,
+.summary-item-copy span {
+  font-size: 12px;
 }
 
 /* Tổng tiền */
-.bl-cart-total {
-  font-size: 16px;
-  line-height: 1.5;
-  font-weight: 600;
-}
-
-.bl-cart-total-amount {
-  font-size: 20px;
-  font-weight: 700;
-  color: #16345b;
-}
-
-/* Nút chức năng */
-.bl-cart-submit,
-.bl-cart-edit-button,
-.bl-cart-remove-button,
-.bl-cart-quantity-button,
-.bl-cart-back-link {
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-/* Giỏ hàng trống */
-.bl-cart-empty-title {
-  font-size: 23px;
-  line-height: 1.5;
-  font-weight: 700;
-  color: #16345b;
-}
-
-/* Hộp thoại chỉnh sửa món */
-.bl-menu-modal-content {
-  font-family: "Segoe UI", Arial, sans-serif;
-}
-
-.bl-menu-modal-content h2 {
-  font-size: 22px;
-  line-height: 1.5;
-  font-weight: 700;
-  color: #16345b;
-}
-
-.bl-menu-modal-content > p {
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.bl-menu-category {
+.summary-totals > div {
   font-size: 13px;
 }
 
-.bl-menu-option-title {
+.summary-totals .summary-total strong {
+  font-size: 20px;
+  font-weight: 700;
+  color: #16345b;
+}
+
+/* Nút bấm */
+.payment-submit,
+.payment-button,
+.discount-form button {
   font-size: 14px;
   font-weight: 600;
 }
 
-.bl-menu-choice button {
-  font-family: inherit;
-  font-size: 14px;
+/* Khu vực thanh toán mô phỏng */
+.mock-payment-heading h3 {
+  font-size: 17px;
+  font-weight: 700;
 }
 
-.bl-menu-choice button small {
-  font-size: 12px;
-}
-
-.bl-menu-total strong {
+.mock-payment-info .mock-payment-amount {
   font-size: 20px;
   font-weight: 700;
 }
 
-.bl-menu-cart-hint {
-  font-size: 12px;
-  line-height: 1.5;
+.payment-error {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
-/* Trên màn hình nhỏ */
-@media (max-width: 767px) {
-  .bl-cart-title {
-    font-size: 23px;
+@media (max-width: 520px) {
+  .payment-heading h1,
+  .payment-success h1 {
+    font-size: 24px;
   }
 
-  .bl-cart-product-name {
-    font-size: 15px;
-  }
-
-  .bl-cart-section-title {
+  .payment-card h2,
+  .summary-heading h2 {
     font-size: 17px;
   }
-
-  .bl-cart-total-amount {
-    font-size: 19px;
-  }
 }
-
