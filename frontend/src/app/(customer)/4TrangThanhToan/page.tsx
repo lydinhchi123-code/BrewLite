@@ -6,6 +6,10 @@ import { useEffect, useState, type FormEvent } from "react";
 import "./thanh-toan.css";
 
 type PaymentMethod = "cod" | "banking" | "momo";
+type MockPaymentResult = "SUCCESS" | "FAILURE";
+const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+).replace(/\/$/, "");
 
 type CheckoutItem = {
   id: string | number;
@@ -34,6 +38,7 @@ type CheckoutData = {
   totalAmount: number;
   status: string;
   paymentMethod?: PaymentMethod;
+  paymentStatus?: string;
 };
 
 const formatPrice = (price: number) =>
@@ -58,9 +63,7 @@ function getItemNote(item: CheckoutItem) {
       item.size ? `Size ${item.size}` : "",
       item.sugar ? `Đường ${item.sugar}` : "",
       item.ice ? `Đá ${item.ice}` : "",
-      item.topping?.length
-        ? `Topping: ${item.topping.join(", ")}`
-        : "",
+      item.topping?.length ? `Topping: ${item.topping.join(", ")}` : "",
     ]
       .filter(Boolean)
       .join(" · ") || "Không có tuỳ chọn bổ sung"
@@ -72,8 +75,8 @@ export default function ThanhToanPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [paymentMethod, setPaymentMethod] =
-    useState<PaymentMethod>("cod");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
+  const [mockResult, setMockResult] = useState<MockPaymentResult>("SUCCESS");
 
   const [discountCode, setDiscountCode] = useState("");
   const [discount, setDiscount] = useState(0);
@@ -133,7 +136,7 @@ export default function ThanhToanPage() {
             window.history.replaceState(
               window.history.state,
               "",
-              newUrl.toString()
+              newUrl.toString(),
             );
           }
         }
@@ -149,10 +152,7 @@ export default function ThanhToanPage() {
 
   const subtotal =
     checkout?.subtotal ??
-    orderItems.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0,
-    );
+    orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   const deliveryFee = checkout?.deliveryFee ?? 0;
 
@@ -162,10 +162,7 @@ export default function ThanhToanPage() {
     subtotal + deliveryFee,
   );
 
-  const total = Math.max(
-    0,
-    subtotal + deliveryFee - appliedDiscount,
-  );
+  const total = Math.max(0, subtotal + deliveryFee - appliedDiscount);
 
   function applyDiscount() {
     if (discountCode.trim().toUpperCase() === "BREW10") {
@@ -241,18 +238,17 @@ export default function ThanhToanPage() {
       note: note || undefined,
     };
 
+    let createdOrderId: string | null = null;
+
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/orders`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const response = await fetch(`${API_URL}/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
       const data = await response.json();
 
@@ -262,7 +258,7 @@ export default function ThanhToanPage() {
             ? data.message
             : Array.isArray(data.message)
               ? data.message.join(", ")
-              : "Không thể tạo đơn hàng."
+              : "Không thể tạo đơn hàng.",
         );
       }
 
@@ -275,9 +271,15 @@ export default function ThanhToanPage() {
         data.data?.madonhanghienthi;
 
       if (!realOrderId || String(realOrderId).startsWith("TEMP-")) {
-        throw new Error(
-          "Không nhận được mã đơn hàng thật từ backend."
-        );
+        throw new Error("Không nhận được mã đơn hàng thật từ backend.");
+      }
+
+      createdOrderId = String(realOrderId);
+      const internalOrderId = Number(
+        data.order?.madonhang ?? data.data?.order?.madonhang,
+      );
+      if (!Number.isSafeInteger(internalOrderId) || internalOrderId < 1) {
+        throw new Error("Không nhận được mã đơn nội bộ để tạo thanh toán.");
       }
 
       const updatedCheckout: CheckoutData = {
@@ -293,35 +295,79 @@ export default function ThanhToanPage() {
         discount: appliedDiscount,
         totalAmount: total,
 
-        // Backend hiện chưa xác minh giao dịch thật.
-        // Không tự đánh dấu PAID cho QR demo.
+        // Trạng thái cuối cùng sẽ lấy từ API thanh toán, không tự suy ra tại frontend.
         status: "PENDING",
       };
 
-       // Lưu đơn hàng với mã thật từ backend.
+      // Lưu mã đơn thật trước khi thanh toán để không tạo trùng đơn nếu API lỗi.
       localStorage.setItem(
         "brewlite_checkout",
-        JSON.stringify(updatedCheckout)
+        JSON.stringify(updatedCheckout),
       );
 
-      // Chỉ xóa giỏ hàng sau khi backend tạo đơn thành công.
-      localStorage.setItem("brewlite_cart", "[]");
+      const backendPaymentMethod = {
+        cod: "COD",
+        banking: "BANKING",
+        momo: "MOMO",
+      }[paymentMethod];
+      const idempotencyKey = `brewlite-${realOrderId}-${backendPaymentMethod}`;
+      const paymentPayload = {
+        madonhang: internalOrderId,
+        phuongthuc: backendPaymentMethod,
+        ...(paymentMethod === "cod" ? {} : { mockResult }),
+      };
+      const paymentResponse = await fetch(`${API_URL}/payments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify(paymentPayload),
+      });
+      const paymentData = await paymentResponse.json();
+      if (!paymentResponse.ok) {
+        throw new Error(
+          typeof paymentData.message === "string"
+            ? paymentData.message
+            : "Không thể ghi nhận kết quả thanh toán.",
+        );
+      }
 
-      // Thông báo để trang giỏ hàng cập nhật state.
-      window.dispatchEvent(new Event("brewlite-cart-updated"));
+      // Giữ lại giỏ hàng nếu thanh toán mô phỏng thất bại để khách có thể đặt lại.
+      if (paymentData.paymentStatus !== "THAT_BAI") {
+        localStorage.setItem("brewlite_cart", "[]");
+        window.dispatchEvent(new Event("brewlite-cart-updated"));
+      }
+
+      localStorage.setItem(
+        "brewlite_checkout",
+        JSON.stringify({
+          ...updatedCheckout,
+          status: paymentData.orderStatus ?? "PENDING",
+          paymentStatus: paymentData.paymentStatus ?? "CHO_THANH_TOAN",
+        }),
+      );
 
       router.push(
         `/5TrangXacNhanDonHang?orderId=${encodeURIComponent(
-          String(realOrderId)
-        )}`
+          String(realOrderId),
+        )}`,
       );
     } catch (error) {
       console.error("Lỗi khi xác nhận đơn hàng:", error);
 
+      if (createdOrderId) {
+        router.push(
+          `/5TrangXacNhanDonHang?orderId=${encodeURIComponent(createdOrderId)}`,
+        );
+        return;
+      }
+
       setSubmitError(
         error instanceof Error
           ? error.message
-          : "Có lỗi xảy ra. Vui lòng kiểm tra lại."
+          : "Có lỗi xảy ra. Vui lòng kiểm tra lại.",
       );
     } finally {
       setSubmitting(false);
@@ -331,9 +377,7 @@ export default function ThanhToanPage() {
   if (!loaded) {
     return (
       <main className="payment-page">
-        <div className="container">
-          Đang tải thông tin đơn hàng...
-        </div>
+        <div className="container">Đang tải thông tin đơn hàng...</div>
       </main>
     );
   }
@@ -342,29 +386,18 @@ export default function ThanhToanPage() {
     return (
       <main className="payment-page">
         <section className="payment-success container">
-          <span className="payment-eyebrow">
-            CHƯA CÓ THÔNG TIN ĐƠN HÀNG
-          </span>
+          <span className="payment-eyebrow">CHƯA CÓ THÔNG TIN ĐƠN HÀNG</span>
 
           <h1>Không tìm thấy đơn hàng cần thanh toán</h1>
 
-          <p>
-            Hãy quay lại giỏ hàng và tạo đơn hàng trước khi
-            tiếp tục.
-          </p>
+          <p>Hãy quay lại giỏ hàng và tạo đơn hàng trước khi tiếp tục.</p>
 
           <div className="payment-success-actions">
-            <Link
-              href="/3TrangGioHang"
-              className="payment-button primary"
-            >
+            <Link href="/3TrangGioHang" className="payment-button primary">
               Quay lại giỏ hàng
             </Link>
 
-            <Link
-              href="/2TrangMenu"
-              className="payment-button secondary"
-            >
+            <Link href="/2TrangMenu" className="payment-button secondary">
               Về Menu
             </Link>
           </div>
@@ -377,34 +410,36 @@ export default function ThanhToanPage() {
     return (
       <main className="payment-page">
         <section className="payment-success container">
-          <span
-            className="payment-success-icon"
-            aria-hidden="true"
-          >
+          <span className="payment-success-icon" aria-hidden="true">
             ✓
           </span>
 
           <span className="payment-eyebrow">
             {checkout.status === "PAID"
               ? "THANH TOÁN MÔ PHỎNG THÀNH CÔNG"
-              : "ĐÃ GHI NHẬN ĐƠN HÀNG"}
+              : checkout.status === "PAYMENT_FAILED"
+                ? "THANH TOÁN MÔ PHỎNG THẤT BẠI"
+                : "ĐÃ GHI NHẬN ĐƠN HÀNG"}
           </span>
 
           <h1>
             {checkout.status === "PAID"
               ? "Thanh toán thành công!"
-              : "Đơn hàng đã được ghi nhận"}
+              : checkout.status === "PAYMENT_FAILED"
+                ? "Thanh toán chưa thành công"
+                : "Đơn hàng đã được ghi nhận"}
           </h1>
 
           <p>
-            Mã đơn hàng{" "}
-            <strong>#{checkout.orderId}</strong> đang ở
-            trạng thái <strong>{checkout.status}</strong>.
+            Mã đơn hàng <strong>#{checkout.orderId}</strong> đang ở trạng thái{" "}
+            <strong>{checkout.status}</strong>.
             {checkout.status === "PAID"
               ? " Đây là giao dịch mô phỏng, không có tiền thật được chuyển."
-              : checkout.paymentMethod === "cod"
-                ? " Bạn sẽ thanh toán khi nhận hàng."
-                : " Đơn hàng đã được ghi nhận. QR hiện tại chỉ là mô phỏng, hệ thống chưa xác minh giao dịch thanh toán."}
+              : checkout.status === "PAYMENT_FAILED"
+                ? " Giao dịch mô phỏng thất bại. Giỏ hàng của bạn vẫn được giữ lại."
+                : checkout.paymentMethod === "cod"
+                  ? " Bạn sẽ thanh toán khi nhận hàng."
+                  : " Đơn hàng đã được ghi nhận nhưng chưa có kết quả thanh toán."}
           </p>
 
           <p>
@@ -427,10 +462,7 @@ export default function ThanhToanPage() {
               Theo dõi đơn hàng
             </Link>
 
-            <Link
-              href="/"
-              className="payment-button secondary"
-            >
+            <Link href="/" className="payment-button secondary">
               Về trang chủ
             </Link>
           </div>
@@ -449,22 +481,14 @@ export default function ThanhToanPage() {
         </div>
 
         <header className="payment-heading">
-          <span className="payment-eyebrow">
-            BREWLITE CHECKOUT
-          </span>
+          <span className="payment-eyebrow">BREWLITE CHECKOUT</span>
 
           <h1>Thanh toán đơn hàng</h1>
 
-          <p>
-            Hoàn tất thông tin để chúng mình chuẩn bị đơn
-            hàng cho bạn.
-          </p>
+          <p>Hoàn tất thông tin để chúng mình chuẩn bị đơn hàng cho bạn.</p>
         </header>
 
-        <form
-          className="payment-layout"
-          onSubmit={handleSubmit}
-        >
+        <form className="payment-layout" onSubmit={handleSubmit}>
           <div className="payment-main">
             <section className="payment-card">
               <div className="payment-card-heading">
@@ -472,10 +496,7 @@ export default function ThanhToanPage() {
 
                 <div>
                   <h2>Thông tin nhận hàng</h2>
-                  <p>
-                    Nhập thông tin để BrewLite giao hàng đến
-                    bạn.
-                  </p>
+                  <p>Nhập thông tin để BrewLite giao hàng đến bạn.</p>
                 </div>
               </div>
 
@@ -498,7 +519,7 @@ export default function ThanhToanPage() {
                     type="tel"
                     defaultValue={checkout.customerPhone}
                     placeholder="090 123 4567"
-                    pattern="[0-9 +()-]{9,}"
+                    pattern="[0-9]{10}"
                     required
                   />
                 </label>
@@ -526,11 +547,7 @@ export default function ThanhToanPage() {
                 </label>
 
                 <label>
-                  Ghi chú đơn hàng{" "}
-                  <span className="optional">
-                    (tuỳ chọn)
-                  </span>
-
+                  Ghi chú đơn hàng <span className="optional">(tuỳ chọn)</span>
                   <input
                     name="note"
                     type="text"
@@ -547,10 +564,7 @@ export default function ThanhToanPage() {
 
                 <div>
                   <h2>Phương thức thanh toán</h2>
-                  <p>
-                    Chọn cách thanh toán thuận tiện nhất cho
-                    bạn.
-                  </p>
+                  <p>Chọn cách thanh toán thuận tiện nhất cho bạn.</p>
                 </div>
               </div>
 
@@ -568,36 +582,23 @@ export default function ThanhToanPage() {
                     onChange={() => setPaymentMethod("cod")}
                   />
 
-                  <span
-                    className="method-icon"
-                    aria-hidden="true"
-                  >
+                  <span className="method-icon" aria-hidden="true">
                     ₫
                   </span>
 
                   <span className="method-copy">
-                    <strong>
-                      Thanh toán khi nhận hàng
-                    </strong>
-                    <small>
-                      Thanh toán bằng tiền mặt khi nhận đồ
-                      uống.
-                    </small>
+                    <strong>Thanh toán khi nhận hàng</strong>
+                    <small>Thanh toán bằng tiền mặt khi nhận đồ uống.</small>
                   </span>
 
-                  <span
-                    className="method-check"
-                    aria-hidden="true"
-                  >
+                  <span className="method-check" aria-hidden="true">
                     ✓
                   </span>
                 </label>
 
                 <label
                   className={`payment-method ${
-                    paymentMethod === "banking"
-                      ? "selected"
-                      : ""
+                    paymentMethod === "banking" ? "selected" : ""
                   }`}
                 >
                   <input
@@ -605,40 +606,26 @@ export default function ThanhToanPage() {
                     name="payment"
                     value="banking"
                     checked={paymentMethod === "banking"}
-                    onChange={() =>
-                      setPaymentMethod("banking")
-                    }
+                    onChange={() => setPaymentMethod("banking")}
                   />
 
-                  <span
-                    className="method-icon"
-                    aria-hidden="true"
-                  >
+                  <span className="method-icon" aria-hidden="true">
                     ↗
                   </span>
 
                   <span className="method-copy">
-                    <strong>
-                      Chuyển khoản ngân hàng
-                    </strong>
-                    <small>
-                      Quét mã QR mô phỏng cho đơn hàng.
-                    </small>
+                    <strong>Chuyển khoản ngân hàng</strong>
+                    <small>Quét mã QR mô phỏng cho đơn hàng.</small>
                   </span>
 
-                  <span
-                    className="method-check"
-                    aria-hidden="true"
-                  >
+                  <span className="method-check" aria-hidden="true">
                     ✓
                   </span>
                 </label>
 
                 <label
                   className={`payment-method ${
-                    paymentMethod === "momo"
-                      ? "selected"
-                      : ""
+                    paymentMethod === "momo" ? "selected" : ""
                   }`}
                 >
                   <input
@@ -649,24 +636,16 @@ export default function ThanhToanPage() {
                     onChange={() => setPaymentMethod("momo")}
                   />
 
-                  <span
-                    className="method-icon momo-icon"
-                    aria-hidden="true"
-                  >
+                  <span className="method-icon momo-icon" aria-hidden="true">
                     M
                   </span>
 
                   <span className="method-copy">
                     <strong>Ví MoMo</strong>
-                    <small>
-                      Quét mã QR MoMo mô phỏng cho đơn hàng.
-                    </small>
+                    <small>Quét mã QR MoMo mô phỏng cho đơn hàng.</small>
                   </span>
 
-                  <span
-                    className="method-check"
-                    aria-hidden="true"
-                  >
+                  <span className="method-check" aria-hidden="true">
                     ✓
                   </span>
                 </label>
@@ -674,8 +653,7 @@ export default function ThanhToanPage() {
             </section>
 
             {/* QR nằm ngay dưới phần chọn phương thức */}
-            {(paymentMethod === "banking" ||
-              paymentMethod === "momo") && (
+            {(paymentMethod === "banking" || paymentMethod === "momo") && (
               <section className="mock-payment-panel">
                 <div className="mock-payment-heading">
                   <div>
@@ -685,29 +663,18 @@ export default function ThanhToanPage() {
                         : "Quét QR thanh toán MoMo"}
                     </h3>
 
-                    <p>
-                      Thanh toán mô phỏng dành cho đồ án
-                      BrewLite
-                    </p>
+                    <p>Thanh toán mô phỏng dành cho đồ án BrewLite</p>
                   </div>
 
-                  <span className="mock-payment-badge">
-                    DEMO
-                  </span>
+                  <span className="mock-payment-badge">DEMO</span>
                 </div>
 
                 <div className="mock-payment-content">
                   <div className="mock-qr-wrapper">
                     <img
-                      src={getMockQrUrl(
-                        paymentMethod,
-                        checkout.orderId,
-                        total,
-                      )}
+                      src={getMockQrUrl(paymentMethod, checkout.orderId, total)}
                       alt={`QR thanh toán mô phỏng ${
-                        paymentMethod === "banking"
-                          ? "ngân hàng"
-                          : "MoMo"
+                        paymentMethod === "banking" ? "ngân hàng" : "MoMo"
                       }`}
                       width={220}
                       height={220}
@@ -737,9 +704,21 @@ export default function ThanhToanPage() {
                     </p>
 
                     <p className="mock-payment-warning">
-                      Đây là QR demo, không dùng để chuyển
-                      tiền thật.
+                      Đây là QR demo, không dùng để chuyển tiền thật.
                     </p>
+
+                    <label className="mock-payment-result">
+                      <span>Kết quả thanh toán mô phỏng</span>
+                      <select
+                        value={mockResult}
+                        onChange={(event) =>
+                          setMockResult(event.target.value as MockPaymentResult)
+                        }
+                      >
+                        <option value="SUCCESS">Thành công</option>
+                        <option value="FAILURE">Thất bại</option>
+                      </select>
+                    </label>
                   </div>
                 </div>
               </section>
@@ -750,17 +729,12 @@ export default function ThanhToanPage() {
             <div className="payment-card">
               <div className="summary-heading">
                 <h2>Đơn hàng của bạn</h2>
-                <Link href="/3TrangGioHang">
-                  Chỉnh sửa
-                </Link>
+                <Link href="/3TrangGioHang">Chỉnh sửa</Link>
               </div>
 
               <div className="summary-items">
                 {orderItems.map((item, index) => (
-                  <div
-                    className="summary-item"
-                    key={`${item.id}-${index}`}
-                  >
+                  <div className="summary-item" key={`${item.id}-${index}`}>
                     <div className="summary-item-image" aria-hidden="true">
                       {item.image ? (
                         <img src={item.image} alt={item.name} />
@@ -775,34 +749,23 @@ export default function ThanhToanPage() {
                       <span>x{item.quantity}</span>
                     </div>
 
-                    <strong>
-                      {formatPrice(
-                        item.price * item.quantity,
-                      )}
-                    </strong>
+                    <strong>{formatPrice(item.price * item.quantity)}</strong>
                   </div>
                 ))}
               </div>
 
               <div className="discount-form">
-                <label htmlFor="discount">
-                  Mã giảm giá
-                </label>
+                <label htmlFor="discount">Mã giảm giá</label>
 
                 <div>
                   <input
                     id="discount"
                     value={discountCode}
-                    onChange={(event) =>
-                      setDiscountCode(event.target.value)
-                    }
+                    onChange={(event) => setDiscountCode(event.target.value)}
                     placeholder="Nhập mã ưu đãi"
                   />
 
-                  <button
-                    type="button"
-                    onClick={applyDiscount}
-                  >
+                  <button type="button" onClick={applyDiscount}>
                     Áp dụng
                   </button>
                 </div>
@@ -828,17 +791,13 @@ export default function ThanhToanPage() {
 
                 <div>
                   <span>Phí giao hàng</span>
-                  <strong>
-                    {formatPrice(deliveryFee)}
-                  </strong>
+                  <strong>{formatPrice(deliveryFee)}</strong>
                 </div>
 
                 {appliedDiscount > 0 && (
                   <div className="discount-row">
                     <span>Giảm giá</span>
-                    <strong>
-                      -{formatPrice(appliedDiscount)}
-                    </strong>
+                    <strong>-{formatPrice(appliedDiscount)}</strong>
                   </div>
                 )}
 
@@ -861,13 +820,15 @@ export default function ThanhToanPage() {
               >
                 {submitting
                   ? "Đang tạo đơn hàng..."
-                  : `Xác nhận phương thức · ${formatPrice(total)}`}
+                  : paymentMethod === "cod"
+                    ? `Đặt đơn COD · ${formatPrice(total)}`
+                    : `Thanh toán mô phỏng · ${formatPrice(total)}`}
                 <span aria-hidden="true">→</span>
               </button>
 
               <p className="secure-note">
-                <span aria-hidden="true">⌁</span>{" "}
-                Thông tin của bạn được bảo mật an toàn
+                <span aria-hidden="true">⌁</span> Thông tin của bạn được bảo mật
+                an toàn
               </p>
             </div>
           </aside>

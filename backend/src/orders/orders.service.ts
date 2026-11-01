@@ -309,6 +309,15 @@ export class OrdersService {
       LEFT JOIN chitietdonhang c
         ON c.madonhang = d.madonhang
       WHERE d.makh = $1
+        AND d.trangthai <> 'PAYMENT_FAILED'
+        AND (
+          d.trangthai <> 'PENDING'
+          OR EXISTS (
+            SELECT 1
+            FROM thanhtoan t
+            WHERE t.madonhang = d.madonhang
+          )
+        )
       GROUP BY d.madonhang
       ORDER BY d.ngaydat DESC
       `,

@@ -3,6 +3,7 @@ import {
   Controller,
   Headers,
   Post,
+  Req,
   UseGuards,
   UsePipes,
   ValidationPipe,
@@ -29,10 +30,12 @@ export class PaymentsController {
   create(
     @Body() dto: CreatePaymentDto,
     @Headers('idempotency-key') idempotencyKey: string,
+    @Req() req: any,
   ) {
     return this.paymentsService.create(
       dto,
       idempotencyKey,
+      req.user?.sub,
     );
   }
 }

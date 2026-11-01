@@ -5,10 +5,16 @@ import {
   BadRequestException,
   ConflictException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.module';
-import { CreatePaymentDto } from './dto/create-payment.dto';
+import {
+  CreatePaymentDto,
+  MockPaymentResult,
+  PaymentMethod,
+} from './dto/create-payment.dto';
+import { OrderStatus, assertTransition } from '../orders/order-state-machine';
 
 @Injectable()
 export class PaymentsService {
@@ -20,6 +26,7 @@ export class PaymentsService {
   async create(
     dto: CreatePaymentDto,
     idempotencyKey: string,
+    authenticatedMakh?: string | number,
   ) {
     if (
       !idempotencyKey ||
@@ -30,6 +37,23 @@ export class PaymentsService {
         'Idempotency-Key không hợp lệ.',
       );
     }
+
+    const makh = Number(authenticatedMakh);
+    if (!Number.isSafeInteger(makh) || makh < 1) {
+      throw new UnauthorizedException('Vui lòng đăng nhập để thanh toán.');
+    }
+
+    const isCod = dto.phuongthuc === PaymentMethod.COD;
+    const paymentStatus = isCod
+      ? 'CHO_THANH_TOAN'
+      : dto.mockResult === MockPaymentResult.FAILURE
+        ? 'THAT_BAI'
+        : 'DA_THANH_TOAN';
+    const nextOrderStatus = isCod
+      ? OrderStatus.PENDING
+      : paymentStatus === 'DA_THANH_TOAN'
+        ? OrderStatus.PAID
+        : OrderStatus.PAYMENT_FAILED;
 
     const client = await this.pool.connect();
 
@@ -46,9 +70,10 @@ export class PaymentsService {
 
       // Request đã xử lý trước đó: trả lại kết quả cũ.
       const existing = await client.query(
-        `SELECT *
-         FROM thanhtoan
-         WHERE idempotency_key = $1`,
+        `SELECT p.*, d.makh, d.trangthai AS order_status
+         FROM thanhtoan p
+         JOIN donhang d ON d.madonhang = p.madonhang
+         WHERE p.idempotency_key = $1`,
         [idempotencyKey],
       );
 
@@ -57,7 +82,9 @@ export class PaymentsService {
 
         if (
           Number(payment.madonhang) !== dto.madonhang ||
-          payment.phuongthuc !== dto.phuongthuc
+          payment.phuongthuc !== dto.phuongthuc ||
+          Number(payment.makh) !== makh ||
+          payment.trangthai !== paymentStatus
         ) {
           throw new ConflictException(
             'Idempotency-Key đã được sử dụng cho yêu cầu khác.',
@@ -69,13 +96,15 @@ export class PaymentsService {
         return {
           message: 'Yêu cầu đã được xử lý trước đó.',
           payment,
+          orderStatus: payment.order_status,
+          paymentStatus: payment.trangthai,
           replayed: true,
         };
       }
 
       // Khóa đơn hàng trong transaction.
       const orderResult = await client.query(
-        `SELECT madonhang, tongtien, trangthai
+        `SELECT madonhang, makh, tongtien, trangthai
          FROM donhang
          WHERE madonhang = $1
          FOR UPDATE`,
@@ -90,16 +119,17 @@ export class PaymentsService {
 
       const order = orderResult.rows[0];
 
-      if (
-        order.trangthai !== 'PENDING' &&
-        order.trangthai !== 'PAYMENT_FAILED'
-      ) {
+      if (Number(order.makh) !== makh) {
+        throw new NotFoundException('Không tìm thấy đơn hàng.');
+      }
+
+      if (order.trangthai !== OrderStatus.PENDING) {
         throw new BadRequestException(
           'Trạng thái đơn hàng không cho phép tạo yêu cầu thanh toán.',
         );
       }
 
-      // Mỗi đơn chỉ có một bản ghi thanh toán theo schema hiện tại.
+      // Mỗi đơn có một bản ghi kết quả thanh toán; Idempotency-Key chống ghi trùng.
       const existingOrderPayment = await client.query(
         `SELECT *
          FROM thanhtoan
@@ -119,23 +149,57 @@ export class PaymentsService {
           phuongthuc,
           trangthai,
           sotien,
-          idempotency_key
+          idempotency_key,
+          ngaythanhtoan
         )
-        VALUES ($1, $2, 'CHO_THANH_TOAN', $3, $4)
+        VALUES (
+          $1, $2, $3, $4, $5,
+          CASE WHEN $6::boolean THEN CURRENT_TIMESTAMP ELSE NULL END
+        )
         RETURNING *`,
         [
           dto.madonhang,
           dto.phuongthuc,
+          paymentStatus,
           order.tongtien,
           idempotencyKey,
+          paymentStatus === 'DA_THANH_TOAN',
         ],
       );
+
+      if (!isCod) {
+        try {
+          assertTransition(
+            order.trangthai as OrderStatus,
+            nextOrderStatus,
+          );
+        } catch (error) {
+          throw new BadRequestException(
+            error instanceof Error
+              ? error.message
+              : 'Chuyển trạng thái đơn hàng không hợp lệ.',
+          );
+        }
+
+        await client.query(
+          `UPDATE donhang
+           SET trangthai = $1, ngaycapnhat = CURRENT_TIMESTAMP
+           WHERE madonhang = $2`,
+          [nextOrderStatus, dto.madonhang],
+        );
+      }
 
       await client.query('COMMIT');
 
       return {
-        message: 'Tạo yêu cầu thanh toán thành công.',
+        message: isCod
+          ? 'Đơn COD đã được ghi nhận; thanh toán khi nhận hàng.'
+          : paymentStatus === 'DA_THANH_TOAN'
+            ? 'Thanh toán mô phỏng thành công.'
+            : 'Thanh toán mô phỏng thất bại.',
         payment: result.rows[0],
+        orderStatus: nextOrderStatus,
+        paymentStatus,
         replayed: false,
       };
     } catch (error) {
