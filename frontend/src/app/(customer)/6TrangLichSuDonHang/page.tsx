@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import "./lichsudon.css";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
 type TaiKhoan = {
   makh: number;
   hoten: string;
@@ -63,22 +65,26 @@ type ApiOrderItem = {
 };
 
 function mapOrderStatus(status: string): OrderStatus {
-  const value = status.trim().toLowerCase().normalize("NFC").replace(/[\s-]+/g, "_");
+  const value = status
+    .trim()
+    .toLowerCase()
+    .normalize("NFC")
+    .replace(/[\s-]+/g, "_");
 
   if (
-    ["da_giao", "hoàn_thành", "hoan_thanh", 
-      "completed", "complete", "delivered",
+    [
+      "da_giao",
+      "hoàn_thành",
+      "hoan_thanh",
+      "completed",
+      "complete",
+      "delivered",
     ].includes(value)
   ) {
     return "Hoàn thành";
   }
 
-  if (
-    [
-      "da_huy", "đã_hủy", "đã_huỷ",
-      "canceled", "cancelled",
-    ].includes(value)
-  ) {
+  if (["da_huy", "đã_hủy", "đã_huỷ", "canceled", "cancelled"].includes(value)) {
     return "Đã hủy";
   }
 
@@ -105,10 +111,7 @@ function mapApiOrder(order: ApiOrder): Order {
 
   const subtotal = Number(
     order.tamtinh ??
-      items.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0,
-      ),
+      items.reduce((sum, item) => sum + item.price * item.quantity, 0),
   );
 
   const shippingFee = Number(order.phigiaohang ?? 0);
@@ -187,10 +190,15 @@ export default function OrderHistoryPage() {
       setLoiDonHang("");
 
       try {
-        const response = await fetch(
-          `http://localhost:3001/orders/khach-hang/${taiKhoan!.makh}`,
-          { signal: controller.signal },
-        );
+        const token = localStorage.getItem("brewlite_accessToken");
+        if (!token) {
+          throw new Error("Vui lòng đăng nhập để xem lịch sử đơn hàng.");
+        }
+
+        const response = await fetch(`${API_URL}/orders/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
 
         if (!response.ok) {
           throw new Error(`Không thể tải đơn hàng (HTTP ${response.status})`);
@@ -202,7 +210,7 @@ export default function OrderHistoryPage() {
           data.map((order) => ({
             id: order.madonhanghienthi || order.madonhang,
             trangthai: order.trangthai,
-          }))
+          })),
         );
 
         setOrders(data.map(mapApiOrder));
@@ -228,8 +236,10 @@ export default function OrderHistoryPage() {
     return () => controller.abort();
   }, [taiKhoan]);
 
-  const visibleOrders = activeFilter === "Tất cả"
-      ? orders : orders.filter((order) => order.status === activeFilter);
+  const visibleOrders =
+    activeFilter === "Tất cả"
+      ? orders
+      : orders.filter((order) => order.status === activeFilter);
 
   function getCount(filter: Filter) {
     if (filter === "Tất cả") return orders.length;

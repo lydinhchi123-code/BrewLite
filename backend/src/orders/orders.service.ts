@@ -275,7 +275,14 @@ export class OrdersService {
     return result.rows;
   }
 
-  async findByCustomerId(makh: number) {
+  async findByCustomerId(authenticatedMakh?: string | number) {
+    const makh = Number(authenticatedMakh);
+    if (!Number.isSafeInteger(makh) || makh < 1) {
+      throw new UnauthorizedException(
+        'Vui lòng đăng nhập để xem lịch sử đơn hàng.',
+      );
+    }
+
     const result = await this.pool.query(
       `
       SELECT
