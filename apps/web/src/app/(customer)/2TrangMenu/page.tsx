@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import "./menu.css";
 
+type ApiRecord = Record<string, unknown>;
+
 type Category = {
   name: string;
   slug: string;
@@ -45,29 +47,51 @@ const DEFAULT_CATEGORIES: Category[] = [
   { name: "Bánh", slug: "banh" },
 ];
 
-function unwrapArray(payload: any): any[] {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.items)) return payload.items;
-  return [];
+function isApiRecord(value: unknown): value is ApiRecord {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
+  );
 }
 
-function normalizeProduct(raw: any): Product {
-  const categoryData =
-    raw.category ?? raw.menu_category ?? raw.menu_categories ?? {};
+function unwrapArray(payload: unknown): ApiRecord[] {
+  let list: unknown[] = [];
 
-  const category =
-    typeof categoryData === "object"
-      ? (categoryData.name ?? raw.categoryName ?? raw.category_name ?? "Khác")
-      : (raw.categoryName ?? raw.category_name ?? categoryData ?? "Khác");
+  if (Array.isArray(payload)) {
+    list = payload;
+  } else if (isApiRecord(payload)) {
+    if (Array.isArray(payload.data)) {
+      list = payload.data;
+    } else if (Array.isArray(payload.items)) {
+      list = payload.items;
+    }
+  }
 
-  const categorySlug =
-    typeof categoryData === "object"
-      ? (categoryData.slug ?? raw.categorySlug ?? raw.category_slug ?? "")
-      : (raw.categorySlug ?? raw.category_slug ?? "");
+  return list.filter(isApiRecord);
+}
 
-  // SQL: menu_product_sizes(product_id, size_code, size_name, price)
-  // Backend nên gộp các dòng size thành mảng raw.sizes cho từng sản phẩm.
+function normalizeProduct(raw: ApiRecord): Product {
+  // Xử lý danh mục
+  const categoryValue =
+    raw.category ?? raw.menu_category ?? raw.menu_categories;
+
+  const categoryData = isApiRecord(categoryValue)
+    ? categoryValue
+    : {};
+
+  const category = isApiRecord(categoryValue)
+    ? categoryData.name ?? raw.categoryName ?? raw.category_name ?? "Khác"
+    : raw.categoryName ??
+      raw.category_name ??
+      categoryValue ??
+      "Khác";
+
+  const categorySlug = isApiRecord(categoryValue)
+    ? categoryData.slug ?? raw.categorySlug ?? raw.category_slug ?? ""
+    : raw.categorySlug ?? raw.category_slug ?? "";
+
+  // Xử lý size
   const rawSizes =
     raw.sizes ??
     raw.sizeOptions ??
@@ -78,8 +102,47 @@ function normalizeProduct(raw: any): Product {
     raw.productSizesList ??
     [];
 
-  // SQL: menu_product_toppings JOIN menu_toppings.
-  // Mỗi phần tử nên có topping_id/id, topping_name/name, topping_price/price.
+  const sizes: SizeOption[] = Array.isArray(rawSizes)
+    ? rawSizes
+        .filter(isApiRecord)
+        .map((item) => {
+          const sizeValue =
+            item.size ?? item.menu_product_size;
+
+          const s = isApiRecord(sizeValue)
+            ? sizeValue
+            : item;
+
+          return {
+            code: String(
+              s.code ??
+                s.size_code ??
+                s.sizeCode ??
+                s.size ??
+                "",
+            ),
+            name: String(
+              s.name ??
+                s.size_name ??
+                s.sizeName ??
+                s.size_code ??
+                s.sizeCode ??
+                s.code ??
+                "",
+            ),
+            price: Number(
+              s.price ??
+                s.size_price ??
+                s.sizePrice ??
+                item.price ??
+                0,
+            ),
+          };
+        })
+        .filter((s) => s.code.length > 0 && s.name.length > 0)
+    : [];
+
+  // Xử lý topping
   const rawToppings =
     raw.toppings ??
     raw.toppingOptions ??
@@ -92,39 +155,20 @@ function normalizeProduct(raw: any): Product {
     raw.menuProductToppings ??
     [];
 
-  const sizes: SizeOption[] = Array.isArray(rawSizes)
-    ? rawSizes
-        .map((item: any) => {
-          const s = item.size ?? item.menu_product_size ?? item;
-          return {
-            code: String(s.code ?? s.size_code ?? s.sizeCode ?? s.size ?? ""),
-            name: String(
-              s.name ??
-                s.size_name ??
-                s.sizeName ??
-                s.size_code ??
-                s.sizeCode ??
-                s.code ??
-                "",
-            ),
-            price: Number(
-              s.price ?? s.size_price ?? s.sizePrice ?? item.price ?? 0,
-            ),
-          };
-        })
-        .filter((s: SizeOption) => s.code && s.name)
-    : [];
-
   const toppings: ToppingOption[] = Array.isArray(rawToppings)
     ? rawToppings
-        .map((item: any) => {
-          const t =
+        .filter(isApiRecord)
+        .map((item) => {
+          const toppingValue =
             item.topping ??
             item.menu_topping ??
             item.menuTopping ??
             item.menu_toppings ??
-            item.topping_info ??
-            item;
+            item.topping_info;
+
+          const t = isApiRecord(toppingValue)
+            ? toppingValue
+            : item;
 
           const id =
             t.id ??
@@ -153,10 +197,12 @@ function normalizeProduct(raw: any): Product {
           };
         })
         .filter(
-          (t: ToppingOption) => t.name.length > 0 && Number.isFinite(t.price),
+          (t) =>
+            t.name.length > 0 &&
+            Number.isFinite(t.price),
         )
         .filter(
-          (t: ToppingOption, index: number, arr: ToppingOption[]) =>
+          (t, index, arr) =>
             arr.findIndex((other) => other.name === t.name) === index,
         )
     : [];
@@ -167,15 +213,28 @@ function normalizeProduct(raw: any): Product {
     category: String(category),
     categorySlug: String(categorySlug),
     price: Number(
-      raw.price ?? raw.basePrice ?? raw.base_price ?? raw.product_price ?? 0,
+      raw.price ??
+        raw.basePrice ??
+        raw.base_price ??
+        raw.product_price ??
+        0,
     ),
     image: String(
-      raw.image ?? raw.imageUrl ?? raw.image_url ?? raw.imageUrlPath ?? "",
+      raw.image ??
+        raw.imageUrl ??
+        raw.image_url ??
+        raw.imageUrlPath ??
+        "",
     ),
-    description: String(raw.description ?? raw.product_description ?? ""),
+    description: String(
+      raw.description ?? raw.product_description ?? "",
+    ),
     tag:
-      raw.tag ??
-      ((raw.is_featured ?? raw.isFeatured) ? "Được yêu thích" : undefined),
+      raw.tag != null
+        ? String(raw.tag)
+        : (raw.is_featured ?? raw.isFeatured)
+          ? "Được yêu thích"
+          : undefined,
     sizes,
     toppings,
   };
@@ -256,12 +315,12 @@ export default function MenuPage() {
           ];
 
           const loadedCategories: Category[] = categoryPayload
-            .map((c: any) => ({
+            .map((c) => ({
               name: String(c.name ?? ""),
               slug: String(c.slug ?? ""),
             }))
-            .filter((c: Category) => allowedSlugs.includes(c.slug))
-            .map((c: Category) =>
+            .filter((c) => allowedSlugs.includes(c.slug))
+            .map((c) =>
               c.slug === "banh-ngot" ? { ...c, name: "Bánh" } : c,
             );
 
@@ -377,7 +436,7 @@ export default function MenuPage() {
       const oldCart = JSON.parse(localStorage.getItem("brewlite_cart") || "[]");
 
       const exists = oldCart.findIndex(
-        (item: { key: string }) => item.key === cartItem.key,
+        (item: ApiRecord) => item.key === cartItem.key,
       );
 
       if (exists >= 0) {

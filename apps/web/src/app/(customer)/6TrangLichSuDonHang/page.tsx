@@ -166,17 +166,39 @@ export default function OrderHistoryPage() {
   const [loiDonHang, setLoiDonHang] = useState("");
 
   useEffect(() => {
-    const duLieu = localStorage.getItem("brewlite_user");
+    let cancelled = false;
 
-    if (duLieu) {
-      try {
-        setTaiKhoan(JSON.parse(duLieu));
-      } catch {
-        localStorage.removeItem("brewlite_user");
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+
+      const duLieu = localStorage.getItem("brewlite_user");
+
+      if (duLieu) {
+        try {
+          const parsed: unknown = JSON.parse(duLieu);
+
+          if (
+            typeof parsed === "object" &&
+            parsed !== null &&
+            "makh" in parsed &&
+            "hoten" in parsed &&
+            "sodienthoai" in parsed
+          ) {
+            setTaiKhoan(parsed as TaiKhoan);
+          } else {
+            localStorage.removeItem("brewlite_user");
+          }
+        } catch {
+          localStorage.removeItem("brewlite_user");
+        }
       }
-    }
 
-    setDaKiemTra(true);
+      setDaKiemTra(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -190,34 +212,44 @@ export default function OrderHistoryPage() {
 
       try {
         const token = localStorage.getItem("brewlite_accessToken");
+
         if (!token) {
           throw new Error("Vui lòng đăng nhập để xem lịch sử đơn hàng.");
         }
 
-        // Lấy mã khách hàng từ JWT ở backend, không truyền makh qua URL.
         const response = await fetch(`${API_URL}/orders/khach-hang`, {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });
 
         if (!response.ok) {
-          throw new Error(`Không thể tải đơn hàng (HTTP ${response.status})`);
+          throw new Error(
+            `Không thể tải đơn hàng (HTTP ${response.status})`,
+          );
         }
 
         const data: ApiOrder[] = await response.json();
+
+        if (controller.signal.aborted) return;
+
         console.log(
           "Trạng thái đơn hàng từ backend:",
           data.map((order) => ({
             id: order.madonhanghienthi || order.madonhang,
             trangthai: order.trangthai,
-          }))
+          })),
         );
 
         setOrders(data.map(mapApiOrder));
       } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") {
+        if (
+          error instanceof Error &&
+          error.name === "AbortError"
+        ) {
           return;
         }
+
+        if (controller.signal.aborted) return;
 
         setLoiDonHang(
           error instanceof Error
@@ -231,9 +263,15 @@ export default function OrderHistoryPage() {
       }
     }
 
-    taiLichSuDonHang();
+    Promise.resolve().then(() => {
+      if (!controller.signal.aborted) {
+        void taiLichSuDonHang();
+      }
+    });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+    };
   }, [taiKhoan]);
 
   const visibleOrders = activeFilter === "Tất cả"

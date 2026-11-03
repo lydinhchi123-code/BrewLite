@@ -10,6 +10,16 @@ const API_URL = (
 type DiscountStatus = "DANG_SU_DUNG" | "AN" | "HET";
 type DiscountType = "NEW_CUSTOMER" | "MONTHLY" | "HOLIDAY" | "OTHER";
 
+type ApiRecord = Record<string, unknown>;
+
+function isApiRecord(value: unknown): value is ApiRecord {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
+  );
+}
+
 type Discount = {
   id: number;
   ma: string;
@@ -95,13 +105,13 @@ function toDateTimeLocal(value: string | null) {
   return local.toISOString().slice(0, 16);
 }
 
-function normalizeDiscount(data: any): Discount {
+function normalizeDiscount(data: ApiRecord): Discount {
   return {
     id: Number(data.id),
     ma: String(data.ma ?? ""),
     ten: String(data.ten ?? ""),
     mo_ta: String(data.mo_ta ?? ""),
-    loai_ma: data.loai_ma,
+    loai_ma: data.loai_ma as DiscountType,
     so_tien_giam: Number(data.so_tien_giam ?? 0),
     don_hang_toi_thieu: Number(data.don_hang_toi_thieu ?? 0),
     so_luong_toi_da:
@@ -110,9 +120,15 @@ function normalizeDiscount(data: any): Discount {
         ? null
         : Number(data.so_luong_toi_da),
     so_luong_da_dung: Number(data.so_luong_da_dung ?? 0),
-    ngay_bat_dau: data.ngay_bat_dau ?? null,
-    ngay_ket_thuc: data.ngay_ket_thuc ?? null,
-    trang_thai: data.trang_thai,
+    ngay_bat_dau:
+      typeof data.ngay_bat_dau === "string"
+        ? data.ngay_bat_dau
+        : null,
+    ngay_ket_thuc:
+      typeof data.ngay_ket_thuc === "string"
+        ? data.ngay_ket_thuc
+        : null,
+    trang_thai: data.trang_thai as DiscountStatus,
     moi_khach_mot_lan: Boolean(data.moi_khach_mot_lan),
   };
 }
@@ -172,15 +188,17 @@ export default function AdminDiscountsPage() {
         );
       }
 
-      const payload = await response.json();
+      const payload: unknown = await response.json();
 
-      const list = Array.isArray(payload)
+      const list: unknown[] = Array.isArray(payload)
         ? payload
-        : Array.isArray(payload.data)
+        : isApiRecord(payload) && Array.isArray(payload.data)
           ? payload.data
           : [];
 
-      setDiscounts(list.map(normalizeDiscount));
+      setDiscounts(
+        list.filter(isApiRecord).map(normalizeDiscount)
+      );
     } catch (e) {
       setError(
         e instanceof Error
@@ -193,7 +211,17 @@ export default function AdminDiscountsPage() {
   }, []);
 
   useEffect(() => {
-    void loadDiscounts();
+    let active = true;
+
+    Promise.resolve().then(() => {
+      if (active) {
+        void loadDiscounts();
+      }
+    });
+
+    return () => {
+      active = false;
+    };
   }, [loadDiscounts]);
 
   const filteredDiscounts = discounts.filter((discount) => {
@@ -362,21 +390,32 @@ export default function AdminDiscountsPage() {
 
       const responseText = await response.text();
 
-      let data: any = {};
+      let data: ApiRecord = {};
 
       try {
-        data = responseText ? JSON.parse(responseText) : {};
+        const parsed: unknown = responseText
+          ? JSON.parse(responseText)
+          : {};
+
+        data = isApiRecord(parsed) ? parsed : {};
       } catch {
         data = { message: responseText };
       }
 
       if (!response.ok) {
-        const message = Array.isArray(data.message)
-          ? data.message.join(", ")
-          : data.message;
+        const rawMessage = data.message;
+
+        const message = Array.isArray(rawMessage)
+          ? rawMessage.filter(
+              (item): item is string => typeof item === "string"
+            ).join(", ")
+          : typeof rawMessage === "string"
+            ? rawMessage
+            : "";
 
         throw new Error(
-          message || `Không thể lưu mã giảm giá (HTTP ${response.status})`
+          message ||
+            `Không thể lưu mã giảm giá (HTTP ${response.status})`
         );
       }
 
@@ -450,17 +489,23 @@ export default function AdminDiscountsPage() {
 
       const responseText = await response.text();
 
-      let data: any = {};
+      let data: ApiRecord = {};
 
       try {
-        data = responseText ? JSON.parse(responseText) : {};
+        const parsed: unknown = responseText
+          ? JSON.parse(responseText)
+          : {};
+
+        data = isApiRecord(parsed) ? parsed : {};
       } catch {
         data = { message: responseText };
       }
 
       if (!response.ok) {
         throw new Error(
-          data.message || "Không thể cập nhật trạng thái mã."
+          typeof data.message === "string"
+            ? data.message
+            : "Không thể cập nhật trạng thái mã."
         );
       }
 

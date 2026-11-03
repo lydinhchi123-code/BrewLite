@@ -10,6 +10,7 @@ import {
   UseGuards,
   UsePipes,
   ValidationPipe,
+  UnauthorizedException,
 } from '@nestjs/common';
 
 import { OrdersService } from './orders.service';
@@ -68,10 +69,15 @@ export class OrdersController {
     @Param('orderId') orderId: string,
     @Req() req: any,
   ) {
-    return this.ordersService.findOne(
-      orderId,
-      Number(req.user.sub),
-    );
+    const makh = req.user?.sub;
+
+    if (makh == null || !/^\d+$/.test(String(makh))) {
+      throw new UnauthorizedException(
+        'Không xác định được khách hàng đăng nhập.',
+      );
+    }
+
+    return this.ordersService.findOne(orderId, String(makh));
   }
 
   @Patch(':madonhang/status')

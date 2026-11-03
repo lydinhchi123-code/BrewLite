@@ -175,7 +175,17 @@ export default function AdminOrdersPage() {
   }, []);
 
   useEffect(() => {
-    void loadOrders();
+    let active = true;
+
+    Promise.resolve().then(() => {
+      if (active) {
+        void loadOrders();
+      }
+    });
+
+    return () => {
+      active = false;
+    };
   }, [loadOrders]);
 
   const filteredOrders = orders.filter((order) => {

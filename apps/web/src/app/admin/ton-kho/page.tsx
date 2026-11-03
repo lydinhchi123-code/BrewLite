@@ -23,8 +23,17 @@ type InventoryItem = {
   packaging: PackagingItem[];
 };
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+type ApiRecord = Record<string, unknown>;
+
+function isApiRecord(value: unknown): value is ApiRecord {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
+  );
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 function formatUnit(unit: BaseUnit) {
   switch (unit) {
@@ -120,17 +129,18 @@ export default function AdminInventoryPage() {
         );
       }
 
-      const payload = await response.json();
+      const payload: unknown = await response.json();
 
-      const rawList = Array.isArray(payload)
+      const rawList: unknown[] = Array.isArray(payload)
         ? payload
-        : Array.isArray(payload.data)
+        : isApiRecord(payload) && Array.isArray(payload.data)
           ? payload.data
           : [];
 
-      const list: InventoryItem[] = rawList.map(
-        (item: Record<string, any>) => {
-          const rawPackaging = Array.isArray(item.packaging)
+      const list: InventoryItem[] = rawList
+        .filter(isApiRecord)
+        .map((item) => {
+          const rawPackaging: unknown[] = Array.isArray(item.packaging)
             ? item.packaging
             : Array.isArray(item.packagings)
               ? item.packagings
@@ -157,8 +167,9 @@ export default function AdminInventoryPage() {
             isActive: Boolean(
               item.isActive ?? item.is_active ?? true
             ),
-            packaging: rawPackaging.map(
-              (p: Record<string, any>) => ({
+            packaging: rawPackaging
+              .filter(isApiRecord)
+              .map((p) => ({
                 packageName: String(
                   p.packageName ??
                     p.package_name ??
@@ -176,11 +187,9 @@ export default function AdminInventoryPage() {
                 isActive: Boolean(
                   p.isActive ?? p.is_active ?? true
                 ),
-              })
-            ),
+              })),
           };
-        }
-      );
+        });
 
       setItems(list);
 
@@ -212,7 +221,17 @@ export default function AdminInventoryPage() {
   }, []);
 
   useEffect(() => {
-    void loadInventory();
+    let active = true;
+
+    Promise.resolve().then(() => {
+      if (active) {
+        void loadInventory();
+      }
+    });
+
+    return () => {
+      active = false;
+    };
   }, [loadInventory]);
 
   const saveStock = async (item: InventoryItem) => {

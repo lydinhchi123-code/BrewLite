@@ -144,13 +144,20 @@ export default function CongThucPhaChePage() {
   }, []);
 
   useEffect(() => {
-    if (!selected) {
-      setRecipes([]);
-      setSelectedRecipe(null);
-      return;
-    }
+    let active = true;
+    const controller = new AbortController();
 
-    async function loadRecipes() {
+    Promise.resolve().then(async () => {
+      if (!active) return;
+
+      if (!selected) {
+        setRecipes([]);
+        setSelectedRecipe(null);
+        setRecipeError("");
+        setRecipeLoading(false);
+        return;
+      }
+
       try {
         setRecipeLoading(true);
         setRecipeError("");
@@ -159,9 +166,10 @@ export default function CongThucPhaChePage() {
         setSelectedRecipe(null);
 
         const response = await fetch(
-          `${API_URL}/recipes/products/${selected!.id}`,
+          `${API_URL}/recipes/products/${selected.id}`,
           {
             cache: "no-store",
+            signal: controller.signal,
           }
         );
 
@@ -177,8 +185,12 @@ export default function CongThucPhaChePage() {
             ? result.data
             : [];
 
+        if (!active) return;
+
         setRecipes(list);
-        console.log("DỮ LIỆU CÁC SIZE:",
+
+        console.log(
+          "DỮ LIỆU CÁC SIZE:",
           list.map((recipe) => ({
             recipeId: recipe.recipeId,
             sizeCode: recipe.sizeCode,
@@ -195,14 +207,23 @@ export default function CongThucPhaChePage() {
           setSelectedRecipe(defaultRecipe);
         }
       } catch (err) {
-        console.error("Lỗi tải công thức:", err);
-        setRecipeError("Không tải được công thức. Hãy kiểm tra API /recipes.");
-      } finally {
-        setRecipeLoading(false);
-      }
-    }
+        if (!active || controller.signal.aborted) return;
 
-    loadRecipes();
+        console.error("Lỗi tải công thức:", err);
+        setRecipeError(
+          "Không tải được công thức. Hãy kiểm tra API /recipes."
+        );
+      } finally {
+        if (active) {
+          setRecipeLoading(false);
+        }
+      }
+    });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [selected]);
 
   const categories = useMemo(

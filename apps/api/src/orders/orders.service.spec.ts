@@ -25,7 +25,8 @@ describe('OrdersService - xác nhận đơn hàng', () => {
     paidAt: new Date('2026-10-26T10:01:00Z'),
     items: [{
       name: 'Cà phê sữa',
-      options: 'Size: M; Đường: 50%',
+      size: 'M',
+      options: 'Đường: 50%',
       quantity: 1,
       price: 40000,
       lineTotal: 40000,
@@ -98,21 +99,96 @@ describe('OrdersService - xác nhận đơn hàng', () => {
       release: jest.fn(),
     };
     client.query.mockImplementation(async (sql: string) => {
-      if (sql.includes('INSERT INTO donhang')) {
-        return { rows: [{ madonhang: '2', madonhanghienthi: 'ORD-1060' }] };
-      }
-      return { rows: [] };
-    });
+    // Truy vấn sản phẩm.
+    if (sql.includes('FROM menu_products')) {
+      return {
+        rowCount: 1,
+        rows: [{
+          id: 1,
+          name: 'Cà phê sữa',
+          base_price: 40000,
+          is_available: true,
+          image_url: null,
+          stock_quantity: 0,
+          track_inventory: false,
+          category_slug: 'banh',
+        }],
+      };
+    }
+
+    // Tìm công thức sản phẩm.
+    if (sql.includes('FROM recipes r')) {
+      return {
+        rowCount: 1,
+        rows: [{ id: 1 }],
+      };
+    }
+
+    // Lấy nguyên liệu trong công thức.
+    if (sql.includes('FROM recipe_details rd')) {
+      return {
+        rowCount: 1,
+        rows: [{
+          ingredient_id: 1,
+          ingredient_name: 'Sữa',
+          quantity: 10,
+          unit: 'ml',
+          base_unit: 'ml',
+        }],
+      };
+    }
+
+    // Kiểm tra tồn kho nguyên liệu.
+    if (sql.includes('FROM ingredients i')) {
+      return {
+        rowCount: 1,
+        rows: [{
+          name: 'Sữa',
+          base_unit: 'ml',
+          is_active: true,
+          stock_quantity: 100,
+        }],
+      };
+    }
+
+    // Tạo đơn hàng.
+    if (sql.includes('INSERT INTO donhang')) {
+      return {
+        rowCount: 1,
+        rows: [{
+          madonhang: '2',
+          madonhanghienthi: 'ORD-1060',
+        }],
+      };
+    }
+
+    // Cập nhật tồn kho nguyên liệu.
+    if (sql.includes('UPDATE ingredient_inventory')) {
+      return {
+        rowCount: 1,
+        rows: [{ stock_quantity: 90 }],
+      };
+    }
+
+    return { rowCount: 1, rows: [] };
+  });
     pool.connect.mockResolvedValue(client);
 
     const createDto = {
       customerName: 'Minh Anh',
       customerPhone: '0901234567',
       address: '123 Đường A',
-      province: 'TP.HCM',
+      phuong: 'TP.HCM',
       subtotal: 40000,
       totalAmount: 40000,
-      items: [{ id: 'ca-phe-sua', name: 'Cà phê sữa', price: 40000, quantity: 1, size: 'M' }],
+      items: [
+        {
+          id: '1',
+          name: 'Cà phê sữa',
+          price: 40000,
+          quantity: 1,
+        },
+      ],
     } as CreateOrderDto;
 
     const result = await service.create(createDto, '12');
@@ -122,7 +198,7 @@ describe('OrdersService - xác nhận đơn hàng', () => {
     );
     expect(insertCall).toBeDefined();
     expect(insertCall[0]).toContain('makh');
-    expect(insertCall[1][1]).toBe('12');
+    expect(insertCall[1][1]).toBe(12);
     expect(result.orderId).toBe('ORD-1060');
     expect(client.query).toHaveBeenCalledWith('COMMIT');
     expect(client.release).toHaveBeenCalled();

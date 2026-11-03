@@ -267,68 +267,111 @@ export default function XacNhanDonHangPage() {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-
-    if (process.env.NODE_ENV === "development" && params.get("demo") === "1") {
-      setPageState({ kind: "ready", order: previewOrder, isPreview: true });
-      return;
-    }
-
-    const orderId = params.get("orderId")?.trim() ?? "";
-    if (!orderId || !/^[A-Za-z0-9_-]{1,30}$/.test(orderId)) {
-      setPageState({ kind: "missing-id" });
-      return;
-    }
-
-    const token = localStorage.getItem("brewlite_accessToken");
-    if (!token) {
-      setPageState({ kind: "login-required" });
-      return;
-    }
-
-    const controller = new AbortController();
     let active = true;
+    let controller: AbortController | null = null;
 
-    async function loadOrder() {
-      try {
-        const response = await fetch(`${API_URL}/orders/${encodeURIComponent(orderId)}`, {
-          method: "GET",
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        if (!active) return;
+    Promise.resolve().then(async () => {
+      if (!active) return;
 
-        if (response.status === 401 || response.status === 403) {
-          setPageState({ kind: "login-required" });
-          return;
-        }
-        if (response.status === 404) {
-          setPageState({ kind: "not-found" });
-          return;
-        }
-        if (!response.ok) {
-          throw new Error(`Máy chủ trả về lỗi HTTP ${response.status}.`);
-        }
+      const params = new URLSearchParams(window.location.search);
 
-        const raw: unknown = await response.json();
-        if (!active) return;
-        const order = toOrderDetail(raw, orderId);
-        if (!order) throw new Error("Dữ liệu đơn hàng trả về không đúng định dạng.");
-        setPageState({ kind: "ready", order, isPreview: false });
-      } catch (error) {
-        if (!active || controller.signal.aborted) return;
+      if (
+        process.env.NODE_ENV === "development" &&
+        params.get("demo") === "1"
+      ) {
         setPageState({
-          kind: "error",
-          message: error instanceof Error ? error.message : "Không thể kết nối máy chủ.",
+          kind: "ready",
+          order: previewOrder,
+          isPreview: true,
         });
+        return;
       }
-    }
 
-    void loadOrder();
+      const orderId = params.get("orderId")?.trim() ?? "";
+
+      if (!orderId || !/^[A-Za-z0-9_-]{1,30}$/.test(orderId)) {
+        setPageState({ kind: "missing-id" });
+        return;
+      }
+
+      const token = localStorage.getItem("brewlite_accessToken");
+
+      if (!token) {
+        setPageState({ kind: "login-required" });
+        return;
+      }
+
+      const requestController = new AbortController();
+      controller = requestController;
+
+      async function loadOrder() {
+        try {
+          const response = await fetch(
+            `${API_URL}/orders/${encodeURIComponent(orderId)}`,
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+              cache: "no-store",
+              signal: requestController.signal,
+            },
+          );
+
+          if (!active) return;
+
+          if (response.status === 401 || response.status === 403) {
+            setPageState({ kind: "login-required" });
+            return;
+          }
+
+          if (response.status === 404) {
+            setPageState({ kind: "not-found" });
+            return;
+          }
+
+          if (!response.ok) {
+            throw new Error(
+              `Máy chủ trả về lỗi HTTP ${response.status}.`,
+            );
+          }
+
+          const raw: unknown = await response.json();
+
+          if (!active) return;
+
+          const order = toOrderDetail(raw, orderId);
+
+          if (!order) {
+            throw new Error(
+              "Dữ liệu đơn hàng trả về không đúng định dạng.",
+            );
+          }
+
+          setPageState({
+            kind: "ready",
+            order,
+            isPreview: false,
+          });
+        } catch (error) {
+          if (!active || requestController.signal.aborted) return;
+
+          setPageState({
+            kind: "error",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Không thể kết nối máy chủ.",
+          });
+        }
+      }
+
+      await loadOrder();
+    });
+
     return () => {
       active = false;
-      controller.abort();
+      controller?.abort();
     };
   }, [attempt]);
 

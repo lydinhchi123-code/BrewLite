@@ -60,6 +60,16 @@ type DiscountItem = {
   trang_thai: string;
 };
 
+type ApiRecord = Record<string, unknown>;
+
+function isApiRecord(value: unknown): value is ApiRecord {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
+  );
+}
+
 const formatPrice = (price: number) =>
   `${new Intl.NumberFormat("vi-VN").format(price)}₫`;
 
@@ -120,69 +130,81 @@ export default function ThanhToanPage() {
   const [loaded, setLoaded] = useState(false);
   const [urlOrderId, setUrlOrderId] = useState("");
 
-  useEffect(() => {
-    const queryOrderId =
-      new URLSearchParams(window.location.search).get("orderId") ?? "";
+    useEffect(() => {
+      let cancelled = false;
 
-    try {
-      const raw = localStorage.getItem("brewlite_checkout");
+      Promise.resolve().then(() => {
+        if (cancelled) return;
 
-      if (raw) {
-        const parsed = JSON.parse(raw) as CheckoutData;
+        const queryOrderId =
+          new URLSearchParams(window.location.search).get("orderId") ?? "";
 
-        if (parsed && Array.isArray(parsed.items) && parsed.orderId) {
-          const savedOrderId = String(parsed.orderId);
+        try {
+          const raw = localStorage.getItem("brewlite_checkout");
 
-          const isMatchingOrder = savedOrderId === queryOrderId;
-          const isTempUrlWithRealSavedOrder =
-            queryOrderId.startsWith("TEMP-") &&
-            !savedOrderId.startsWith("TEMP-");
+          if (raw) {
+            const parsed = JSON.parse(raw) as CheckoutData;
 
-          if (isMatchingOrder || isTempUrlWithRealSavedOrder) {
-            setCheckout(parsed);
-            setUrlOrderId(savedOrderId);
-            setDiscount(parsed.discount ?? 0);
+            if (parsed && Array.isArray(parsed.items) && parsed.orderId) {
+              const savedOrderId = String(parsed.orderId);
 
-            if (parsed.paymentMethod) {
-              setPaymentMethod(parsed.paymentMethod);
-            }
+              const isMatchingOrder = savedOrderId === queryOrderId;
+              const isTempUrlWithRealSavedOrder =
+                queryOrderId.startsWith("TEMP-") &&
+                !savedOrderId.startsWith("TEMP-");
 
-            if (isTempUrlWithRealSavedOrder) {
-              const newUrl = new URL(window.location.href);
-              newUrl.searchParams.set("orderId", savedOrderId);
-              window.history.replaceState(
-                window.history.state,
-                "",
-                newUrl.toString(),
-              );
-            }
+              if (isMatchingOrder || isTempUrlWithRealSavedOrder) {
+                setCheckout(parsed);
+                setUrlOrderId(savedOrderId);
+                setDiscount(parsed.discount ?? 0);
 
-            if (parsed.paymentStatus === "DA_THANH_TOAN") {
-              setIsSubmitted(true);
-            } else if (parsed.paymentStatus === "CHO_THANH_TOAN") {
-              // COD đã được ghi nhận, chờ khách thanh toán khi nhận hàng.
-              setIsSubmitted(true);
-            } else if (
-              parsed.internalOrderId &&
-              !savedOrderId.startsWith("TEMP-")
-            ) {
-              // Đơn đã tạo nhưng chưa thanh toán hoặc thanh toán thất bại.
-              setPaymentStep(true);
-            } else if (
-              parsed.status === "PAID" ||
-              parsed.status === "COMPLETED"
-            ) {
-              setIsSubmitted(true);
+                if (parsed.paymentMethod) {
+                  setPaymentMethod(parsed.paymentMethod);
+                }
+
+                if (isTempUrlWithRealSavedOrder) {
+                  const newUrl = new URL(window.location.href);
+                  newUrl.searchParams.set("orderId", savedOrderId);
+
+                  window.history.replaceState(
+                    window.history.state,
+                    "",
+                    newUrl.toString(),
+                  );
+                }
+
+                if (
+                  parsed.paymentStatus === "DA_THANH_TOAN" ||
+                  parsed.paymentStatus === "CHO_THANH_TOAN"
+                ) {
+                  setIsSubmitted(true);
+                } else if (
+                  parsed.internalOrderId &&
+                  !savedOrderId.startsWith("TEMP-")
+                ) {
+                  setPaymentStep(true);
+                } else if (
+                  parsed.status === "PAID" ||
+                  parsed.status === "COMPLETED"
+                ) {
+                  setIsSubmitted(true);
+                }
+              }
             }
           }
+        } catch (error) {
+          console.error("Không thể đọc thông tin đơn hàng:", error);
+        } finally {
+          if (!cancelled) {
+            setLoaded(true);
+          }
         }
-      }
-    } catch (error) {
-      console.error("Không thể đọc thông tin đơn hàng:", error);
-    } finally {
-      setLoaded(true);
-    }
-  }, []);
+      });
+
+      return () => {
+        cancelled = true;
+      };
+    }, []);
 
   const orderItems = checkout?.items ?? [];
 
@@ -396,15 +418,25 @@ export default function ThanhToanPage() {
       });
 
       const responseText = await response.text();
-      let data: any;
+      let data: ApiRecord = {};
 
       try {
-        data = responseText ? JSON.parse(responseText) : {};
+        const parsed: unknown = responseText
+          ? JSON.parse(responseText)
+          : {};
+
+        data = isApiRecord(parsed) ? parsed : {};
       } catch {
         data = {
           message: responseText || "Backend trả về phản hồi không hợp lệ.",
         };
       }
+
+      const responseData = isApiRecord(data.data) ? data.data : {};
+      const orderData = isApiRecord(data.order) ? data.order : {};
+      const nestedOrderData = isApiRecord(responseData.order)
+        ? responseData.order
+        : {};
 
       console.log("Kết quả API tạo đơn hàng:", {
         status: response.status,
@@ -425,10 +457,10 @@ export default function ThanhToanPage() {
 
       const realOrderId =
         data.orderId ??
-        data.data?.orderId ??
+        responseData.orderId ??
         data.madonhanghienthi ??
-        data.order?.madonhanghienthi ??
-        data.data?.madonhanghienthi;
+        orderData.madonhanghienthi ??
+        responseData.madonhanghienthi;
 
       if (!realOrderId || String(realOrderId).startsWith("TEMP-")) {
         throw new Error("Không nhận được mã đơn hàng thật từ backend.");
@@ -436,9 +468,9 @@ export default function ThanhToanPage() {
 
       const internalOrderId = Number(
         data.madonhang ??
-          data.order?.madonhang ??
-          data.data?.madonhang ??
-          data.data?.order?.madonhang,
+        orderData.madonhang ??
+        responseData.madonhang ??
+        nestedOrderData.madonhang,
       );
 
       if (!Number.isSafeInteger(internalOrderId) || internalOrderId < 1) {
@@ -542,10 +574,14 @@ export default function ThanhToanPage() {
       });
 
       const responseText = await response.text();
-      let data: any;
+      let data: ApiRecord = {};
 
       try {
-        data = responseText ? JSON.parse(responseText) : {};
+        const parsed: unknown = responseText
+          ? JSON.parse(responseText)
+          : {};
+
+        data = isApiRecord(parsed) ? parsed : {};
       } catch {
         data = { message: responseText };
       }
@@ -560,8 +596,14 @@ export default function ThanhToanPage() {
 
       const updatedCheckout: CheckoutData = {
         ...checkout,
-        status: data.orderStatus ?? checkout.status,
-        paymentStatus: data.paymentStatus,
+        status:
+        typeof data.orderStatus === "string"
+          ? data.orderStatus
+          : checkout.status,
+      paymentStatus:
+        typeof data.paymentStatus === "string"
+          ? data.paymentStatus
+          : undefined,
       };
 
       localStorage.setItem(

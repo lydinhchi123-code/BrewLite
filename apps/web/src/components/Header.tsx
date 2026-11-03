@@ -102,33 +102,56 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
-    const duLieu = localStorage.getItem("brewlite_user");
+    let active = true;
 
-    if (duLieu) {
-      try {
-        setTaiKhoan(JSON.parse(duLieu));
-      } catch {
-        localStorage.removeItem("brewlite_user");
+    Promise.resolve().then(() => {
+      if (!active) return;
+
+      const duLieu = localStorage.getItem("brewlite_user");
+
+      if (duLieu) {
+        try {
+          setTaiKhoan(JSON.parse(duLieu));
+        } catch {
+          localStorage.removeItem("brewlite_user");
+        }
       }
-    }
+    });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
-    capNhatSoLuongGioHang();
+    let active = true;
+
+    const capNhatGioHang = () => {
+      if (active) {
+        capNhatSoLuongGioHang();
+      }
+    };
+
+    Promise.resolve().then(capNhatGioHang);
 
     // Cập nhật khi chuyển tab hoặc quay lại trang
-    window.addEventListener("focus", capNhatSoLuongGioHang);
+    window.addEventListener("focus", capNhatGioHang);
 
     // Nhận thông báo khi trang khác cập nhật giỏ hàng
-    window.addEventListener("storage", capNhatSoLuongGioHang);
+    window.addEventListener("storage", capNhatGioHang);
 
     // Sự kiện tùy chỉnh dùng trong cùng một tab
-    window.addEventListener("brewlite-cart-updated", capNhatSoLuongGioHang);
+    window.addEventListener("brewlite-cart-updated", capNhatGioHang);
 
     return () => {
-      window.removeEventListener("focus", capNhatSoLuongGioHang);
-      window.removeEventListener("storage", capNhatSoLuongGioHang);
-      window.removeEventListener("brewlite-cart-updated", capNhatSoLuongGioHang);
+      active = false;
+
+      window.removeEventListener("focus", capNhatGioHang);
+      window.removeEventListener("storage", capNhatGioHang);
+      window.removeEventListener(
+        "brewlite-cart-updated",
+        capNhatGioHang
+      );
     };
   }, []);
 

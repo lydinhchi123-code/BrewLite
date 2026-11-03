@@ -1020,7 +1020,15 @@ export class OrdersService {
       throw new NotFoundException('Không tìm thấy đơn hàng.');
     }
 
-    return result.rows[0];
+    const order = result.rows[0];
+
+    return {
+      ...order,
+      subtotal: Number(order.subtotal),
+      deliveryFee: Number(order.deliveryFee),
+      discount: Number(order.discount),
+      totalAmount: Number(order.totalAmount),
+    };
   }
 
   async updateStatus(

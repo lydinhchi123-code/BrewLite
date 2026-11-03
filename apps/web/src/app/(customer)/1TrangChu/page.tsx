@@ -39,28 +39,34 @@ export default function TrangChu() {
           );
         }
 
-        const payload = await response.json();
+        const payload: unknown = await response.json();
 
-        const danhSach: any[] = Array.isArray(payload)
+        const isRecord = (
+          value: unknown
+        ): value is Record<string, unknown> => {
+          return typeof value === "object" && value !== null && !Array.isArray(value);
+        };
+
+        const rawList: unknown[] = Array.isArray(payload)
           ? payload
-          : Array.isArray(payload.data)
+          : isRecord(payload) && Array.isArray(payload.data)
             ? payload.data
-            : Array.isArray(payload.items)
+            : isRecord(payload) && Array.isArray(payload.items)
               ? payload.items
               : [];
 
+        const danhSach = rawList.filter(isRecord);
+
         const ketQua: MonNoiBat[] = TEN_MON_NOI_BAT
           .map((tenMon) => {
-            const mon = danhSach.find((item: any) => {
+            const mon = danhSach.find((item) => {
               const tenTrongDB = String(
                 item.name ?? item.product_name ?? item.productName ?? ""
               )
                 .trim()
                 .toLocaleLowerCase("vi-VN");
 
-              return (
-                tenTrongDB === tenMon.toLocaleLowerCase("vi-VN")
-              );
+              return tenTrongDB === tenMon.toLocaleLowerCase("vi-VN");
             });
 
             if (!mon) {
@@ -76,10 +82,9 @@ export default function TrangChu() {
                 0
             );
 
-            const category =
-              typeof mon.category === "object" && mon.category !== null
-                ? mon.category.name ?? mon.category.category_name ?? ""
-                : mon.category ?? mon.category_name ?? "";
+            const category = isRecord(mon.category)
+              ? mon.category.name ?? mon.category.category_name ?? ""
+              : mon.category ?? mon.category_name ?? "";
 
             return {
               ten: String(
