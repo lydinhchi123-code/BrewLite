@@ -4,8 +4,9 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { Pool, PoolClient } from 'pg';
+import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.module';
 import { CreateOrderDto } from './dto/create-order.dto';
 import {
@@ -20,6 +21,22 @@ interface RequiredIngredient {
   quantity: number;
 }
 
+interface PricedOrderItem {
+  id: string;
+  name: string;
+  price?: number;
+  quantity: number;
+  size?: string;
+  topping?: string[];
+  sugar?: string;
+  ice?: string;
+  productId: number;
+  productName: string;
+  categorySlug: string;
+  sizeId: number | null;
+  finalUnitPrice: number;
+}
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -27,27 +44,29 @@ export class OrdersService {
     private readonly pool: Pool,
   ) {}
 
-  async create(createOrderDto: CreateOrderDto) {
+  async create(
+    createOrderDto: CreateOrderDto,
+    authenticatedMakh?: string | number,
+  ) {
     const {
       items,
       customerName,
       customerPhone,
       address,
       phuong,
-      subtotal,
       deliveryFee = 0,
-      discount = 0,
-      totalAmount,
+      maGiamGia,
       note,
-      makh,
     } = createOrderDto;
+
+    const makh = authenticatedMakh;
 
     if (
       makh == null ||
       !Number.isSafeInteger(Number(makh)) ||
       Number(makh) < 1
     ) {
-      throw new BadRequestException(
+      throw new UnauthorizedException(
         'Không xác định được khách hàng. Vui lòng đăng nhập lại.',
       );
     }
@@ -77,53 +96,6 @@ export class OrdersService {
           'Số lượng mỗi món phải là số nguyên dương.',
         );
       }
-
-      if (
-        !Number.isFinite(item.price) ||
-        item.price < 0
-      ) {
-        throw new BadRequestException(
-          'Đơn giá sản phẩm không hợp lệ.',
-        );
-      }
-    }
-
-    if (
-      !Number.isFinite(subtotal) ||
-      !Number.isFinite(deliveryFee) ||
-      !Number.isFinite(discount) ||
-      !Number.isFinite(totalAmount) ||
-      deliveryFee < 0 ||
-      discount < 0
-    ) {
-      throw new BadRequestException(
-        'Thông tin thanh toán không hợp lệ.',
-      );
-    }
-
-    const expectedTotal =
-      subtotal + deliveryFee - discount;
-
-    if (
-      expectedTotal < 0 ||
-      Math.abs(expectedTotal - totalAmount) > 0.001
-    ) {
-      throw new BadRequestException(
-        'Tổng tiền không hợp lệ.',
-      );
-    }
-
-    const calculatedSubtotal = items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0,
-    );
-
-    if (
-      Math.abs(calculatedSubtotal - subtotal) > 0.001
-    ) {
-      throw new BadRequestException(
-        'Tạm tính không khớp với chi tiết đơn hàng.',
-      );
     }
 
     const client = await this.pool.connect();
@@ -131,47 +103,325 @@ export class OrdersService {
     try {
       await client.query('BEGIN');
 
+      // Tính giá sản phẩm từ database, không tin giá frontend.
+      let calculatedSubtotal = 0;
+
+      const pricedItems: PricedOrderItem[] = [];
+
+      for (const item of items) {
+        const productId = Number(item.id);
+
+        const productResult = await client.query(
+          `
+          SELECT
+            p.id,
+            p.name,
+            p.base_price,
+            p.is_available,
+            c.slug AS category_slug
+          FROM menu_products p
+          JOIN menu_categories c ON c.id = p.category_id
+          WHERE p.id = $1
+          FOR UPDATE OF p
+          `,
+          [productId],
+        );
+
+        if (productResult.rowCount === 0) {
+          throw new NotFoundException(
+            `Không tìm thấy sản phẩm ID ${productId}.`,
+          );
+        }
+
+        const product = productResult.rows[0];
+
+        if (!product.is_available) {
+          throw new BadRequestException(
+            `Sản phẩm "${product.name}" hiện không được bán.`,
+          );
+        }
+
+        let unitPrice = 0;
+        let sizeId: number | null = null;
+
+        // Bánh sử dụng base_price, không có size.
+        if (product.category_slug === 'banh') {
+          if (item.size) {
+            throw new BadRequestException(
+              `Sản phẩm "${product.name}" không hỗ trợ chọn size.`,
+            );
+          }
+
+          unitPrice = Number(product.base_price);
+        } else {
+          // Đồ uống phải chọn size hợp lệ.
+          const sizeMap: Record<string, string> = {
+            'NHỎ': 'S',
+            'VỪA': 'M',
+            'LỚN': 'L',
+            S: 'S',
+            M: 'M',
+            L: 'L',
+          };
+
+          const normalizedSize = sizeMap[
+            item.size?.trim().toUpperCase() ?? ''
+          ];
+
+          if (!normalizedSize) {
+            throw new BadRequestException(
+              `Vui lòng chọn size hợp lệ cho "${product.name}".`,
+            );
+          }
+
+          const sizeResult = await client.query(
+            `
+            SELECT id, price
+            FROM menu_product_sizes
+            WHERE product_id = $1
+              AND UPPER(TRIM(size_code)) = $2
+              AND is_available = TRUE
+            `,
+            [productId, normalizedSize],
+          );
+
+          if (sizeResult.rowCount === 0) {
+            throw new BadRequestException(
+              `Size ${normalizedSize} của "${product.name}" hiện không khả dụng.`,
+            );
+          }
+
+          sizeId = Number(sizeResult.rows[0].id);
+          unitPrice = Number(sizeResult.rows[0].price);
+        }
+
+        // Kiểm tra và lấy giá topping từ database.
+        const originalToppings = item.topping ?? [];
+        const toppingNames = [...new Set(originalToppings)];
+
+        if (toppingNames.length !== originalToppings.length) {
+          throw new BadRequestException(
+            `Topping của "${product.name}" không được chọn trùng.`,
+          );
+        }
+
+        let toppingPrice = 0;
+
+        if (toppingNames.length > 0) {
+          if (product.category_slug === 'banh') {
+            throw new BadRequestException(
+              `Sản phẩm bánh "${product.name}" không hỗ trợ topping.`,
+            );
+          }
+
+          const toppingResult = await client.query(
+            `
+            SELECT t.name, t.price
+            FROM menu_toppings t
+            JOIN menu_product_toppings pt
+              ON pt.topping_id = t.id
+            WHERE pt.product_id = $1
+              AND t.name = ANY($2::text[])
+              AND t.is_available = TRUE
+            `,
+            [productId, toppingNames],
+          );
+
+          if (toppingResult.rowCount !== toppingNames.length) {
+            throw new BadRequestException(
+              `Một hoặc nhiều topping của "${product.name}" không hợp lệ hoặc không khả dụng.`,
+            );
+          }
+
+          toppingPrice = toppingResult.rows.reduce(
+            (sum, topping) => sum + Number(topping.price),
+            0,
+          );
+        }
+
+        const finalUnitPrice = unitPrice + toppingPrice;
+
+        calculatedSubtotal +=
+          finalUnitPrice * item.quantity;
+
+        pricedItems.push({
+          ...item,
+          productId,
+          productName: product.name,
+          categorySlug: product.category_slug,
+          sizeId,
+          finalUnitPrice,
+        });
+      }
+
+      let calculatedDiscount = 0;
+
+      if (maGiamGia?.trim()) {
+        const code = maGiamGia.trim().toUpperCase();
+
+        const discountResult = await client.query(
+          `
+          SELECT *
+          FROM magiamgia
+          WHERE UPPER(TRIM(ma)) = $1
+          FOR UPDATE
+          `,
+          [code],
+        );
+
+        if (discountResult.rowCount === 0) {
+          throw new BadRequestException(
+            'Mã giảm giá không tồn tại.',
+          );
+        }
+
+        const discount = discountResult.rows[0];
+        const now = new Date();
+
+        if (discount.trang_thai !== 'DANG_SU_DUNG') {
+          throw new BadRequestException(
+            'Mã giảm giá hiện không khả dụng.',
+          );
+        }
+
+        if (
+          discount.ngay_bat_dau &&
+          now < new Date(discount.ngay_bat_dau)
+        ) {
+          throw new BadRequestException(
+            'Mã giảm giá chưa đến thời gian sử dụng.',
+          );
+        }
+
+        if (
+          discount.ngay_ket_thuc &&
+          now > new Date(discount.ngay_ket_thuc)
+        ) {
+          throw new BadRequestException(
+            'Mã giảm giá đã hết hạn.',
+          );
+        }
+
+        if (
+          discount.so_luong_toi_da !== null &&
+          Number(discount.so_luong_da_dung) >=
+            Number(discount.so_luong_toi_da)
+        ) {
+          throw new BadRequestException(
+            'Mã giảm giá đã hết lượt sử dụng.',
+          );
+        }
+
+        if (
+          calculatedSubtotal <
+          Number(discount.don_hang_toi_thieu)
+        ) {
+          throw new BadRequestException(
+            `Đơn hàng phải đạt tối thiểu ${Number(discount.don_hang_toi_thieu).toLocaleString('vi-VN')}đ để sử dụng mã này.`,
+          );
+        }
+
+        // Kiểm tra khách đã sử dụng mã này chưa.
+        const usedResult = await client.query(
+          `
+          SELECT 1
+          FROM lich_su_su_dung_ma_giam_gia
+          WHERE ma_giam_gia_id = $1
+            AND makh = $2
+          LIMIT 1
+          `,
+          [discount.id, Number(makh)],
+        );
+
+        if (usedResult.rows.length > 0) {
+          throw new BadRequestException(
+            'Bạn đã sử dụng mã giảm giá này rồi.',
+          );
+        }
+
+        // Mã khách mới: kiểm tra khách đã có đơn thành công chưa.
+        if (discount.loai_ma === 'NEW_CUSTOMER') {
+          const previousOrder = await client.query(
+            `
+            SELECT 1
+            FROM donhang
+            WHERE makh = $1
+              AND trangthai IN (
+                'PAID',
+                'PREPARING',
+                'READY',
+                'COMPLETED'
+              )
+            LIMIT 1
+            `,
+            [Number(makh)],
+          );
+
+          if (previousOrder.rows.length > 0) {
+            throw new BadRequestException(
+              'Mã này chỉ dành cho khách hàng đặt đơn lần đầu.',
+            );
+          }
+        }
+
+        calculatedDiscount = Math.min(
+          Number(discount.so_tien_giam),
+          calculatedSubtotal,
+        );
+      }
+
+      const calculatedTotal =
+        calculatedSubtotal + Number(deliveryFee) - calculatedDiscount;
+
+      if (calculatedTotal < 0) {
+        throw new BadRequestException(
+          'Tổng tiền đơn hàng không hợp lệ.',
+        );
+      }
+
       const displayOrderId =
         `ORD-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
       // 1. Tạo đơn hàng trong transaction.
       const orderResult = await client.query(
-        `
-        INSERT INTO donhang (
-          madonhanghienthi,
-          makh,
-          hotennguoinhan,
-          sodienthoainguoinhan,
-          diachigiaohang,
-          phuong,
-          ghichu,
-          tamtinh,
-          phigiaohang,
-          giamgia,
-          tongtien
-        )
-        VALUES (
-          $1, $2, $3, $4, $5, $6,
-          $7, $8, $9, $10, $11
-        )
-        RETURNING *
-        `,
-        [
-          displayOrderId,
-          Number(makh),
-          customerName,
-          customerPhone,
-          address,
-          phuong,
-          note ?? null,
-          subtotal,
-          deliveryFee,
-          discount,
-          totalAmount,
-        ],
-      );
+      `
+      INSERT INTO donhang (
+        madonhanghienthi,
+        makh,
+        hotennguoinhan,
+        sodienthoainguoinhan,
+        diachigiaohang,
+        phuong,
+        ghichu,
+        tamtinh,
+        phigiaohang,
+        giamgia,
+        magiamgia,
+        tongtien
+      )
+      VALUES (
+        $1, $2, $3, $4, $5, $6,
+        $7, $8, $9, $10, $11, $12
+      )
+      RETURNING *
+      `,
+      [
+        displayOrderId,
+        Number(makh),
+        customerName,
+        customerPhone,
+        address,
+        phuong,
+        note ?? null,
+        calculatedSubtotal,
+        deliveryFee,
+        calculatedDiscount,
+        maGiamGia?.trim().toUpperCase() || null,
+        calculatedTotal,
+      ],
+    );
 
-      const order = orderResult.rows[0];
+    const order = orderResult.rows[0];
 
       let hasProductStockDeduction = false;
 
@@ -182,21 +432,23 @@ export class OrdersService {
       >();
 
       // 2. Kiểm tra sản phẩm, công thức và tạo chi tiết đơn.
-      for (const item of items) {
-        const productId = Number(item.id);
+      for (const item of pricedItems) {
+        const productId = item.productId;
 
         const productResult = await client.query(
           `
           SELECT
-            id,
-            name,
-            image_url,
-            is_available,
-            stock_quantity,
-            track_inventory
-          FROM menu_products
-          WHERE id = $1
-          FOR UPDATE
+            p.id,
+            p.name,
+            p.image_url,
+            p.is_available,
+            p.stock_quantity,
+            p.track_inventory,
+            c.slug AS category_slug
+          FROM menu_products p
+          JOIN menu_categories c ON c.id = p.category_id
+          WHERE p.id = $1
+          FOR UPDATE OF p
           `,
           [productId],
         );
@@ -250,24 +502,67 @@ export class OrdersService {
           hasProductStockDeduction = true;
         }
 
-        // 4. Lấy công thức mặc định của sản phẩm.
-        // Hiện DTO chưa có size_id nên dùng size_id IS NULL.
-        const recipeResult = await client.query(
-          `
-          SELECT id
-          FROM recipes
-          WHERE product_id = $1
-            AND size_id IS NULL
-            AND is_active = TRUE
-          ORDER BY version DESC, id DESC
-          LIMIT 1
-          `,
-          [productId],
-        );
+        // 4. Lấy công thức phù hợp với size của sản phẩm.
+        const isCake = product.category_slug === 'banh';
+
+        let recipeResult;
+
+        if (isCake) {
+          // Bánh luôn lấy công thức mặc định, không phụ thuộc item.size.
+          recipeResult = await client.query(
+            `
+            SELECT r.id
+            FROM recipes r
+            WHERE r.product_id = $1
+              AND r.size_id IS NULL
+              AND r.is_active = TRUE
+            ORDER BY r.version DESC, r.id DESC
+            LIMIT 1
+            `,
+            [productId],
+          );
+        } else {
+          // Món nước lấy công thức theo size.
+          const rawSize = item.size?.trim().toUpperCase() || null;
+
+          const sizeMap: Record<string, string> = {
+            'NHỎ': 'S',
+            'VỪA': 'M',
+            'LỚN': 'L',
+            S: 'S',
+            M: 'M',
+            L: 'L',
+          };
+
+          const size = rawSize
+            ? sizeMap[rawSize] ?? rawSize
+            : null;
+
+          if (!size) {
+            throw new BadRequestException(
+              `Vui lòng chọn size cho sản phẩm "${product.name}".`,
+            );
+          }
+
+          recipeResult = await client.query(
+            `
+            SELECT r.id
+            FROM recipes r
+            JOIN menu_product_sizes s ON s.id = r.size_id
+            WHERE r.product_id = $1
+              AND s.product_id = $1
+              AND UPPER(TRIM(s.size_code)) = $2
+              AND r.is_active = TRUE
+            ORDER BY r.version DESC, r.id DESC
+            LIMIT 1
+            `,
+            [productId, size],
+          );
+        }
 
         if (recipeResult.rowCount === 0) {
           throw new BadRequestException(
-            `Sản phẩm "${product.name}" chưa có công thức nguyên liệu mặc định. Không thể tạo đơn hàng.`,
+            `Sản phẩm "${product.name}" chưa có công thức phù hợp.`,
           );
         }
 
@@ -365,7 +660,7 @@ export class OrdersService {
             item.ice ?? null,
             topping,
             item.quantity,
-            item.price,
+            item.finalUnitPrice,
             stockDeducted,
           ],
         );
@@ -386,17 +681,17 @@ export class OrdersService {
             i.is_active,
             inv.stock_quantity
           FROM ingredients i
-          LEFT JOIN ingredient_inventory inv
+          JOIN ingredient_inventory inv
             ON inv.ingredient_id = i.id
           WHERE i.id = $1
-          FOR UPDATE OF i
+          FOR UPDATE OF inv
           `,
           [ingredient.ingredientId],
         );
 
         if (inventoryResult.rowCount === 0) {
-          throw new NotFoundException(
-            `Không tìm thấy nguyên liệu "${ingredient.name}".`,
+          throw new BadRequestException(
+            `Nguyên liệu "${ingredient.name}" chưa có bản ghi tồn kho.`,
           );
         }
 
@@ -424,9 +719,7 @@ export class OrdersService {
 
         if (available < ingredient.quantity) {
           throw new BadRequestException(
-            `Nguyên liệu "${ingredient.name}" không đủ tồn kho. ` +
-            `Hiện có: ${available} ${ingredient.unit}, ` +
-            `cần: ${ingredient.quantity} ${ingredient.unit}.`,
+            `Rất tiếc, nguyên liệu "${ingredient.name}" hiện không đủ để đáp ứng đơn hàng. Vui lòng giảm số lượng đặt hàng hoặc thử lại sau.`,
           );
         }
       }
@@ -574,7 +867,14 @@ export class OrdersService {
     return result.rows;
   }
 
-  async findByCustomerId(makh: number) {
+  async findByCustomerId(authenticatedMakh?: string | number) {
+    const makh = Number(authenticatedMakh);
+    if (!Number.isSafeInteger(makh) || makh < 1) {
+      throw new UnauthorizedException(
+        'Vui lòng đăng nhập để xem lịch sử đơn hàng.',
+      );
+    }
+
     const result = await this.pool.query(
       `
       SELECT
@@ -601,6 +901,14 @@ export class OrdersService {
       LEFT JOIN chitietdonhang c
         ON c.madonhang = d.madonhang
       WHERE d.makh = $1
+        AND (
+          d.trangthai <> 'PENDING'
+          OR EXISTS (
+            SELECT 1
+            FROM thanhtoan t
+            WHERE t.madonhang = d.madonhang
+          )
+        )
       GROUP BY d.madonhang
       ORDER BY d.ngaydat DESC
       `,
@@ -610,7 +918,20 @@ export class OrdersService {
     return result.rows;
   }
 
-  async findOne(orderId: string) {
+  async findOne(orderId: string, authenticatedMakh?: string | number) {
+    if (
+      authenticatedMakh == null ||
+      !/^\d+$/.test(String(authenticatedMakh))
+    ) {
+      throw new UnauthorizedException(
+        'Không xác định được khách hàng đăng nhập.',
+      );
+    }
+
+    if (!/^ORD-[A-Za-z0-9-]+$/.test(orderId)) {
+      throw new BadRequestException('Mã đơn hàng không hợp lệ.');
+    }
+
     const result = await this.pool.query(
       `
       SELECT
@@ -623,7 +944,14 @@ export class OrdersService {
         ) AS "paymentStatus",
 
         t.phuongthuc AS "paymentMethod",
+        t.ngaythanhtoan AS "paidAt",
         d.ngaydat AS "createdAt",
+
+        d.hotennguoinhan AS "recipientName",
+        d.sodienthoainguoinhan AS "recipientPhone",
+        d.diachigiaohang AS "deliveryAddress",
+        d.phuong AS province,
+        d.ghichu AS note,
 
         d.tamtinh AS subtotal,
         d.phigiaohang AS "deliveryFee",
@@ -660,20 +988,36 @@ export class OrdersService {
         ) AS items
 
       FROM donhang d
-      LEFT JOIN thanhtoan t
-        ON t.madonhang = d.madonhang
+
+      -- Chỉ lấy giao dịch thanh toán mới nhất.
+      LEFT JOIN LATERAL (
+        SELECT
+          t.trangthai,
+          t.phuongthuc,
+          t.ngaythanhtoan
+        FROM thanhtoan t
+        WHERE t.madonhang = d.madonhang
+        ORDER BY t.mathanhtoan DESC
+        LIMIT 1
+      ) t ON TRUE
+
       LEFT JOIN chitietdonhang c
         ON c.madonhang = d.madonhang
+
       WHERE d.madonhanghienthi = $1
-      GROUP BY d.madonhang, t.mathanhtoan
+        AND d.makh = $2::bigint
+
+      GROUP BY
+        d.madonhang,
+        t.trangthai,
+        t.phuongthuc,
+        t.ngaythanhtoan
       `,
-      [orderId],
+      [orderId, String(authenticatedMakh)],
     );
 
     if (result.rows.length === 0) {
-      throw new NotFoundException(
-        'Không tìm thấy đơn hàng.',
-      );
+      throw new NotFoundException('Không tìm thấy đơn hàng.');
     }
 
     return result.rows[0];
@@ -688,9 +1032,16 @@ export class OrdersService {
     try {
       await client.query('BEGIN');
 
+      // 1. Khóa đơn hàng và lấy thông tin mã giảm giá.
       const result = await client.query(
         `
-        SELECT madonhang, madonhanghienthi, trangthai
+        SELECT
+          madonhang,
+          madonhanghienthi,
+          makh,
+          trangthai,
+          magiamgia,
+          giamgia
         FROM donhang
         WHERE madonhang = $1
         FOR UPDATE
@@ -707,6 +1058,7 @@ export class OrdersService {
       const order = result.rows[0];
       const currentStatus = order.trangthai as OrderStatus;
 
+      // 2. Kiểm tra chuyển trạng thái hợp lệ.
       try {
         assertTransition(currentStatus, nextStatus);
       } catch (error: unknown) {
@@ -717,10 +1069,89 @@ export class OrdersService {
         );
       }
 
-      // Chỉ cập nhật trạng thái ở đây.
-      // Không tự hoàn kho khi hủy vì cần lưu lại định lượng
-      // nguyên liệu đã xuất tại thời điểm đặt đơn để hoàn kho
-      // chính xác kể cả khi công thức đã thay đổi.
+      // 3. Nếu Admin xác nhận đơn đã thanh toán.
+      if (nextStatus === OrderStatus.PAID) {
+        // Lấy giao dịch thanh toán mới nhất.
+        const paymentResult = await client.query(
+          `
+          SELECT
+            mathanhtoan,
+            phuongthuc,
+            trangthai
+          FROM thanhtoan
+          WHERE madonhang = $1
+          ORDER BY mathanhtoan DESC
+          LIMIT 1
+          FOR UPDATE
+          `,
+          [madonhang],
+        );
+
+        if (paymentResult.rowCount === 0) {
+          throw new BadRequestException(
+            'Đơn hàng chưa có giao dịch thanh toán.',
+          );
+        }
+
+        const payment = paymentResult.rows[0];
+
+        // Chỉ cho Admin xác nhận giao dịch COD đang chờ thanh toán.
+        if (
+          payment.phuongthuc === 'COD' &&
+          payment.trangthai === 'CHO_THANH_TOAN'
+        ) {
+          await client.query(
+            `
+            UPDATE thanhtoan
+            SET trangthai = 'DA_THANH_TOAN',
+                ngaythanhtoan = CURRENT_TIMESTAMP
+            WHERE mathanhtoan = $1
+            `,
+            [payment.mathanhtoan],
+          );
+        } else if (payment.trangthai !== 'DA_THANH_TOAN') {
+          throw new BadRequestException(
+            'Giao dịch chưa thanh toán thành công.',
+          );
+        }
+
+        // 4. Ghi nhận lịch sử sử dụng mã giảm giá nếu đơn có mã.
+        if (
+          order.magiamgia &&
+          Number(order.giamgia) > 0
+        ) {
+          const discountResult = await client.query(
+            `
+            INSERT INTO lich_su_su_dung_ma_giam_gia (
+              ma_giam_gia_id,
+              makh,
+              madonhang,
+              so_tien_duoc_giam
+            )
+            SELECT
+              m.id,
+              d.makh,
+              d.madonhang,
+              d.giamgia
+            FROM donhang d
+            JOIN magiamgia m
+              ON UPPER(TRIM(m.ma)) = UPPER(TRIM(d.magiamgia))
+            WHERE d.madonhang = $1
+              AND d.magiamgia IS NOT NULL
+              AND d.giamgia > 0
+            `,
+            [madonhang],
+          );
+
+          if (discountResult.rowCount !== 1) {
+            throw new BadRequestException(
+              'Không thể ghi nhận lịch sử sử dụng mã giảm giá.',
+            );
+          }
+        }
+      }
+
+      // 5. Cập nhật trạng thái đơn hàng.
       const updated = await client.query(
         `
         UPDATE donhang

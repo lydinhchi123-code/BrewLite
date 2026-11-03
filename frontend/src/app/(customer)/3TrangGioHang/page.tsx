@@ -289,15 +289,28 @@ export default function CartPage() {
       orderId: `TEMP-${Date.now()}`,
       makh,
       items: items.map((item) => ({
-        id: String(item.product.id),
-        name: item.product.name,
-        price: item.unitPrice,
-        quantity: item.qty,
-        size: item.sizeName ?? item.size ?? "M",
-        sugar: item.sugar ?? undefined,
-        ice: item.ice ?? undefined,
-        topping: (item.toppings ?? []).map((t) => t.name),
-      })),
+      id: String(item.product.id),
+      name: item.product.name,
+      price: item.unitPrice,
+      quantity: item.qty,
+
+      // Chỉ gửi size nếu sản phẩm không phải bánh
+      ...(!isCake(item.product)
+        ? { size: item.size ?? "M" }
+        : {}),
+
+      sugar: !isCake(item.product)
+        ? item.sugar ?? undefined
+        : undefined,
+
+      ice: !isCake(item.product)
+        ? item.ice ?? undefined
+        : undefined,
+
+      topping: !isCake(item.product)
+        ? (item.toppings ?? []).map((t) => t.name)
+        : [],
+    })),
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
       address: fullAddress,
@@ -395,8 +408,8 @@ export default function CartPage() {
         ...editingProduct,
         price: editProductPrice,
       },
-      size: editSize,
-      sizeName: chosenSize?.name ?? editSize,
+      size: editingCake ? undefined : editSize,
+      sizeName: editingCake ? undefined : chosenSize?.name ?? editSize,
       sugar: editingCake ? null : editSugar,
       ice: editingCake ? null : editIce,
       toppings: selectedToppings,
@@ -489,9 +502,11 @@ export default function CartPage() {
                     {item.product.name}
                   </h3>
 
-                  <p className="bl-cart-detail">
-                    Size: {item.sizeName ?? item.size ?? "M"}
-                  </p>
+                  {!isCake(item.product) && (
+                    <p className="bl-cart-detail">
+                      Size: {item.sizeName ?? item.size ?? "M"}
+                    </p>
+                  )}
 
                   {item.sugar && (
                     <p className="bl-cart-detail">

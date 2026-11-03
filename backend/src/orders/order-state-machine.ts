@@ -18,6 +18,8 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 
   [OrderStatus.PAYMENT_FAILED]: [
     OrderStatus.PENDING,
+    OrderStatus.PAID,
+    OrderStatus.PAYMENT_FAILED,
     OrderStatus.CANCELLED,
   ],
 

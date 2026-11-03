@@ -5,6 +5,7 @@ import {
   Post,
   Patch,
   Param,
+  Req,
   ParseIntPipe,
   UseGuards,
   UsePipes,
@@ -30,8 +31,16 @@ export class OrdersController {
       transform: true,
     }),
   )
-  create(@Body() createOrderDto: CreateOrderDto) {
-    return this.ordersService.create(createOrderDto);
+  create(
+    @Body() createOrderDto: CreateOrderDto,
+    @Req() req: any,
+  ) {
+    console.log("JWT USER:", req.user);
+
+    return this.ordersService.create(
+      createOrderDto,
+      Number(req.user.sub),
+    );
   }
 
   @Get()
@@ -44,17 +53,25 @@ export class OrdersController {
     return this.ordersService.getDashboardStats();
   }
   
-  @Get(':orderId')
+  @Get('khach-hang')
   @UseGuards(JwtAuthGuard)
-  findOne(@Param('orderId') orderId: string) {
-    return this.ordersService.findOne(orderId);
+  findByCustomerId(@Req() req: any) {
+    return this.ordersService.findByCustomerId(
+      Number(req.user.sub),
+    );
   }
 
-  @Get('khach-hang/:makh')
-  findByCustomerId(
-    @Param('makh', ParseIntPipe) makh: number,
+  // Lấy chi tiết một đơn hàng
+  @Get(':orderId')
+  @UseGuards(JwtAuthGuard)
+  findOne(
+    @Param('orderId') orderId: string,
+    @Req() req: any,
   ) {
-    return this.ordersService.findByCustomerId(makh);
+    return this.ordersService.findOne(
+      orderId,
+      Number(req.user.sub),
+    );
   }
 
   @Patch(':madonhang/status')

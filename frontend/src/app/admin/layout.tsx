@@ -6,14 +6,11 @@ import { usePathname } from "next/navigation";
 import "./admin.css";
 
 const menuItems = [
-  { label: "Tổng quan", href: "/admin", icon: "▦" },
-  { label: "Đơn hàng", href: "/admin/don-hang", icon: "▤" },
-  { label: "Tồn kho", href: "/admin/ton-kho", icon: "▣" },
-  {
-    label: "Công thức pha chế",
-    href: "/admin/cong-thuc-pha-che",
-    icon: "♨",
-  },
+  { label: "Tổng quan", href: "/admin", icon: "📊" },
+  { label: "Đơn hàng", href: "/admin/don-hang", icon: "🧾" },
+  { label: "Tồn kho", href: "/admin/ton-kho", icon: "📦" },
+  { label: "Công thức pha chế", href: "/admin/cong-thuc-pha-che", icon: "🧪" },
+  { label: "Mã giảm giá", href: "/admin/ma-giam-gia", icon: "🎟️" },
 ];
 
 export default function AdminLayout({

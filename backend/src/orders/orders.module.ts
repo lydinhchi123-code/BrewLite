@@ -9,7 +9,7 @@ import { DatabaseModule } from "../database/database.module";
     DatabaseModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET,
-      signOptions: { expiresIn: "1h" },
+      signOptions: { expiresIn: "30d" },
     }),
   ],
   controllers: [OrdersController],

@@ -222,10 +222,9 @@ export default function AdminInventoryPage() {
     if (
       rawQuantity === "" ||
       !Number.isFinite(enteredQuantity) ||
-      !Number.isSafeInteger(enteredQuantity) ||
       enteredQuantity < 0
     ) {
-      setError("Số lượng phải là số nguyên không âm.");
+      setError("Số lượng phải là số không âm hợp lệ.");
       setSuccess("");
       return;
     }

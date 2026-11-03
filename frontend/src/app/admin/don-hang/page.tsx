@@ -179,7 +179,7 @@ export default function AdminOrdersPage() {
   }, [loadOrders]);
 
   const filteredOrders = orders.filter((order) => {
-    const keyword = search.toLowerCase();
+    const keyword = search.trim().toLowerCase();
 
     const matchesSearch =
         String(order.madonhang).toLowerCase().includes(keyword) ||
@@ -376,7 +376,16 @@ export default function AdminOrdersPage() {
                       <td>{formatDate(order.date)}</td>
                       <td>{formatMoney(order.total)}</td>
                       <td>
-                        <span className="admin-status">
+                        <span className="admin-status"
+                          style={order.status === "PAYMENT_FAILED"
+                              ? {
+                                  backgroundColor: "#fee2e2",
+                                  color: "#dc2626",
+                                  border: "1px solid #fecaca",
+                                }
+                              : {}
+                          }
+                        >
                           {statusLabels[order.status] ?? order.status}
                         </span>
                       </td>

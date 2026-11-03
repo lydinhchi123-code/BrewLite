@@ -1,20 +1,23 @@
+
 .admin-shell {
   --coffee: #70452d;
   --coffee-dark: #422b20;
   --cream: #faf7f2;
   --muted: #8e8178;
   --line: #eee7df;
+
   min-height: 100vh;
   display: flex;
   color: #33271f;
   background: var(--cream);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Segoe UI", Arial, Helvetica, sans-serif;
 }
 
 .admin-shell * {
   box-sizing: border-box;
 }
 
+/* SIDEBAR */
 .admin-sidebar {
   width: 250px;
   flex-shrink: 0;
@@ -159,6 +162,7 @@
   background: #46a675;
 }
 
+/* MAIN */
 .admin-main {
   min-width: 0;
   flex: 1;
@@ -213,6 +217,7 @@
   padding: 30px 34px 40px;
 }
 
+/* PAGE HEADING */
 .admin-page-heading {
   display: flex;
   align-items: flex-start;
@@ -235,6 +240,7 @@
   line-height: 1.7;
 }
 
+/* BUTTONS */
 .admin-primary-button {
   display: inline-flex;
   justify-content: center;
@@ -255,6 +261,23 @@
   background: var(--coffee-dark);
 }
 
+.admin-action-button {
+  padding: 8px 11px;
+  border: 1px solid #dfcbbb;
+  border-radius: 8px;
+  background: #fffaf5;
+  color: var(--coffee);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* STATISTICS */
 .admin-stats-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -306,6 +329,7 @@
   font-size: 11px;
 }
 
+/* PANEL */
 .admin-panel {
   margin-bottom: 24px;
   overflow: hidden;
@@ -335,6 +359,7 @@
   text-decoration: none;
 }
 
+/* TABLE */
 .admin-table-wrap {
   width: 100%;
   overflow-x: auto;
@@ -370,6 +395,7 @@
   font-size: 12px;
 }
 
+/* STATUS */
 .admin-muted {
   color: var(--muted);
 }
@@ -404,6 +430,7 @@
   color: #b54738;
 }
 
+/* SHORTCUTS */
 .admin-shortcuts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -452,12 +479,21 @@
   line-height: 1.6;
 }
 
+/* TOOLBAR */
 .admin-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
   margin-bottom: 20px;
+}
+
+.admin-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
 }
 
 .admin-search {
@@ -475,6 +511,11 @@
   border-color: #a98265;
 }
 
+.admin-toolbar-left .admin-search {
+  width: 360px;
+  max-width: 360px;
+}
+
 .admin-select {
   padding: 11px 12px;
   border: 1px solid #e8dfd6;
@@ -484,6 +525,17 @@
   font-size: 12px;
 }
 
+.admin-toolbar-left .admin-select {
+  width: 200px;
+  flex-shrink: 0;
+}
+
+.admin-toolbar > .admin-action-button {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* EMPTY & LOADING */
 .admin-empty {
   padding: 40px 20px;
   color: var(--muted);
@@ -507,6 +559,7 @@
   font-size: 13px;
 }
 
+/* STOCK */
 .admin-stock-input {
   width: 100px;
   padding: 9px;
@@ -516,22 +569,37 @@
   font-size: 12px;
 }
 
-.admin-action-button {
-  padding: 8px 11px;
-  border: 1px solid #dfcbbb;
-  border-radius: 8px;
-  background: #fffaf5;
-  color: var(--coffee);
-  font-size: 11px;
+/* FONT & SPACING */
+.admin-shell,
+.admin-shell * {
+  word-spacing: normal;
+}
+
+.admin-shell h1,
+.admin-shell h2,
+.admin-shell h3,
+.admin-shell p,
+.admin-shell span,
+.admin-shell a,
+.admin-shell button,
+.admin-shell th,
+.admin-shell td,
+.admin-shell input,
+.admin-shell label,
+.admin-shell strong,
+.admin-shell small {
+  letter-spacing: normal;
+  word-spacing: normal;
+}
+
+.admin-topbar h2,
+.admin-page-heading h1,
+.admin-panel-header h3 {
+  font-family: "Segoe UI", Arial, sans-serif;
   font-weight: 700;
-  cursor: pointer;
 }
 
-.admin-action-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
+/* TABLET */
 @media (max-width: 1100px) {
   .admin-stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -542,6 +610,7 @@
   }
 }
 
+/* MOBILE */
 @media (max-width: 700px) {
   .admin-sidebar {
     width: 74px;
@@ -627,39 +696,24 @@
     flex-direction: column;
   }
 
-  .admin-search {
+  .admin-toolbar-left {
+    flex-direction: column;
+    align-items: stretch;
     width: 100%;
   }
 
-/* Sửa lỗi khoảng cách chữ tiếng Việt trong trang admin */
-.admin-shell,
-.admin-shell * {
-  font-family: "Segoe UI", Arial, sans-serif;
-  word-spacing: normal;
-}
-}
-/* Đưa khoảng cách ký tự về bình thường */
-.admin-shell h1,
-.admin-shell h2,
-.admin-shell h3,
-.admin-shell p,
-.admin-shell span,
-.admin-shell a,
-.admin-shell button,
-.admin-shell th,
-.admin-shell td,
-.admin-shell input,
-.admin-shell label,
-.admin-shell strong,
-.admin-shell small {
-  letter-spacing: normal;
-  word-spacing: normal;
-}
+  .admin-toolbar-left .admin-search,
+  .admin-toolbar-left .admin-select {
+    width: 100%;
+    max-width: none;
+  }
 
-/* Font cho tiêu đề */
-.admin-topbar h2,
-.admin-page-heading h1,
-.admin-panel-header h3 {
-  font-family: "Segoe UI", Arial, sans-serif;
-  font-weight: 700;
+  .admin-toolbar > .admin-action-button {
+    margin-left: 0;
+    align-self: flex-end;
+  }
+
+  .admin-search {
+    width: 100%;
+  }
 }

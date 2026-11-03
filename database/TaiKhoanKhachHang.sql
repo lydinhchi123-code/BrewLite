@@ -1,3 +1,4 @@
+
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS TaiKhoanKhachHang (
@@ -36,3 +37,5 @@ COMMIT;
 
 SELECT * FROM TaiKhoanKhachHang
 ORDER BY makh;
+
+DELE

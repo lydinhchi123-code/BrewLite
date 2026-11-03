@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import "./lichsudon.css";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
 type TaiKhoan = {
   makh: number;
   hoten: string;
@@ -187,10 +189,16 @@ export default function OrderHistoryPage() {
       setLoiDonHang("");
 
       try {
-        const response = await fetch(
-          `http://localhost:3001/orders/khach-hang/${taiKhoan!.makh}`,
-          { signal: controller.signal },
-        );
+        const token = localStorage.getItem("brewlite_accessToken");
+        if (!token) {
+          throw new Error("Vui lòng đăng nhập để xem lịch sử đơn hàng.");
+        }
+
+        // Lấy mã khách hàng từ JWT ở backend, không truyền makh qua URL.
+        const response = await fetch(`${API_URL}/orders/khach-hang`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
 
         if (!response.ok) {
           throw new Error(`Không thể tải đơn hàng (HTTP ${response.status})`);

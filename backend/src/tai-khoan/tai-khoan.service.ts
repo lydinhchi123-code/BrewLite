@@ -152,7 +152,7 @@ export class TaiKhoanService {
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
-      expiresIn: "1h",
+      expiresIn: "30d",
     });
 
     return {

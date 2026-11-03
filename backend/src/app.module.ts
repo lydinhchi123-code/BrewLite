@@ -12,6 +12,8 @@ import { OrdersModule } from "./orders/orders.module";
 import { PaymentsModule } from "./payments/payments.module";
 import { DonHangController } from "./don_hang/don_hang.controller";
 import { DonHangService } from "./don_hang/don_hang.service";
+import { DiscountsModule } from './discounts/discounts.module';
+import { RecipesModule } from './recipes/recipes.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -29,11 +31,13 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
     JwtModule.register({
       secret: process.env.JWT_SECRET,
-      signOptions: { expiresIn: "1h" },
+      signOptions: { expiresIn: "30d" },
     }),
 
     OrdersModule,
     PaymentsModule,
+    DiscountsModule,
+    RecipesModule,
   ],
   controllers: [
     AppController,

@@ -25,393 +25,31 @@ interface Product {
 }
 
 interface Ingredient {
-  name: string;
-  amount: string;
+  ingredientId: number;
+  ingredientName: string;
+  quantity: number;
+  unit: string;
+  note?: string;
+}
+
+interface RecipeStep {
+  stepNumber: number;
+  instruction: string;
 }
 
 interface Recipe {
+  recipeId: number;
+  productId: number;
+  recipeName: string;
+  version: number;
+  notes?: string;
+  preparationTime?: number;
+  sizeId: number | null;
+  sizeCode: string | null;
   ingredients: Ingredient[];
-  steps: string[];
-  time: string;
-  note: string;
+  steps: RecipeStep[];
 }
 
-const recipes: Record<string, Recipe> = {
-  "ca-phe-sua-da": {
-    ingredients: [
-      { name: "Cà phê espresso hoặc cà phê đậm đặc", amount: "40 ml" },
-      { name: "Sữa đặc", amount: "25 ml" },
-      { name: "Đá viên", amount: "150 g" },
-    ],
-    steps: [
-      "Chuẩn bị ly sạch và cho sữa đặc vào đáy ly.",
-      "Chiết xuất cà phê rồi rót vào ly.",
-      "Khuấy đều cà phê với sữa đặc.",
-      "Thêm đá viên, khuấy nhẹ và phục vụ.",
-    ],
-    time: "5 phút",
-    note: "Có thể điều chỉnh lượng sữa theo độ ngọt mong muốn.",
-  },
-
-  "caramel-macchiato": {
-    ingredients: [
-      { name: "Espresso", amount: "30 ml" },
-      { name: "Sữa tươi", amount: "150 ml" },
-      { name: "Sốt caramel", amount: "20 ml" },
-      { name: "Đá viên", amount: "120 g" },
-    ],
-    steps: [
-      "Rót một phần sốt caramel vào ly.",
-      "Thêm đá và sữa tươi.",
-      "Chiết xuất espresso rồi rót từ từ lên trên.",
-      "Trang trí với sốt caramel.",
-    ],
-    time: "5 phút",
-    note: "Có thể dùng sữa đã đánh bọt nếu pha phiên bản nóng.",
-  },
-
-  americano: {
-    ingredients: [
-      { name: "Espresso", amount: "40 ml" },
-      { name: "Nước lọc nóng hoặc lạnh", amount: "150 ml" },
-      { name: "Đá viên nếu dùng lạnh", amount: "100 g" },
-    ],
-    steps: [
-      "Chiết xuất espresso.",
-      "Cho nước vào ly.",
-      "Rót espresso vào nước.",
-      "Thêm đá nếu phục vụ lạnh.",
-    ],
-    time: "3 phút",
-    note: "Điều chỉnh lượng nước để đạt độ đậm mong muốn.",
-  },
-
-  cappuccino: {
-    ingredients: [
-      { name: "Espresso", amount: "30 ml" },
-      { name: "Sữa tươi", amount: "120 ml" },
-    ],
-    steps: [
-      "Chiết xuất espresso vào tách.",
-      "Đánh nóng sữa tạo lớp bọt mịn.",
-      "Rót sữa vào espresso.",
-      "Hoàn thiện lớp bọt sữa trên bề mặt.",
-    ],
-    time: "5 phút",
-    note: "Nên sử dụng sữa lạnh để tạo bọt ổn định.",
-  },
-
-  "tra-dao": {
-    ingredients: [
-      { name: "Trà đen đã ủ", amount: "150 ml" },
-      { name: "Siro đào", amount: "20 ml" },
-      { name: "Nước đường", amount: "15 ml" },
-      { name: "Đào ngâm", amount: "40 g" },
-      { name: "Đá viên", amount: "120 g" },
-    ],
-    steps: [
-      "Ủ trà theo hướng dẫn của loại trà sử dụng rồi để nguội.",
-      "Cho trà, siro đào và nước đường vào bình lắc.",
-      "Thêm đá, lắc đều.",
-      "Rót ra ly và thêm đào ngâm.",
-    ],
-    time: "5 phút",
-    note: "Không nên ủ trà quá lâu vì có thể gây vị chát.",
-  },
-
-  "tra-dau": {
-    ingredients: [
-      { name: "Trà nền đã ủ", amount: "150 ml" },
-      { name: "Siro dâu", amount: "20 ml" },
-      { name: "Nước đường", amount: "15 ml" },
-      { name: "Dâu tươi", amount: "30 g" },
-      { name: "Đá viên", amount: "120 g" },
-    ],
-    steps: [
-      "Chuẩn bị trà nền và để nguội.",
-      "Cho trà, siro dâu và nước đường vào bình lắc.",
-      "Thêm đá và lắc đều.",
-      "Rót ra ly, trang trí bằng dâu tươi.",
-    ],
-    time: "5 phút",
-    note: "Có thể điều chỉnh siro để cân bằng vị chua ngọt.",
-  },
-
-  "tra-vai-lai": {
-    ingredients: [
-      { name: "Trà lài đã ủ", amount: "150 ml" },
-      { name: "Siro vải", amount: "20 ml" },
-      { name: "Nước đường", amount: "10 ml" },
-      { name: "Vải ngâm", amount: "40 g" },
-      { name: "Đá viên", amount: "120 g" },
-    ],
-    steps: [
-      "Ủ trà lài và để nguội.",
-      "Kết hợp trà, siro vải và nước đường.",
-      "Thêm đá rồi lắc đều.",
-      "Rót ra ly và thêm vải ngâm.",
-    ],
-    time: "5 phút",
-    note: "Giữ hương trà lài nhẹ nhàng, tránh pha quá đậm.",
-  },
-
-  "tra-chanh": {
-    ingredients: [
-      { name: "Trà đen đã ủ", amount: "150 ml" },
-      { name: "Nước cốt chanh", amount: "15 ml" },
-      { name: "Nước đường", amount: "20 ml" },
-      { name: "Đá viên", amount: "120 g" },
-    ],
-    steps: [
-      "Ủ trà và để nguội.",
-      "Cho trà, nước cốt chanh và nước đường vào bình.",
-      "Thêm đá rồi lắc đều.",
-      "Rót ra ly và trang trí bằng lát chanh.",
-    ],
-    time: "4 phút",
-    note: "Điều chỉnh lượng chanh và đường theo khẩu vị.",
-  },
-
-  "tra-luu-do": {
-    ingredients: [
-      { name: "Trà nền", amount: "150 ml" },
-      { name: "Siro lựu", amount: "25 ml" },
-      { name: "Nước đường", amount: "10 ml" },
-      { name: "Đá viên", amount: "120 g" },
-    ],
-    steps: [
-      "Chuẩn bị trà nền đã nguội.",
-      "Kết hợp trà, siro lựu và nước đường.",
-      "Thêm đá, lắc đều.",
-      "Rót ra ly và trang trí theo tiêu chuẩn cửa hàng.",
-    ],
-    time: "4 phút",
-    note: "Công thức mẫu, cần điều chỉnh theo loại siro thực tế.",
-  },
-
-  "tra-sua-dau": {
-    ingredients: [
-      { name: "Trà nền", amount: "120 ml" },
-      { name: "Sữa tươi", amount: "60 ml" },
-      { name: "Siro dâu", amount: "25 ml" },
-      { name: "Bột kem béo", amount: "15 g" },
-      { name: "Đá viên", amount: "120 g" },
-    ],
-    steps: [
-      "Ủ trà rồi để nguội.",
-      "Hòa tan bột kem béo với trà.",
-      "Thêm sữa tươi và siro dâu.",
-      "Lắc với đá rồi rót ra ly.",
-    ],
-    time: "5 phút",
-    note: "Topping được chuẩn bị riêng theo yêu cầu của khách.",
-  },
-
-  "tra-sua-thai-xanh": {
-    ingredients: [
-      { name: "Trà Thái xanh đã ủ", amount: "150 ml" },
-      { name: "Sữa tươi", amount: "50 ml" },
-      { name: "Sữa đặc", amount: "20 ml" },
-      { name: "Bột kem béo", amount: "10 g" },
-      { name: "Đá viên", amount: "120 g" },
-    ],
-    steps: [
-      "Ủ trà Thái xanh, lọc bỏ bã và để nguội.",
-      "Hòa tan bột kem béo trong trà.",
-      "Thêm sữa tươi và sữa đặc.",
-      "Lắc với đá rồi rót ra ly.",
-    ],
-    time: "5 phút",
-    note: "Có thể điều chỉnh lượng sữa đặc theo độ ngọt yêu cầu.",
-  },
-
-  "tra-sua-tran-chau": {
-    ingredients: [
-      { name: "Trà đen đã ủ", amount: "150 ml" },
-      { name: "Sữa tươi", amount: "60 ml" },
-      { name: "Sữa đặc", amount: "20 ml" },
-      { name: "Bột kem béo", amount: "10 g" },
-      { name: "Trân châu đã nấu", amount: "50 g" },
-      { name: "Đá viên", amount: "100 g" },
-    ],
-    steps: [
-      "Nấu trân châu theo hướng dẫn của nhà cung cấp.",
-      "Ủ trà và để nguội.",
-      "Khuấy trà cùng sữa tươi, sữa đặc và bột kem béo.",
-      "Cho trân châu vào ly, thêm đá và rót trà sữa.",
-    ],
-    time: "7 phút",
-    note: "Trân châu nên được sử dụng trong thời gian bảo quản phù hợp.",
-  },
-
-  "matcha-da-xay": {
-    ingredients: [
-      { name: "Bột matcha", amount: "5 g" },
-      { name: "Sữa tươi", amount: "120 ml" },
-      { name: "Sữa đặc", amount: "20 ml" },
-      { name: "Đá viên", amount: "180 g" },
-    ],
-    steps: [
-      "Rây bột matcha để hạn chế vón cục.",
-      "Hòa matcha với một ít nước ấm.",
-      "Cho matcha, sữa, sữa đặc và đá vào máy xay.",
-      "Xay đến khi hỗn hợp mịn rồi rót ra ly.",
-    ],
-    time: "5 phút",
-    note: "Công thức mẫu; điều chỉnh lượng đá theo công suất máy xay.",
-  },
-
-  "chocolate-da-xay": {
-    ingredients: [
-      { name: "Bột chocolate", amount: "20 g" },
-      { name: "Sữa tươi", amount: "120 ml" },
-      { name: "Sữa đặc", amount: "20 ml" },
-      { name: "Đá viên", amount: "180 g" },
-    ],
-    steps: [
-      "Hòa tan bột chocolate với một ít sữa.",
-      "Cho hỗn hợp vào máy xay.",
-      "Thêm sữa, sữa đặc và đá.",
-      "Xay mịn rồi rót ra ly.",
-    ],
-    time: "5 phút",
-    note: "Có thể dùng sốt chocolate để trang trí.",
-  },
-
-  "oreo-da-xay": {
-    ingredients: [
-      { name: "Bánh Oreo", amount: "3 chiếc" },
-      { name: "Sữa tươi", amount: "120 ml" },
-      { name: "Sữa đặc", amount: "20 ml" },
-      { name: "Đá viên", amount: "180 g" },
-    ],
-    steps: [
-      "Bẻ bánh Oreo thành miếng nhỏ.",
-      "Cho bánh, sữa tươi, sữa đặc và đá vào máy xay.",
-      "Xay đến khi hỗn hợp hòa quyện.",
-      "Rót ra ly và trang trí bằng vụn bánh.",
-    ],
-    time: "5 phút",
-    note: "Điều chỉnh độ đặc bằng lượng sữa và đá.",
-  },
-
-  
-"banh-croissant": {
-  ingredients: [
-    { name: "Bột mì làm bánh mì", amount: "250 g" },
-    { name: "Sữa tươi không đường lạnh", amount: "125 ml" },
-    { name: "Đường", amount: "30 g" },
-    { name: "Bơ lạt", amount: "25 g" },
-    { name: "Muối", amount: "5 g" },
-    { name: "Men nở instant", amount: "5 g" },
-    { name: "Bơ cán lớp", amount: "125 g" },
-    { name: "Trứng gà đánh tan để quét mặt", amount: "1 quả" },
-  ],
-  steps: [
-    "Trộn bột mì, đường, muối và men trong âu. Thêm sữa lạnh và 25 g bơ lạt, nhào đến khi bột tương đối mịn và đàn hồi.",
-    "Bọc kín khối bột, để lạnh khoảng 30–60 phút để bột dễ cán.",
-    "Đặt 125 g bơ cán lớp giữa hai tờ giấy nến, cán thành miếng vuông đều nhau. Làm lạnh để bơ dẻo nhưng không cứng giòn.",
-    "Cán bột thành hình chữ nhật, đặt miếng bơ vào giữa rồi gấp bột bao kín bơ.",
-    "Cán dài và gấp ba. Bọc kín, làm lạnh khoảng 30 phút. Lặp lại thao tác cán và gấp thêm 2 lần, giữ bơ không bị chảy.",
-    "Cán bột thành tấm dày khoảng 3–4 mm, cắt thành các hình tam giác rồi cuộn từ cạnh đáy lên thành hình croissant.",
-    "Xếp bánh lên khay có lót giấy nến. Ủ ở khoảng 24–27°C đến khi bánh nở rõ, lớp bột mềm và rung nhẹ khi di chuyển khay; thời gian có thể khoảng 2–3 giờ tùy điều kiện.",
-    "Làm nóng lò trước. Quét một lớp trứng mỏng lên mặt bánh, tránh để trứng chảy vào các mép lớp bột.",
-    "Nướng tham khảo ở 190–200°C trong khoảng 15–22 phút, tùy kích thước bánh và loại lò, đến khi bánh nở xốp và có màu vàng nâu đều.",
-    "Đặt bánh lên rack cho nguội. Khi phục vụ lại bánh đã nướng, làm nóng ở khoảng 160–170°C trong 3–5 phút và kiểm tra để bánh không bị khô.",
-  ],
-  time: "Khoảng 4–6 giờ, chưa tính thời gian làm lạnh dài",
-  note: "Đây là công thức croissant làm từ bột và bơ cán lớp, không phải quy trình làm nóng bánh đông lạnh. Giữ bơ và bột đủ lạnh trong khi cán; điều chỉnh nhiệt độ nướng theo lò thực tế.",
-},
-
-
-  
-"banh-kem-dau": {
-  ingredients: [
-    { name: "Trứng gà", amount: "3 quả" },
-    { name: "Bột mì đa dụng", amount: "90 g" },
-    { name: "Đường", amount: "90 g" },
-    { name: "Sữa tươi không đường", amount: "30 ml" },
-    { name: "Dầu ăn", amount: "25 ml" },
-    { name: "Vanilla", amount: "3 ml" },
-    { name: "Whipping cream lạnh", amount: "300 ml" },
-    { name: "Đường bột cho kem", amount: "25–30 g" },
-    { name: "Dâu tây tươi", amount: "200 g" },
-    { name: "Siro đường làm ẩm cốt bánh", amount: "30–40 ml" },
-  ],
-  steps: [
-    "Làm nóng lò ở khoảng 165–170°C. Lót giấy nến vào đáy khuôn tròn đường kính khoảng 16–18 cm.",
-    "Tách lòng đỏ và lòng trắng trứng vào hai âu sạch, khô. Tránh để lòng đỏ hoặc dầu mỡ lẫn vào lòng trắng.",
-    "Đánh lòng đỏ với một phần đường, sau đó thêm sữa, dầu ăn và vanilla. Rây bột mì vào, trộn vừa hòa quyện.",
-    "Đánh lòng trắng đến khi nổi bọt, thêm phần đường còn lại từ từ và đánh đến chóp mềm hoặc chóp vừa.",
-    "Trộn một phần lòng trắng vào hỗn hợp lòng đỏ để làm nhẹ hỗn hợp, sau đó fold nhẹ phần lòng trắng còn lại để giữ bọt khí.",
-    "Đổ bột vào khuôn, gõ nhẹ để loại bọt khí lớn. Nướng khoảng 25–35 phút tùy khuôn và lò. Kiểm tra bằng que thử; điều chỉnh thời gian nếu cốt bánh chưa chín.",
-    "Lấy cốt bánh ra, để nguội hoàn toàn trên rack. Không phết kem lên cốt bánh còn nóng.",
-    "Để âu và que đánh sạch, lạnh. Đánh whipping cream với đường bột đến khi kem bông vừa, đứng form nhưng vẫn mịn.",
-    "Rửa dâu nhanh, lau khô hoàn toàn, bỏ cuống. Cắt một phần dâu thành lát để làm nhân và giữ lại vài quả đẹp để trang trí.",
-    "Cắt cốt bánh thành 2–3 lớp. Quét một lượng siro vừa đủ lên mặt bánh, phết kem và xếp dâu giữa các lớp.",
-    "Phủ kem bên ngoài, làm phẳng bằng spatula rồi trang trí dâu tươi. Bảo quản lạnh ngay sau khi hoàn thiện.",
-  ],
-  time: "Khoảng 90–120 phút",
-  note: "Định lượng tham khảo cho một bánh nhỏ. Dâu phải khô trước khi lắp bánh; bánh có kem tươi cần được giữ lạnh ở nhiệt độ an toàn theo quy định thực phẩm địa phương.",
-},
-
-
-  
-"banh-tart": {
-  ingredients: [
-    { name: "Bột mì đa dụng làm vỏ", amount: "150 g" },
-    { name: "Bơ lạt lạnh", amount: "75 g" },
-    { name: "Đường bột", amount: "35 g" },
-    { name: "Lòng đỏ trứng cho vỏ", amount: "1 lòng đỏ" },
-    { name: "Nước lạnh", amount: "10–15 ml, tùy độ khô" },
-    { name: "Trứng gà làm nhân", amount: "2 quả" },
-    { name: "Sữa tươi không đường", amount: "150 ml" },
-    { name: "Whipping cream", amount: "100 ml" },
-    { name: "Đường cho nhân", amount: "45 g" },
-    { name: "Vanilla", amount: "3 ml" },
-  ],
-  steps: [
-    "Cắt bơ lạnh thành hạt nhỏ. Trộn với bột mì và đường bột đến khi hỗn hợp giống vụn bánh mì, hạn chế làm bơ nóng chảy.",
-    "Thêm lòng đỏ và từng ít nước lạnh. Trộn vừa đủ để bột kết dính, không nhào quá lâu.",
-    "Bọc kín bột, làm lạnh 30 phút. Cán bột dày khoảng 3 mm rồi lót vào khuôn tart, ép sát đáy và thành khuôn.",
-    "Chọc nhẹ đáy vỏ bằng nĩa, làm lạnh thêm 15 phút. Làm nóng lò ở khoảng 175–180°C.",
-    "Lót giấy nến lên vỏ và thêm hạt nướng hoặc vật nặng chuyên dụng. Nướng sơ khoảng 12–15 phút; bỏ vật nặng và nướng thêm 5 phút nếu đáy còn ẩm.",
-    "Đánh trứng và đường vừa hòa quyện, không đánh quá mạnh để tránh tạo nhiều bọt.",
-    "Làm ấm sữa và whipping cream đến khi nóng nhẹ, không đun sôi. Rót từ từ vào trứng trong khi khuấy liên tục.",
-    "Thêm vanilla, lọc hỗn hợp qua rây để nhân mịn. Để nguội bớt rồi rót vào vỏ tart đã nướng sơ.",
-    "Hạ lò xuống khoảng 150–160°C. Nướng khoảng 25–35 phút tùy kích thước khuôn, đến khi phần nhân gần đông và tâm bánh còn hơi rung nhẹ.",
-    "Lấy bánh ra để nguội. Làm lạnh trước khi cắt để nhân ổn định và dễ phục vụ.",
-  ],
-  time: "Khoảng 90 phút, chưa tính thời gian làm lạnh",
-  note: "Đây là công thức tart trứng tham khảo. Thời gian nướng thay đổi theo kích thước khuôn; nhân trứng cần được nấu chín an toàn và bánh phải được bảo quản lạnh phù hợp.",
-},
-
-  
-tiramisu: {
-  ingredients: [
-    { name: "Mascarpone", amount: "250 g" },
-    { name: "Whipping cream lạnh", amount: "200 ml" },
-    { name: "Đường bột", amount: "60 g" },
-    { name: "Bánh ladyfinger", amount: "150 g" },
-    { name: "Cà phê espresso đã pha", amount: "180 ml" },
-    { name: "Bột cacao không đường", amount: "10 g" },
-    { name: "Vanilla", amount: "3 ml" },
-  ],
-  steps: [
-    "Pha espresso và để nguội hoàn toàn. Đổ cà phê vào khay nông để thuận tiện nhúng bánh.",
-    "Để mascarpone mềm nhẹ trong ngăn mát, sau đó khuấy bằng phới đến khi mịn. Không đánh quá lâu vì phô mai có thể bị tách nước.",
-    "Đánh whipping cream lạnh với đường bột và vanilla đến chóp mềm-vừa.",
-    "Fold whipping cream vào mascarpone thành nhiều lần, trộn nhẹ tay đến khi hỗn hợp đồng nhất và giữ được độ bông.",
-    "Nhúng nhanh từng chiếc ladyfinger vào cà phê đã nguội. Không ngâm lâu vì bánh sẽ hút quá nhiều chất lỏng và dễ nhũn.",
-    "Xếp một lớp bánh vào hộp hoặc khuôn. Phủ một lớp kem mascarpone lên trên và dàn đều.",
-    "Lặp lại một lớp bánh và một lớp kem nữa. Làm phẳng mặt kem.",
-    "Đậy kín và để lạnh ít nhất 4–6 giờ, tốt nhất qua đêm, để các lớp ổn định và hương vị hòa quyện.",
-    "Rây cacao lên mặt bánh ngay trước khi phục vụ. Chia phần bằng dao sạch, lau dao giữa các lần cắt.",
-  ],
-  time: "Khoảng 45 phút chuẩn bị + 4–6 giờ làm lạnh",
-  note: "Công thức này không dùng trứng sống. Luôn giữ mascarpone và kem lạnh trong quá trình chế biến; bảo quản thành phẩm trong tủ lạnh và sử dụng trong thời hạn an toàn của cửa hàng.",
-}
-}
 function getSlug(product: Product) {
   if (product.slug) return product.slug;
 
@@ -450,10 +88,18 @@ function getPrice(product: Product) {
 export default function CongThucPhaChePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [selected, setSelected] = useState<Product | null>(null);
+
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
+
   const [loading, setLoading] = useState(true);
+  const [recipeLoading, setRecipeLoading] = useState(false);
+
   const [error, setError] = useState("");
+  const [recipeError, setRecipeError] = useState("");
 
   useEffect(() => {
     async function loadProducts() {
@@ -497,6 +143,68 @@ export default function CongThucPhaChePage() {
     loadProducts();
   }, []);
 
+  useEffect(() => {
+    if (!selected) {
+      setRecipes([]);
+      setSelectedRecipe(null);
+      return;
+    }
+
+    async function loadRecipes() {
+      try {
+        setRecipeLoading(true);
+        setRecipeError("");
+
+        setRecipes([]);
+        setSelectedRecipe(null);
+
+        const response = await fetch(
+          `${API_URL}/recipes/products/${selected!.id}`,
+          {
+            cache: "no-store",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`API trả về HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        const list: Recipe[] = Array.isArray(result)
+          ? result
+          : Array.isArray(result.data)
+            ? result.data
+            : [];
+
+        setRecipes(list);
+        console.log("DỮ LIỆU CÁC SIZE:",
+          list.map((recipe) => ({
+            recipeId: recipe.recipeId,
+            sizeCode: recipe.sizeCode,
+            ingredients: recipe.ingredients.length,
+            steps: recipe.steps,
+          }))
+        );
+
+        if (list.length > 0) {
+          // Ưu tiên công thức size S; nếu không có thì lấy công thức đầu tiên.
+          const defaultRecipe =
+            list.find((recipe) => recipe.sizeCode === "S") || list[0];
+
+          setSelectedRecipe(defaultRecipe);
+        }
+      } catch (err) {
+        console.error("Lỗi tải công thức:", err);
+        setRecipeError("Không tải được công thức. Hãy kiểm tra API /recipes.");
+      } finally {
+        setRecipeLoading(false);
+      }
+    }
+
+    loadRecipes();
+  }, [selected]);
+
   const categories = useMemo(
     () => [
       "all",
@@ -517,8 +225,6 @@ export default function CongThucPhaChePage() {
       return matchesSearch && matchesCategory;
     });
   }, [products, search, category]);
-
-  const recipe = selected ? recipes[getSlug(selected)] : undefined;
 
   return (
     <div className="recipe-page">
@@ -701,21 +407,75 @@ export default function CongThucPhaChePage() {
           line-height: 1.7;
         }
 
+        /* Thông tin danh mục và giá */
         .detail-tags {
           display: flex;
           flex-wrap: wrap;
+          align-items: center;
           gap: 8px;
-          margin-bottom: 22px;
+          margin-bottom: 16px;
         }
 
         .detail-tag {
-          padding: 7px 10px;
+          display: inline-flex;
+          align-items: center;
+          width: fit-content;
+          min-height: 30px;
+          padding: 6px 10px;
           border-radius: 8px;
           background: #f7f2ec;
           color: #785640;
           font-size: 12px;
+          line-height: 1.4;
         }
 
+        /* Chọn size công thức */
+        .size-selector {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          margin: 16px 0 22px;
+        }
+
+        .size-selector label {
+          color: #38291f;
+          font-size: 13px;
+          font-weight: 600;
+        }
+
+        .size-selector select {
+          box-sizing: border-box;
+          width: 100%;
+          max-width: 260px;
+          height: 42px;
+          padding: 0 38px 0 14px;
+          border: 1px solid #d8c8b9;
+          border-radius: 10px;
+          background-color: #fff;
+          color: #38291f;
+          font-family: inherit;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          outline: none;
+          appearance: none;
+
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23785640' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 12px center;
+          background-size: 16px;
+        }
+
+        .size-selector select:hover {
+          border-color: #785640;
+        }
+
+        .size-selector select:focus {
+          border-color: #785640;
+          box-shadow: 0 0 0 3px rgba(120, 86, 64, 0.12);
+        }
+
+        /* Các phần nội dung công thức */
         .recipe-section {
           margin-top: 22px;
         }
@@ -745,6 +505,7 @@ export default function CongThucPhaChePage() {
           font-weight: 700;
         }
 
+        /* Danh sách các bước pha chế */
         .step-list {
           display: grid;
           gap: 13px;
@@ -774,16 +535,7 @@ export default function CongThucPhaChePage() {
           font-weight: 700;
         }
 
-        .recipe-note {
-          margin-top: 20px;
-          padding: 13px 14px;
-          border-radius: 10px;
-          background: #fbf5e9;
-          color: #765a32;
-          font-size: 12px;
-          line-height: 1.7;
-        }
-
+        /* Ghi chú và thông báo */
         .recipe-message {
           padding: 18px;
           color: #81776d;
@@ -795,6 +547,7 @@ export default function CongThucPhaChePage() {
           color: #b42318;
         }
 
+        /* Responsive: máy tính bảng */
         @media (max-width: 850px) {
           .recipe-layout {
             grid-template-columns: 1fr;
@@ -805,6 +558,7 @@ export default function CongThucPhaChePage() {
           }
         }
 
+        /* Responsive: điện thoại */
         @media (max-width: 480px) {
           .detail-body {
             padding: 15px;
@@ -818,15 +572,26 @@ export default function CongThucPhaChePage() {
             width: 47px;
             height: 47px;
           }
+
+          .size-selector select {
+            max-width: 100%;
+          }
+
+          .step-item {
+            gap: 10px;
+            font-size: 12px;
+          }
         }
       `}</style>
 
-      <section className="recipe-heading">
-        <h1><b>Công thức pha chế</b></h1>
-        <p>
-          Tra cứu nguyên liệu, định lượng và quy trình chuẩn bị
-          cho từng món trong thực đơn BrewLite.
-        </p>
+
+      <section className="admin-page-heading">
+        <div>  
+          <h1>Công thức pha chế</h1>
+          <p>
+            Tra cứu nguyên liệu, định lượng và quy trình chuẩn bị cho từng món trong thực đơn BrewLite.
+          </p>
+        </div>
       </section>
 
       {error && (
@@ -947,57 +712,121 @@ export default function CongThucPhaChePage() {
                 <span className="detail-tag">
                   {getCategory(selected)}
                 </span>
+
                 <span className="detail-tag">
                   Giá: {getPrice(selected).toLocaleString("vi-VN")} đ
                 </span>
-                <span className="detail-tag">
-                  {recipe?.time || "Chưa cập nhật thời gian"}
-                </span>
+
+                {selectedRecipe?.preparationTime && (
+                  <span className="detail-tag">
+                    Thời gian chuẩn bị: {selectedRecipe.preparationTime} phút
+                  </span>
+                )}
               </div>
 
-              {recipe ? (
+              {recipes.length > 0 && (
+                <div className="size-selector">
+                  <label htmlFor="recipe-size">Chọn size công thức</label>
+
+                  <select
+                    id="recipe-size"
+                    value={selectedRecipe?.recipeId ?? ""}
+                    onChange={(event) => {
+                      const recipe = recipes.find(
+                        (item) => Number(item.recipeId) === Number(event.target.value)
+                      );
+
+                      console.log("SIZE ĐƯỢC CHỌN:", recipe);
+                      console.log("CÁC BƯỚC:", recipe?.steps);
+
+                      setSelectedRecipe(recipe || null);
+                    }}
+                  >
+                    {recipes.map((recipe) => (
+                      <option key={recipe.recipeId} value={recipe.recipeId}>
+                        {recipe.sizeCode
+                          ? `Size ${recipe.sizeCode}`
+                          : "Công thức mặc định"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {recipeLoading ? (
+                <div className="recipe-message">
+                  Đang tải công thức từ cơ sở dữ liệu...
+                </div>
+              ) : recipeError ? (
+                <div className="recipe-message recipe-error">
+                  {recipeError}
+                </div>
+              ) : selectedRecipe ? (
                 <>
                   <section className="recipe-section">
                     <h3>🧾 Nguyên liệu và định lượng</h3>
 
-                    <div className="ingredient-list">
-                      {recipe.ingredients.map((ingredient, index) => (
-                        <div
-                          className="ingredient-row"
-                          key={`${ingredient.name}-${index}`}
-                        >
-                          <span>{ingredient.name}</span>
-                          <span>{ingredient.amount}</span>
-                        </div>
-                      ))}
+                    {selectedRecipe.ingredients.length > 0 ? (
+                      <div className="ingredient-list">
+                        {selectedRecipe.ingredients.map((ingredient) => (
+                          <div
+                            className="ingredient-row"
+                            key={ingredient.ingredientId}
+                          >
+                            <div>
+                              <span>{ingredient.ingredientName}</span>
+
+                              {ingredient.note && (
+                                <div
+                                  style={{
+                                    marginTop: 4,
+                                    color: "#81776d",
+                                    fontSize: 11,
+                                  }}
+                                >
+                                  {ingredient.note}
+                                </div>
+                              )}
+                            </div>
+
+                            <span>
+                              {ingredient.quantity.toLocaleString("vi-VN")}{" "}
+                              {ingredient.unit}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="recipe-message">
+                        Công thức này chưa có nguyên liệu.
+                      </div>
+                    )}
+                  </section>
+
+                  {selectedRecipe.steps && selectedRecipe.steps.length > 0 ? (
+                    <section className="recipe-section">
+                      <h3>👨‍🍳 Các bước thực hiện</h3>
+
+                      <ol className="step-list">
+                        {[...selectedRecipe.steps]
+                          .sort((a, b) => a.stepNumber - b.stepNumber)
+                          .map((step) => (
+                            <li className="step-item" key={step.stepNumber}>
+                              <span className="step-number">{step.stepNumber}</span>
+                              <span>{step.instruction}</span>
+                            </li>
+                          ))}
+                      </ol>
+                    </section>
+                  ) : (
+                    <div className="recipe-message">
+                      Công thức này chưa có quy trình thực hiện.
                     </div>
-                  </section>
-
-                  <section className="recipe-section">
-                    <h3>👨‍🍳 Các bước thực hiện</h3>
-
-                    <ol className="step-list">
-                      {recipe.steps.map((step, index) => (
-                        <li className="step-item" key={`${index}-${step}`}>
-                          <span className="step-number">{index + 1}</span>
-                          <span>{step}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </section>
-
-                  <div className="recipe-note">
-                    <strong>Lưu ý: </strong>
-                    {recipe.note}
-                    <br />
-                    Định lượng hiện tại là công thức mẫu, cần được
-                    kiểm tra và điều chỉnh theo tiêu chuẩn thực tế của BrewLite.
-                  </div>
+                  )}
                 </>
               ) : (
                 <div className="recipe-message">
-                  Món này chưa có công thức mẫu. Hãy bổ sung công thức
-                  tương ứng với mã món: <strong>{getSlug(selected)}</strong>.
+                  Món này chưa có công thức trong cơ sở dữ liệu.
                 </div>
               )}
             </div>

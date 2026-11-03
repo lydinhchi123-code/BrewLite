@@ -18,8 +18,8 @@ Tận hưởng những ly cà phê thơm ngon,
       <div>
         <strong>Khám phá</strong>
         <Link href="/" className="footer-link">Trang chủ</Link>
-        <Link href="/menu" className="footer-link">Thực đơn</Link>
-        <Link href="/orders" className="footer-link">Lịch sử đơn hàng</Link>
+        <Link href="/2TrangMenu" className="footer-link">Thực đơn</Link>
+        <Link href="/6TrangLichSuDonHang" className="footer-link">Lịch sử đơn hàng</Link>
       </div>
 
       <div>

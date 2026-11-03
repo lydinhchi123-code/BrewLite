@@ -7,6 +7,7 @@ import {
   IsString,
   Matches,
   Min,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -20,9 +21,10 @@ export class OrderItemDto {
   @IsNotEmpty()
   name: string;
 
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  price: number;
+  price?: number;
 
   @IsInt()
   @Min(1)
@@ -85,11 +87,16 @@ export class CreateOrderDto {
   @Min(0)
   discount?: number;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  maGiamGia?: string;
+
   @IsNumber()
   @Min(0)
   totalAmount: number;
 
-    @IsOptional()
+  @IsOptional()
   @IsString()
   note?: string;
 

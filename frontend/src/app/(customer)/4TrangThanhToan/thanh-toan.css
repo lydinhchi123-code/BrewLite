@@ -58,6 +58,7 @@
 .summary-items { display: grid; gap: 17px; padding-bottom: 23px; border-bottom: 1px solid var(--line); }
 .summary-item { display: flex; align-items: center; gap: 11px; }
 .summary-item-image { display: grid; width: 49px; height: 49px; flex: 0 0 49px; place-items: center; border-radius: 10px; color: var(--coffee); background: var(--beige); font-size: 21px; }
+.summary-item-image img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .summary-item-copy { display: grid; flex: 1; gap: 3px; min-width: 0; }
 .summary-item-copy strong { overflow: hidden; color: var(--coffee); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .summary-item-copy small, .summary-item-copy span { color: var(--muted); font-size: 10px; }
@@ -202,6 +203,25 @@
   line-height: 1.6;
 }
 
+.mock-payment-result {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mock-payment-result select {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  background: #fffdfa;
+  font: inherit;
+}
+
 @media (max-width: 600px) {
   .mock-payment-content {
     flex-direction: column;
@@ -243,7 +263,7 @@
   line-height: 1.4;
   font-weight: 700;
   letter-spacing: 0;
-  color: #16345b;
+  color: #3a2b1e;
 }
 
 /* Tiêu đề các khung thông tin */
@@ -252,7 +272,7 @@
   font-size: 20px;
   line-height: 1.5;
   font-weight: 700;
-  color: #16345b;
+  color: #6b422b;
 }
 
 /* Tiêu đề và nội dung phụ */
@@ -303,7 +323,7 @@
 .summary-totals .summary-total strong {
   font-size: 20px;
   font-weight: 700;
-  color: #16345b;
+  color: #5b3516;
 }
 
 /* Nút bấm */
@@ -340,4 +360,166 @@
   .summary-heading h2 {
     font-size: 17px;
   }
+}
+
+/* Nút chọn mã giảm giá */
+.discount-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.discount-select-button {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  text-align: left;
+}
+
+.discount-apply-button {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #6f4e37;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.discount-apply-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal mã giảm giá */
+.discount-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.discount-modal {
+  width: 100%;
+  max-width: 550px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.discount-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.discount-modal-header h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+
+.discount-modal-header p {
+  margin: 0;
+  color: #777;
+  font-size: 13px;
+}
+
+.discount-modal-close {
+  border: none;
+  background: transparent;
+  font-size: 28px;
+  cursor: pointer;
+  color: #555;
+}
+
+.discount-modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+.discount-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  margin-bottom: 12px;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+}
+
+.discount-item.selected {
+  border-color: #6f4e37;
+  background: #faf7f4;
+}
+
+.discount-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.discount-item-info strong {
+  font-size: 15px;
+}
+
+.discount-item-code {
+  color: #6f4e37;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.discount-item-info p {
+  margin: 3px 0;
+  color: #b45309;
+  font-weight: 700;
+}
+
+.discount-item-info small {
+  color: #777;
+  font-size: 12px;
+}
+
+.discount-item > button {
+  flex-shrink: 0;
+  padding: 9px 16px;
+  border: none;
+  border-radius: 7px;
+  background: #6f4e37;
+  color: white;
+  cursor: pointer;
+}
+
+.discount-empty {
+  padding: 25px 10px;
+  text-align: center;
+  color: #777;
+}
+
+/* Ghi chú đơn hàng */
+.note-field .note-label {
+  display: inline;
+}
+
+.note-field .optional {
+  display: inline;
+  font-size: 12px;
+  color: #888;
 }
