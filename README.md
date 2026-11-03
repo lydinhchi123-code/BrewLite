@@ -1,68 +1,85 @@
 # BrewLite
+Ứng dụng web đặt đồ uống trực tuyến, cho phép người dùng tìm kiếm và lựa chọn đồ uống thông qua giao diện website.
 
-Ứng dụng web đặt đồ uống trực tuyến.
-
-## Công nghệ sử dụng
+## 1. Công nghệ sử dụng
 
 - **Frontend:** Next.js, React, TypeScript, Tailwind CSS
 - **Backend:** NestJS, TypeScript
 - **Database:** PostgreSQL
-- **ORM dự kiến:** Prisma
-- **Version control:** Git
+- **ORM:** Prisma (dự kiến tích hợp)
+- **Version control:** Git, GitHub
 
-## Cấu trúc dự án
+## 2. Cấu trúc dự án
 
 ```text
 BrewLite/
-├── frontend/       # Next.js
-├── backend/        # NestJS
-├── .gitignore
-├── .env.example
-└── README.md
+├── apps/
+│   ├── api/              # Backend - NestJS
+│   └── web/              # Frontend - Next.js
+├── database/             # Tài liệu và dữ liệu cơ sở dữ liệu
+├── docs/                 # Tài liệu phân tích và thiết kế
+├── .env.example          # File mẫu cấu hình môi trường
+├── .gitignore            # Các file không đưa lên Git
+└── README.md             # Tài liệu giới thiệu dự án
 ```
 
-## Yêu cầu môi trường
+## 3. Yêu cầu môi trường
 
 - Node.js và npm
 - Git
-- PostgreSQL (phục vụ các bước tích hợp cơ sở dữ liệu sau này)
+- PostgreSQL (phục vụ tích hợp cơ sở dữ liệu)
 
-## Chạy Frontend
+## 4. Cài đặt và chạy dự án
 
-Mở terminal tại thư mục gốc:
+### 4.1. Frontend
+
+Mở terminal tại thư mục gốc dự án:
 
 ```bash
-cd frontend
+cd apps/web
 npm install
 npm run dev
 ```
 
 Truy cập: http://localhost:3000
 
-## Chạy Backend
+### 4.2. Backend
 
-Mở một terminal khác tại thư mục gốc:
+Mở một terminal khác tại thư mục gốc dự án:
 
 ```bash
-cd backend
+cd apps/api
 npm install
 npm run start:dev
 ```
 
-Truy cập: http://localhost:3001
+Backend chạy tại: http://localhost:3001
 
-## Cấu hình môi trường
+## 5. Cấu hình môi trường
 
-Tham khảo `.env.example` để biết các biến môi trường cần thiết.
+Tham khảo file `.env.example` tại thư mục gốc để biết biến môi trường mẫu.
 
-Khi triển khai các chức năng cơ sở dữ liệu và xác thực, hãy tạo file `.env` riêng và điền các giá trị phù hợp. Không commit thông tin bí mật lên Git.
+Đối với frontend, tạo file `apps/web/.env.local` và cấu hình:
 
-## Trạng thái hiện tại
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3001
+```
+
+Các thông tin môi trường khác cần được cấu hình theo yêu cầu thực tế của từng ứng dụng.
+
+Không đưa file `.env`, `.env.local` hoặc thông tin bí mật lên GitHub.
+
+## 6. Trạng thái dự án
 
 - [x] Khởi tạo Frontend Next.js
 - [x] Khởi tạo Backend NestJS
 - [x] Chạy thử hai ứng dụng
 - [x] Thiết lập Git và tài liệu cơ bản
+- [x] Sắp xếp cấu trúc dự án theo `apps/api` và `apps/web`
 - [ ] Tích hợp PostgreSQL và Prisma
 - [ ] Xây dựng API và giao diện
 - [ ] Kiểm thử và tích hợp các chức năng
+
+## 7. Đóng góp và phát triển
+
+Các thành viên sử dụng Git để quản lý mã nguồn, cập nhật chức năng và phối hợp phát triển dự án thông qua GitHub.
