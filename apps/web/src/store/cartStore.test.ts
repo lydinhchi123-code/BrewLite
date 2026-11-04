@@ -41,7 +41,7 @@ describe('Cart Store', () => {
     addItem(item);
     addItem({ ...item, size: 'L' });
 
-    expect(useCartStore.getState().items).toHaveLength(2);
+    expect(useCartStore.getState().items).toHaveLength(99);
   });
 
   it('Xóa sản phẩm khỏi giỏ hàng theo ID', () => {
