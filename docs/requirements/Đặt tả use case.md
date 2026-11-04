@@ -13,7 +13,6 @@ Cho phép khách hàng chọn các sản phẩm trong menu, tùy chỉnh món, x
 
 - **Actor chính:** Khách hàng.
 - **Actor phụ:** Dịch vụ thanh toán giả lập.
-- **Actor hỗ trợ vận hành:** Nhân viên quầy (tiếp nhận và xử lý đơn sau khi đơn được tạo).
 
 ## 3. Trigger
 
@@ -25,7 +24,7 @@ Khách hàng chọn chức năng thanh toán/đặt hàng từ giỏ hàng.
 2. Menu đã có sản phẩm hợp lệ.
 3. Giỏ hàng có ít nhất một dòng hàng.
 4. Khách hàng cung cấp thông tin liên hệ/giao nhận bắt buộc.
-5. Nếu quy trình yêu cầu đăng nhập, khách hàng đã đăng nhập hợp lệ trước khi tạo đơn.
+5. Khách hàng có thể chưa đăng nhập khi bắt đầu use case, nhưng phải đăng nhập hợp lệ trước khi thực hiện tạo đơn nếu hệ thống yêu cầu tài khoản.
 
 ## 5. Hậu điều kiện
 
@@ -55,9 +54,9 @@ Khách hàng chọn chức năng thanh toán/đặt hàng từ giỏ hàng.
 10. Hệ thống kiểm tra dữ liệu bắt buộc và gửi yêu cầu tạo đơn tới backend.
 11. Backend xác thực người dùng, kiểm tra sản phẩm/tùy chọn/giá và tính lại tổng tiền.
 12. Backend tạo đơn và các dòng đơn trong transaction.
-13. Nếu chọn COD, hệ thống lưu phương thức COD và trạng thái thanh toán phù hợp. Nếu chọn thanh toán giả lập, backend gửi yêu cầu tới dịch vụ giả lập.
-14. Dịch vụ thanh toán trả kết quả.
-15. Backend lưu kết quả thanh toán và trạng thái đơn phù hợp.
+13. Nếu khách hàng chọn COD, backend lưu phương thức thanh toán COD và trạng thái thanh toán chưa thanh toán. Nếu khách hàng chọn thanh toán giả lập, backend gửi yêu cầu đến dịch vụ thanh toán.
+14. Nếu sử dụng thanh toán giả lập, dịch vụ thanh toán trả kết quả giao dịch cho backend.
+15. Backend lưu kết quả thanh toán tương ứng và cập nhật trạng thái đơn hàng theo quy tắc nghiệp vụ.
 16. Hệ thống trả mã đơn và thông tin tóm tắt.
 17. Giao diện hiển thị trang xác nhận đơn hàng.
 
@@ -87,8 +86,8 @@ Khách hàng chọn chức năng thanh toán/đặt hàng từ giỏ hàng.
 - Giá cuối cùng phải được tính/kiểm tra tại backend.
 - Số lượng phải là số nguyên dương.
 - Tất cả dòng hàng của đơn và tổng tiền phải nhất quán.
-- Không lưu mật khẩu dạng rõ và không lưu số thẻ/CVV.
-- Chỉ chủ đơn hoặc nhân viên/quản lý có quyền mới được truy cập đơn.
+- Không lưu mật khẩu dạng rõ.
+- Khách hàng chỉ được xem các đơn hàng thuộc tài khoản của mình; Admin có quyền truy cập và quản lý đơn hàng theo chức năng được phân quyền.
 - Trạng thái đơn và thanh toán là hai trạng thái riêng biệt.
 - Mọi chuyển trạng thái phải tuân theo tập trạng thái hợp lệ của hệ thống.
 
