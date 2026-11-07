@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import "./thanh-toan.css";
 
-type PaymentMethod = "cod" | "banking" | "momo";
+type PaymentMethod = "cod" | "banking" | "momo" | "vnpay";
 type MockPaymentResult = "SUCCESS" | "FAILURE";
+type FormField = "name" | "phone" | "address" | "phuong" | "note";
+type FormErrors = Partial<Record<FormField, string>>;
 
 const API_URL = (
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
@@ -108,6 +110,7 @@ export default function ThanhToanPage() {
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [paymentError, setPaymentError] = useState("");
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const [mockResult, setMockResult] = useState<MockPaymentResult>("SUCCESS");
@@ -219,6 +222,42 @@ export default function ThanhToanPage() {
   );
 
   const total = Math.max(0, subtotal + deliveryFee - appliedDiscount);
+
+  function validateField(field: FormField, value: string) {
+    const normalized = field === "phone"
+      ? value.replace(/[\s()-]/g, "")
+      : value.trim();
+
+    if (
+      field === "name" &&
+      (normalized.length < 2 || !/^[\p{L} ]+$/u.test(normalized))
+    ) {
+      return "Họ tên phải có ít nhất 2 ký tự và chỉ gồm chữ cái.";
+    }
+    if (field === "phone" && !/^0\d{9}$/.test(normalized)) {
+      return "Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0.";
+    }
+    if (field === "address" && normalized.length < 10) {
+      return "Địa chỉ cần có ít nhất 10 ký tự.";
+    }
+    if (field === "phuong" && normalized.length < 2) {
+      return "Vui lòng nhập phường / xã.";
+    }
+    if (field === "note" && normalized.length > 200) {
+      return "Ghi chú không được vượt quá 200 ký tự.";
+    }
+    return undefined;
+  }
+
+  function handleFieldChange(field: FormField, value: string) {
+    const error = validateField(field, value);
+    setFormErrors((current) => {
+      const next = { ...current };
+      if (error) next[field] = error;
+      else delete next[field];
+      return next;
+    });
+  }
 
   async function openDiscountModal() {
     setShowDiscountModal(true);
@@ -368,8 +407,22 @@ export default function ThanhToanPage() {
     const phuong = String(formData.get("phuong") ?? checkout.phuong ?? checkout.ward ?? "",).trim();
     const note = String(formData.get("note") ?? "").trim();
 
-    if (!customerName || !customerPhone || !address || !phuong) {
-      setSubmitError("Vui lòng nhập đầy đủ họ tên, số điện thoại, địa chỉ và phường.",);
+    const errors: FormErrors = {};
+    const values: Record<FormField, string> = {
+      name: customerName,
+      phone: customerPhone,
+      address,
+      phuong,
+      note,
+    };
+    (Object.keys(values) as FormField[]).forEach((field) => {
+      const error = validateField(field, values[field]);
+      if (error) errors[field] = error;
+    });
+
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setSubmitError("Vui lòng kiểm tra lại thông tin nhận hàng.");
       return;
     }
 
@@ -542,6 +595,35 @@ export default function ThanhToanPage() {
     setPaymentError("");
 
     const selectedMethod = checkout.paymentMethod ?? paymentMethod;
+    if (selectedMethod === "vnpay") {
+      try {
+        const response = await fetch(`${API_URL}/payments/vnpay`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: checkout.totalAmount,
+            orderInfo: `Thanh toan don hang ${checkout.orderId}`,
+          }),
+        });
+        const result = (await response.json()) as {
+          paymentUrl?: string;
+          message?: string;
+        };
+        if (!response.ok || !result.paymentUrl) {
+          throw new Error(result.message ?? "Không thể tạo giao dịch VNPay.");
+        }
+        window.location.assign(result.paymentUrl);
+      } catch (error) {
+        setPaymentError(
+          error instanceof Error
+            ? error.message
+            : "Không thể kết nối cổng thanh toán VNPay.",
+        );
+        setPaymentSubmitting(false);
+      }
+      return;
+    }
+
     const backendPaymentMethod = {
       cod: "COD",
       banking: "BANKING",
@@ -786,11 +868,23 @@ export default function ThanhToanPage() {
               </>
             ) : (
               <div className="mock-payment-info">
-                <h3>Thanh toán khi nhận hàng (COD)</h3>
-                <p>
-                  Đơn hàng sẽ được ghi nhận. Bạn thanh toán bằng tiền mặt khi
-                  nhận đồ uống.
-                </p>
+                {selectedMethod === "vnpay" ? (
+                  <>
+                    <h3>Thanh toán VNPay Sandbox</h3>
+                    <p>
+                      Bạn sẽ được chuyển đến cổng VNPay thử nghiệm để hoàn tất
+                      giao dịch. Không phát sinh tiền thật.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3>Thanh toán khi nhận hàng (COD)</h3>
+                    <p>
+                      Đơn hàng sẽ được ghi nhận. Bạn thanh toán bằng tiền mặt
+                      khi nhận đồ uống.
+                    </p>
+                  </>
+                )}
               </div>
             )}
 
@@ -815,8 +909,9 @@ export default function ThanhToanPage() {
             </button>
 
             <p className="secure-note">
-              Đây là quy trình thanh toán mô phỏng, không phát sinh giao dịch
-              tiền thật.
+              {selectedMethod === "vnpay"
+                ? "VNPay Sandbox chỉ dùng để kiểm thử, không phát sinh giao dịch thật."
+                : "Đây là quy trình thanh toán mô phỏng, không phát sinh giao dịch tiền thật."}
             </p>
           </section>
         </div>
@@ -841,7 +936,7 @@ export default function ThanhToanPage() {
           <p>Hoàn tất thông tin để chúng mình chuẩn bị đơn hàng cho bạn.</p>
         </header>
 
-        <form className="payment-layout" onSubmit={handleSubmit}>
+        <form className="payment-layout" onSubmit={handleSubmit} noValidate>
           <div className="payment-main">
             <section className="payment-card">
               <div className="payment-card-heading">
@@ -862,7 +957,13 @@ export default function ThanhToanPage() {
                     defaultValue={checkout.customerName}
                     placeholder="Nguyễn Minh Anh"
                     required
+                    aria-invalid={Boolean(formErrors.name)}
+                    className={formErrors.name ? "field-invalid" : ""}
+                    onChange={(event) =>
+                      handleFieldChange("name", event.target.value)
+                    }
                   />
+                  {formErrors.name && <small className="field-error">{formErrors.name}</small>}
                 </label>
 
                 <label>
@@ -876,7 +977,13 @@ export default function ThanhToanPage() {
                     maxLength={10}
                     inputMode="numeric"
                     required
+                    aria-invalid={Boolean(formErrors.phone)}
+                    className={formErrors.phone ? "field-invalid" : ""}
+                    onChange={(event) =>
+                      handleFieldChange("phone", event.target.value)
+                    }
                   />
+                  {formErrors.phone && <small className="field-error">{formErrors.phone}</small>}
                 </label>
 
                 <label className="field-wide">
@@ -887,7 +994,13 @@ export default function ThanhToanPage() {
                     defaultValue={checkout.address}
                     placeholder="Số nhà, tên đường"
                     required
+                    aria-invalid={Boolean(formErrors.address)}
+                    className={formErrors.address ? "field-invalid" : ""}
+                    onChange={(event) =>
+                      handleFieldChange("address", event.target.value)
+                    }
                   />
+                  {formErrors.address && <small className="field-error">{formErrors.address}</small>}
                 </label>
 
                 <label>
@@ -898,7 +1011,13 @@ export default function ThanhToanPage() {
                     defaultValue={checkout.phuong ?? checkout.ward ?? ""}
                     placeholder="Tên phường"
                     required
+                    aria-invalid={Boolean(formErrors.phuong)}
+                    className={formErrors.phuong ? "field-invalid" : ""}
+                    onChange={(event) =>
+                      handleFieldChange("phuong", event.target.value)
+                    }
                   />
+                  {formErrors.phuong && <small className="field-error">{formErrors.phuong}</small>}
                 </label>
 
                 <label className="note-field">
@@ -911,7 +1030,14 @@ export default function ThanhToanPage() {
                     type="text"
                     defaultValue={checkout.note ?? ""}
                     placeholder="Ví dụ: Giao giờ hành chính"
+                    maxLength={200}
+                    aria-invalid={Boolean(formErrors.note)}
+                    className={formErrors.note ? "field-invalid" : ""}
+                    onChange={(event) =>
+                      handleFieldChange("note", event.target.value)
+                    }
                   />
+                  {formErrors.note && <small className="field-error">{formErrors.note}</small>}
                 </label>
               </div>
             </section>
@@ -951,6 +1077,30 @@ export default function ThanhToanPage() {
                     </small>
                   </span>
 
+                  <span className="method-check" aria-hidden="true">
+                    ✓
+                  </span>
+                </label>
+
+                <label
+                  className={`payment-method ${
+                    paymentMethod === "vnpay" ? "selected" : ""
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="payment"
+                    value="vnpay"
+                    checked={paymentMethod === "vnpay"}
+                    onChange={() => setPaymentMethod("vnpay")}
+                  />
+                  <span className="method-icon" aria-hidden="true">
+                    V
+                  </span>
+                  <span className="method-copy">
+                    <strong>VNPay Sandbox</strong>
+                    <small>Thanh toán qua cổng VNPay thử nghiệm.</small>
+                  </span>
                   <span className="method-check" aria-hidden="true">
                     ✓
                   </span>

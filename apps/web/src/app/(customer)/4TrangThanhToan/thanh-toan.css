@@ -41,6 +41,9 @@
 .payment-fields input, .payment-fields select, .discount-form input { width: 100%; height: 47px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; outline: 0; color: var(--ink); background: #fffdfa; font-size: 13px; }
 .payment-fields input:focus, .payment-fields select:focus, .discount-form input:focus { border-color: var(--caramel); box-shadow: 0 0 0 3px rgba(200,135,74,.11); }
 .payment-fields input::placeholder, .discount-form input::placeholder { color: #b0a79f; }
+.payment-fields .field-invalid { border-color: var(--red); background: var(--red-pale); }
+.payment-fields .field-invalid:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(168,79,71,.12); }
+.field-error { color: var(--red); font-size: 10px; font-weight: 600; line-height: 1.35; }
 .payment-methods { display: grid; gap: 11px; }
 .payment-method { position: relative; display: flex; align-items: center; gap: 13px; padding: 15px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; transition: border-color .2s, background .2s; }
 .payment-method:hover, .payment-method.selected { border-color: var(--caramel); background: #fffaf4; }

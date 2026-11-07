@@ -3,6 +3,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { DatabaseModule } from "../database/database.module";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsService } from "./payments.service";
+import { VnpayService } from "./vnpay.service";
 
 @Module({
   imports: [
@@ -13,6 +14,6 @@ import { PaymentsService } from "./payments.service";
     }),
   ],
   controllers: [PaymentsController],
-  providers: [PaymentsService],
+  providers: [PaymentsService, VnpayService],
 })
 export class PaymentsModule {}
