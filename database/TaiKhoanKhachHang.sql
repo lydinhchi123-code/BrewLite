@@ -37,5 +37,3 @@ COMMIT;
 
 SELECT * FROM TaiKhoanKhachHang
 ORDER BY makh;
-
-DELE
