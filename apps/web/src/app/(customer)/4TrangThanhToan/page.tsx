@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import "./thanh-toan.css";
 
-type PaymentMethod = "cod" | "banking" | "momo" | "vnpay";
+type PaymentMethod = "wallet" | "card";
 type MockPaymentResult = "SUCCESS" | "FAILURE";
 type FormField = "name" | "phone" | "address" | "phuong" | "note";
 type FormErrors = Partial<Record<FormField, string>>;
@@ -75,21 +75,6 @@ function isApiRecord(value: unknown): value is ApiRecord {
 const formatPrice = (price: number) =>
   `${new Intl.NumberFormat("vi-VN").format(price)}₫`;
 
-function getMockQrUrl(
-  method: "banking" | "momo",
-  orderId: string,
-  amount: number,
-) {
-  const content =
-    method === "banking"
-      ? `BREWLITE-MOCK-BANK-${orderId}-${amount}`
-      : `BREWLITE-MOCK-MOMO-${orderId}-${amount}`;
-
-  return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
-    content,
-  )}`;
-}
-
 function getItemNote(item: CheckoutItem) {
   return [
     item.size ? `Size ${item.size}` : "",
@@ -112,8 +97,10 @@ export default function ThanhToanPage() {
   const [paymentError, setPaymentError] = useState("");
   const [formErrors, setFormErrors] = useState<FormErrors>({});
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
-  const [mockResult, setMockResult] = useState<MockPaymentResult>("SUCCESS");
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethod>("wallet");
+  const [mockResult, setMockResult] =
+    useState<MockPaymentResult>("SUCCESS");
 
   const [discountCode, setDiscountCode] = useState("");
   const [appliedDiscountCode, setAppliedDiscountCode] = useState("");
@@ -127,7 +114,6 @@ export default function ThanhToanPage() {
   const [loadingDiscounts, setLoadingDiscounts] = useState(false);
   const [discountListError, setDiscountListError] = useState("");
 
-  const [isSubmitted, setIsSubmitted] = useState(false);
   const [paymentStep, setPaymentStep] = useState(false);
   const [checkout, setCheckout] = useState<CheckoutData | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -162,7 +148,9 @@ export default function ThanhToanPage() {
                 setDiscount(parsed.discount ?? 0);
 
                 if (parsed.paymentMethod) {
-                  setPaymentMethod(parsed.paymentMethod);
+                  setPaymentMethod(
+                    parsed.paymentMethod === "card" ? "card" : "wallet",
+                  );
                 }
 
                 if (isTempUrlWithRealSavedOrder) {
@@ -177,20 +165,10 @@ export default function ThanhToanPage() {
                 }
 
                 if (
-                  parsed.paymentStatus === "DA_THANH_TOAN" ||
-                  parsed.paymentStatus === "CHO_THANH_TOAN"
-                ) {
-                  setIsSubmitted(true);
-                } else if (
                   parsed.internalOrderId &&
                   !savedOrderId.startsWith("TEMP-")
                 ) {
                   setPaymentStep(true);
-                } else if (
-                  parsed.status === "PAID" ||
-                  parsed.status === "COMPLETED"
-                ) {
-                  setIsSubmitted(true);
                 }
               }
             }
@@ -581,11 +559,10 @@ export default function ThanhToanPage() {
     }
   }
 
-  async function handleMockPayment() {
+  async function handlePayment() {
     if (!checkout?.internalOrderId || paymentSubmitting) return;
 
     const token = localStorage.getItem("brewlite_accessToken");
-
     if (!token) {
       setPaymentError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
       return;
@@ -594,45 +571,9 @@ export default function ThanhToanPage() {
     setPaymentSubmitting(true);
     setPaymentError("");
 
-    const selectedMethod = checkout.paymentMethod ?? paymentMethod;
-    if (selectedMethod === "vnpay") {
-      try {
-        const response = await fetch(`${API_URL}/payments/vnpay`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: checkout.totalAmount,
-            orderInfo: `Thanh toan don hang ${checkout.orderId}`,
-          }),
-        });
-        const result = (await response.json()) as {
-          paymentUrl?: string;
-          message?: string;
-        };
-        if (!response.ok || !result.paymentUrl) {
-          throw new Error(result.message ?? "Không thể tạo giao dịch VNPay.");
-        }
-        window.location.assign(result.paymentUrl);
-      } catch (error) {
-        setPaymentError(
-          error instanceof Error
-            ? error.message
-            : "Không thể kết nối cổng thanh toán VNPay.",
-        );
-        setPaymentSubmitting(false);
-      }
-      return;
-    }
-
-    const backendPaymentMethod = {
-      cod: "COD",
-      banking: "BANKING",
-      momo: "MOMO",
-    }[selectedMethod];
-
+    const backendPaymentMethod =
+      paymentMethod === "wallet" ? "MOMO" : "BANKING";
     const storageKey = `brewlite-payment-${checkout.orderId}`;
-
-    // Giữ cùng key nếu request lỗi mạng để retry không tạo giao dịch trùng.
     let idempotencyKey = localStorage.getItem(storageKey);
 
     if (!idempotencyKey) {
@@ -651,41 +592,35 @@ export default function ThanhToanPage() {
         body: JSON.stringify({
           madonhang: checkout.internalOrderId,
           phuongthuc: backendPaymentMethod,
-          ...(backendPaymentMethod === "COD" ? {} : { mockResult }),
+          mockResult,
         }),
       });
 
-      const responseText = await response.text();
-      let data: ApiRecord = {};
-
-      try {
-        const parsed: unknown = responseText
-          ? JSON.parse(responseText)
-          : {};
-
-        data = isApiRecord(parsed) ? parsed : {};
-      } catch {
-        data = { message: responseText };
-      }
-
+      const data = (await response.json()) as ApiRecord;
       if (!response.ok) {
         throw new Error(
           typeof data.message === "string"
             ? data.message
-            : "Không thể xử lý thanh toán.",
+            : "Không thể xử lý thanh toán mô phỏng.",
         );
       }
 
-      const updatedCheckout: CheckoutData = {
-        ...checkout,
-        status:
-        typeof data.orderStatus === "string"
-          ? data.orderStatus
-          : checkout.status,
-      paymentStatus:
+      const paymentStatus =
         typeof data.paymentStatus === "string"
           ? data.paymentStatus
-          : undefined,
+          : mockResult === "SUCCESS"
+            ? "DA_THANH_TOAN"
+            : "THAT_BAI";
+      const orderStatus =
+        typeof data.orderStatus === "string"
+          ? data.orderStatus
+          : mockResult === "SUCCESS"
+            ? "PAID"
+            : "PAYMENT_FAILED";
+      const updatedCheckout: CheckoutData = {
+        ...checkout,
+        status: orderStatus,
+        paymentStatus,
       };
 
       localStorage.setItem(
@@ -693,40 +628,30 @@ export default function ThanhToanPage() {
         JSON.stringify(updatedCheckout),
       );
       setCheckout(updatedCheckout);
+      localStorage.removeItem(storageKey);
 
-      if (data.paymentStatus === "THAT_BAI") {
-        // Thất bại đã được backend ghi nhận; lần thử kế tiếp dùng key mới.
-        localStorage.removeItem(storageKey);
-        setPaymentError(
-          "Thanh toán thất bại. Bạn có thể chọn thành công và thử lại.",
+      if (mockResult === "SUCCESS") {
+        localStorage.setItem("brewlite_cart", "[]");
+        window.dispatchEvent(new Event("brewlite-cart-updated"));
+        router.push(
+          `/5TrangXacNhanDonHang?orderId=${encodeURIComponent(checkout.orderId)}`,
         );
         return;
       }
 
-      // Thanh toán thành công hoặc COD đã được ghi nhận:
-      // chuyển sang trang xác nhận đơn hàng.
-      localStorage.removeItem(storageKey);
-      localStorage.setItem("brewlite_cart", "[]");
-      window.dispatchEvent(new Event("brewlite-cart-updated"));
-
-      router.push(
-        `/5TrangXacNhanDonHang?orderId=${encodeURIComponent(
-          checkout.orderId,
-        )}`,
+      setPaymentError(
+        "Thanh toán mô phỏng thất bại. Đơn hàng đã chuyển sang PAYMENT_FAILED.",
       );
     } catch (error) {
-      console.error("Lỗi thanh toán:", error);
-
       setPaymentError(
         error instanceof Error
           ? error.message
-          : "Có lỗi xảy ra khi thanh toán.",
+          : "Không thể xử lý thanh toán mô phỏng.",
       );
     } finally {
       setPaymentSubmitting(false);
     }
   }
-
   if (!loaded) {
     return (
       <main className="payment-page">
@@ -776,7 +701,7 @@ export default function ThanhToanPage() {
           </div>
 
           <section className="payment-card mock-payment-page-card">
-            <span className="payment-eyebrow">BREWLITE PAYMENT DEMO</span>
+            <span className="payment-eyebrow">BREWLITE PAYMENT</span>
 
             <h1>Thanh toán đơn hàng</h1>
 
@@ -791,103 +716,28 @@ export default function ThanhToanPage() {
               </strong>
             </p>
 
-            {selectedMethod === "banking" ||
-            selectedMethod === "momo" ? (
-              <>
-                <div className="mock-payment-heading">
-                  <div>
-                    <h3>
-                      {selectedMethod === "banking"
-                        ? "Chuyển khoản ngân hàng mô phỏng"
-                        : "Thanh toán MoMo mô phỏng"}
-                    </h3>
-                    <p>
-                      Quét mã QR demo hoặc xác nhận kết quả giao dịch bên dưới.
-                    </p>
-                  </div>
-
-                  <span className="mock-payment-badge">DEMO</span>
-                </div>
-
-                <div className="mock-payment-content">
-                  <div className="mock-qr-wrapper">
-                    <img
-                      src={getMockQrUrl(
-                        selectedMethod,
-                        checkout.orderId,
-                        checkout.totalAmount,
-                      )}
-                      alt="QR thanh toán mô phỏng"
-                      width={220}
-                      height={220}
-                    />
-                  </div>
-
-                  <div className="mock-payment-info">
-                    <p>
-                      <span>Mã đơn hàng</span>
-                      <strong>{checkout.orderId}</strong>
-                    </p>
-
-                    <p>
-                      <span>Phương thức</span>
-                      <strong>
-                        {selectedMethod === "banking"
-                          ? "Chuyển khoản ngân hàng"
-                          : "Ví MoMo"}
-                      </strong>
-                    </p>
-
-                    <p>
-                      <span>Số tiền mô phỏng</span>
-                      <strong className="mock-payment-amount">
-                        {formatPrice(checkout.totalAmount)}
-                      </strong>
-                    </p>
-
-                    <p className="mock-payment-warning">
-                      Đây là QR demo, không dùng để chuyển tiền thật.
-                    </p>
-
-                    <label className="mock-payment-result">
-                      <span>Kết quả thanh toán mô phỏng</span>
-                      <select
-                        value={mockResult}
-                        onChange={(event) =>
-                          setMockResult(
-                            event.target.value as MockPaymentResult,
-                          )
-                        }
-                      >
-                        <option value="SUCCESS">Thành công</option>
-                        <option value="FAILURE">Thất bại</option>
-                      </select>
-                    </label>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="mock-payment-info">
-                {selectedMethod === "vnpay" ? (
-                  <>
-                    <h3>Thanh toán VNPay Sandbox</h3>
-                    <p>
-                      Bạn sẽ được chuyển đến cổng VNPay thử nghiệm để hoàn tất
-                      giao dịch. Không phát sinh tiền thật.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <h3>Thanh toán khi nhận hàng (COD)</h3>
-                    <p>
-                      Đơn hàng sẽ được ghi nhận. Bạn thanh toán bằng tiền mặt
-                      khi nhận đồ uống.
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
-
+            <div className="mock-payment-info">
+              <h3>
+                {selectedMethod === "wallet"
+                  ? "Thanh toán bằng ví điện tử"
+                  : "Thanh toán bằng thẻ ngân hàng"}
+              </h3>
+              <p>
+                Đây là thanh toán mô phỏng phục vụ kiểm thử luồng đơn hàng.
+              </p>
+              <label className="mock-payment-result">
+                <span>Kết quả thanh toán mô phỏng</span>
+                <select
+                  value={mockResult}
+                  onChange={(event) =>
+                    setMockResult(event.target.value as MockPaymentResult)
+                  }
+                >
+                  <option value="SUCCESS">Thành công</option>
+                  <option value="FAILURE">Thất bại</option>
+                </select>
+              </label>
+            </div>
             {paymentError && (
               <p role="alert" className="payment-error">
                 {paymentError}
@@ -898,20 +748,14 @@ export default function ThanhToanPage() {
               type="button"
               className="payment-submit"
               disabled={paymentSubmitting}
-              onClick={handleMockPayment}
+              onClick={handlePayment}
             >
-              {paymentSubmitting
-                ? "Đang xử lý..."
-                : selectedMethod === "cod"
-                  ? "Xác nhận đặt đơn COD"
-                  : "Xác nhận thanh toán"}
+              {paymentSubmitting ? "Đang xử lý..." : "Xác nhận thanh toán"}
               <span aria-hidden="true">→</span>
             </button>
 
             <p className="secure-note">
-              {selectedMethod === "vnpay"
-                ? "VNPay Sandbox chỉ dùng để kiểm thử, không phát sinh giao dịch thật."
-                : "Đây là quy trình thanh toán mô phỏng, không phát sinh giao dịch tiền thật."}
+              Thanh toán mô phỏng không phát sinh giao dịch tiền thật.
             </p>
           </section>
         </div>
@@ -1053,111 +897,40 @@ export default function ThanhToanPage() {
               </div>
 
               <div className="payment-methods">
-                <label
-                  className={`payment-method ${
-                    paymentMethod === "cod" ? "selected" : ""
-                  }`}
-                >
+                <label className={`payment-method ${
+                  paymentMethod === "wallet" ? "selected" : ""
+                }`}>
                   <input
                     type="radio"
                     name="payment"
-                    value="cod"
-                    checked={paymentMethod === "cod"}
-                    onChange={() => setPaymentMethod("cod")}
+                    value="wallet"
+                    checked={paymentMethod === "wallet"}
+                    onChange={() => setPaymentMethod("wallet")}
                   />
-
-                  <span className="method-icon" aria-hidden="true">
-                    ₫
-                  </span>
-
+                  <span className="method-icon" aria-hidden="true">V</span>
                   <span className="method-copy">
-                    <strong>Thanh toán khi nhận hàng</strong>
-                    <small>
-                      Thanh toán bằng tiền mặt khi nhận đồ uống.
-                    </small>
+                    <strong>Ví điện tử</strong>
+                    <small>Thanh toán bằng ví điện tử mô phỏng.</small>
                   </span>
-
-                  <span className="method-check" aria-hidden="true">
-                    ✓
-                  </span>
+                  <span className="method-check" aria-hidden="true">✓</span>
                 </label>
 
-                <label
-                  className={`payment-method ${
-                    paymentMethod === "vnpay" ? "selected" : ""
-                  }`}
-                >
+                <label className={`payment-method ${
+                  paymentMethod === "card" ? "selected" : ""
+                }`}>
                   <input
                     type="radio"
                     name="payment"
-                    value="vnpay"
-                    checked={paymentMethod === "vnpay"}
-                    onChange={() => setPaymentMethod("vnpay")}
+                    value="card"
+                    checked={paymentMethod === "card"}
+                    onChange={() => setPaymentMethod("card")}
                   />
-                  <span className="method-icon" aria-hidden="true">
-                    V
-                  </span>
+                  <span className="method-icon" aria-hidden="true">▣</span>
                   <span className="method-copy">
-                    <strong>VNPay Sandbox</strong>
-                    <small>Thanh toán qua cổng VNPay thử nghiệm.</small>
+                    <strong>Thẻ ngân hàng</strong>
+                    <small>Thanh toán bằng thẻ ngân hàng mô phỏng.</small>
                   </span>
-                  <span className="method-check" aria-hidden="true">
-                    ✓
-                  </span>
-                </label>
-
-                <label
-                  className={`payment-method ${
-                    paymentMethod === "banking" ? "selected" : ""
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="payment"
-                    value="banking"
-                    checked={paymentMethod === "banking"}
-                    onChange={() => setPaymentMethod("banking")}
-                  />
-
-                  <span className="method-icon" aria-hidden="true">
-                    ↗
-                  </span>
-
-                  <span className="method-copy">
-                    <strong>Chuyển khoản ngân hàng</strong>
-                    <small>Quét mã QR mô phỏng cho đơn hàng.</small>
-                  </span>
-
-                  <span className="method-check" aria-hidden="true">
-                    ✓
-                  </span>
-                </label>
-
-                <label
-                  className={`payment-method ${
-                    paymentMethod === "momo" ? "selected" : ""
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="payment"
-                    value="momo"
-                    checked={paymentMethod === "momo"}
-                    onChange={() => setPaymentMethod("momo")}
-                  />
-
-                  <span className="method-icon momo-icon" aria-hidden="true">
-                    M
-                  </span>
-
-                  <span className="method-copy">
-                    <strong>Ví MoMo</strong>
-                    <small>Quét mã QR MoMo mô phỏng cho đơn hàng.</small>
-                  </span>
-
-                  <span className="method-check" aria-hidden="true">
-                    ✓
-                  </span>
+                  <span className="method-check" aria-hidden="true">✓</span>
                 </label>
               </div>
             </section>
