@@ -6,7 +6,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import "./thanh-toan.css";
 
 type PaymentMethod = "wallet" | "card";
-type MockPaymentResult = "SUCCESS" | "FAILURE";
 type FormField = "name" | "phone" | "address" | "phuong" | "note";
 type FormErrors = Partial<Record<FormField, string>>;
 
@@ -92,15 +91,12 @@ export default function ThanhToanPage() {
   const router = useRouter();
 
   const [submitting, setSubmitting] = useState(false);
-  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [paymentError, setPaymentError] = useState("");
   const [formErrors, setFormErrors] = useState<FormErrors>({});
 
   const [paymentMethod, setPaymentMethod] =
     useState<PaymentMethod>("wallet");
-  const [mockResult, setMockResult] =
-    useState<MockPaymentResult>("SUCCESS");
 
   const [discountCode, setDiscountCode] = useState("");
   const [appliedDiscountCode, setAppliedDiscountCode] = useState("");
@@ -559,98 +555,14 @@ export default function ThanhToanPage() {
     }
   }
 
-  async function handlePayment() {
-    if (!checkout?.internalOrderId || paymentSubmitting) return;
+  function handlePayment() {
+    if (!checkout?.internalOrderId) return;
 
-    const token = localStorage.getItem("brewlite_accessToken");
-    if (!token) {
-      setPaymentError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
-      return;
-    }
-
-    setPaymentSubmitting(true);
-    setPaymentError("");
-
-    const backendPaymentMethod =
-      paymentMethod === "wallet" ? "MOMO" : "BANKING";
-    const storageKey = `brewlite-payment-${checkout.orderId}`;
-    let idempotencyKey = localStorage.getItem(storageKey);
-
-    if (!idempotencyKey) {
-      idempotencyKey = `brewlite-${crypto.randomUUID()}`;
-      localStorage.setItem(storageKey, idempotencyKey);
-    }
-
-    try {
-      const response = await fetch(`${API_URL}/payments`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          "Idempotency-Key": idempotencyKey,
-        },
-        body: JSON.stringify({
-          madonhang: checkout.internalOrderId,
-          phuongthuc: backendPaymentMethod,
-          mockResult,
-        }),
-      });
-
-      const data = (await response.json()) as ApiRecord;
-      if (!response.ok) {
-        throw new Error(
-          typeof data.message === "string"
-            ? data.message
-            : "Không thể xử lý thanh toán mô phỏng.",
-        );
-      }
-
-      const paymentStatus =
-        typeof data.paymentStatus === "string"
-          ? data.paymentStatus
-          : mockResult === "SUCCESS"
-            ? "DA_THANH_TOAN"
-            : "THAT_BAI";
-      const orderStatus =
-        typeof data.orderStatus === "string"
-          ? data.orderStatus
-          : mockResult === "SUCCESS"
-            ? "PAID"
-            : "PAYMENT_FAILED";
-      const updatedCheckout: CheckoutData = {
-        ...checkout,
-        status: orderStatus,
-        paymentStatus,
-      };
-
-      localStorage.setItem(
-        "brewlite_checkout",
-        JSON.stringify(updatedCheckout),
-      );
-      setCheckout(updatedCheckout);
-      localStorage.removeItem(storageKey);
-
-      if (mockResult === "SUCCESS") {
-        localStorage.setItem("brewlite_cart", "[]");
-        window.dispatchEvent(new Event("brewlite-cart-updated"));
-        router.push(
-          `/5TrangXacNhanDonHang?orderId=${encodeURIComponent(checkout.orderId)}`,
-        );
-        return;
-      }
-
-      setPaymentError(
-        "Thanh toán mô phỏng thất bại. Đơn hàng đã chuyển sang PAYMENT_FAILED.",
-      );
-    } catch (error) {
-      setPaymentError(
-        error instanceof Error
-          ? error.message
-          : "Không thể xử lý thanh toán mô phỏng.",
-      );
-    } finally {
-      setPaymentSubmitting(false);
-    }
+    router.push(
+      `/4TrangThanhToan/sandbox?orderId=${encodeURIComponent(
+        checkout.orderId,
+      )}&method=${paymentMethod}`,
+    );
   }
   if (!loaded) {
     return (
@@ -723,20 +635,9 @@ export default function ThanhToanPage() {
                   : "Thanh toán bằng thẻ ngân hàng"}
               </h3>
               <p>
-                Đây là thanh toán mô phỏng phục vụ kiểm thử luồng đơn hàng.
+                Bạn sẽ được chuyển đến cổng thanh toán mô phỏng để hoàn tất
+                giao dịch.
               </p>
-              <label className="mock-payment-result">
-                <span>Kết quả thanh toán mô phỏng</span>
-                <select
-                  value={mockResult}
-                  onChange={(event) =>
-                    setMockResult(event.target.value as MockPaymentResult)
-                  }
-                >
-                  <option value="SUCCESS">Thành công</option>
-                  <option value="FAILURE">Thất bại</option>
-                </select>
-              </label>
             </div>
             {paymentError && (
               <p role="alert" className="payment-error">
@@ -747,15 +648,14 @@ export default function ThanhToanPage() {
             <button
               type="button"
               className="payment-submit"
-              disabled={paymentSubmitting}
               onClick={handlePayment}
             >
-              {paymentSubmitting ? "Đang xử lý..." : "Xác nhận thanh toán"}
+              Xác nhận thanh toán
               <span aria-hidden="true">→</span>
             </button>
 
             <p className="secure-note">
-              Thanh toán mô phỏng không phát sinh giao dịch tiền thật.
+              Môi trường mô phỏng không phát sinh giao dịch tiền thật.
             </p>
           </section>
         </div>
