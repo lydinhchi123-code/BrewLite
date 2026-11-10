@@ -36,7 +36,8 @@ export class DiscountsService {
         moi_khach_mot_lan
       FROM magiamgia
       WHERE trang_thai = 'DANG_SU_DUNG'
-        AND CURRENT_TIMESTAMP BETWEEN ngay_bat_dau AND ngay_ket_thuc
+        AND (ngay_bat_dau IS NULL OR CURRENT_TIMESTAMP >= ngay_bat_dau)
+        AND (ngay_ket_thuc IS NULL OR CURRENT_TIMESTAMP <= ngay_ket_thuc)
         AND (
           so_luong_toi_da IS NULL
           OR so_luong_da_dung < so_luong_toi_da
@@ -335,12 +336,16 @@ export class DiscountsService {
     }
 
     const now = new Date();
-    const start = new Date(discount.ngay_bat_dau);
-    const end = new Date(discount.ngay_ket_thuc);
 
-    if (now < start || now > end) {
+    if (discount.ngay_bat_dau && now < new Date(discount.ngay_bat_dau)) {
       throw new BadRequestException(
-        'Mã giảm giá chưa đến thời gian hoặc đã hết hạn',
+        'Mã giảm giá chưa đến thời gian sử dụng',
+      );
+    }
+
+    if (discount.ngay_ket_thuc && now > new Date(discount.ngay_ket_thuc)) {
+      throw new BadRequestException(
+        'Mã giảm giá đã hết hạn',
       );
     }
 

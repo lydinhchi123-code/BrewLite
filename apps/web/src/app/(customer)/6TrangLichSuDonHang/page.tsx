@@ -36,6 +36,11 @@ type Order = {
   shippingFee: number;
   discount: number;
   totalAmount: number;
+  recipientName?: string;
+  recipientPhone?: string;
+  deliveryAddress?: string;
+  province?: string;
+  note?: string;
 };
 
 type ApiOrder = {
@@ -49,6 +54,11 @@ type ApiOrder = {
   phigiaohang: number;
   giamgia: number;
   items: ApiOrderItem[];
+  hotennguoinhan?: string;
+  sodienthoainguoinhan?: string;
+  diachigiaohang?: string;
+  phuong?: string;
+  ghichu?: string;
 };
 
 type ApiOrderItem = {
@@ -125,6 +135,11 @@ function mapApiOrder(order: ApiOrder): Order {
     shippingFee,
     discount,
     totalAmount: Number(order.tongtien),
+    recipientName: order.hotennguoinhan,
+    recipientPhone: order.sodienthoainguoinhan,
+    deliveryAddress: order.diachigiaohang,
+    province: order.phuong,
+    note: order.ghichu,
   };
 }
 
@@ -507,6 +522,34 @@ export default function OrderHistoryPage() {
                 <span className="status-dot" />
                 {selectedOrder.status}
               </span>
+            </div>
+
+            {/* Thông tin giao nhận */}
+            <div className="history-modal-delivery">
+              <h4>Thông tin giao nhận</h4>
+              <div className="history-delivery-grid">
+                <div>
+                  <span>Người nhận:</span>
+                  <strong>{selectedOrder.recipientName || "Khách hàng"}</strong>
+                </div>
+                <div>
+                  <span>Số điện thoại:</span>
+                  <strong>{selectedOrder.recipientPhone || "Chưa cập nhật"}</strong>
+                </div>
+                <div className="history-delivery-full">
+                  <span>Địa chỉ nhận hàng:</span>
+                  <strong>
+                    {selectedOrder.deliveryAddress || "Chưa cập nhật"}
+                    {selectedOrder.province && !selectedOrder.deliveryAddress?.includes(selectedOrder.province) ? `, ${selectedOrder.province}` : ""}
+                  </strong>
+                </div>
+                {selectedOrder.note && (
+                  <div className="history-delivery-full">
+                    <span>Ghi chú đơn hàng:</span>
+                    <em>"{selectedOrder.note}"</em>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="history-modal-items">

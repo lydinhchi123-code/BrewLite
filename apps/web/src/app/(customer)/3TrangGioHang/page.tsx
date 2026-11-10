@@ -187,6 +187,7 @@ export default function CartPage() {
         setItems([]);
       } finally {
         setLoaded(true);
+        setSubmitting(false);
       }
     }
 
@@ -276,6 +277,7 @@ export default function CartPage() {
 
     setOrderError("");
     setOrderMessage("");
+    setSubmitting(true);
 
     const subtotal = items.reduce(
       (sum, item) => sum + item.unitPrice * item.qty,
@@ -338,6 +340,8 @@ export default function CartPage() {
     } catch (error) {
       console.error("Không thể lưu thông tin thanh toán:", error);
       setOrderError("Không thể lưu thông tin đơn hàng. Vui lòng thử lại.");
+    } finally {
+      setSubmitting(false);
     }
   }
 

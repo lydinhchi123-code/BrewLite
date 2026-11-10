@@ -44,6 +44,69 @@ function PaymentSandboxContent() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<"success" | "failure" | null>(null);
 
+  function handleCardNumberChange(value: string) {
+    const digits = value.replace(/\D/g, "").slice(0, 16);
+    const parts = digits.match(/.{1,4}/g);
+    setCardNumber(parts ? parts.join(" ") : digits);
+    if (error) setError("");
+  }
+
+  function handleExpiryChange(value: string) {
+    const digits = value.replace(/\D/g, "").slice(0, 4);
+    if (digits.length >= 3) {
+      setExpiry(`${digits.slice(0, 2)}/${digits.slice(2)}`);
+    } else {
+      setExpiry(digits);
+    }
+    if (error) setError("");
+  }
+
+  function handleCvvChange(value: string) {
+    const digits = value.replace(/\D/g, "").slice(0, 4);
+    setCvv(digits);
+    if (error) setError("");
+  }
+
+  function validateCard(): string | null {
+    const rawDigits = cardNumber.replace(/\D/g, "");
+    if (!rawDigits) {
+      return "Vui lòng nhập số thẻ ngân hàng.";
+    }
+    if (rawDigits.length !== 16) {
+      return "Số thẻ ngân hàng phải gồm đúng 16 chữ số (ví dụ: 9704 0000 0000 0000).";
+    }
+
+    const cleanExpiry = expiry.trim();
+    if (!cleanExpiry) {
+      return "Vui lòng nhập ngày hết hạn của thẻ (MM/YY).";
+    }
+    const expiryMatch = cleanExpiry.match(/^(0[1-9]|1[0-2])\/?([0-9]{2})$/);
+    if (!expiryMatch) {
+      return "Ngày hết hạn không hợp lệ. Vui lòng nhập định dạng MM/YY (ví dụ: 12/28).";
+    }
+    const expMonth = parseInt(expiryMatch[1], 10);
+    const expYear = parseInt(`20${expiryMatch[2]}`, 10);
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    if (
+      expYear < currentYear ||
+      (expYear === currentYear && expMonth < currentMonth)
+    ) {
+      return "Thẻ đã hết hạn sử dụng. Vui lòng kiểm tra lại.";
+    }
+
+    const cleanCvv = cvv.trim();
+    if (!cleanCvv) {
+      return "Vui lòng nhập mã bảo mật CVV.";
+    }
+    if (!/^\d{3,4}$/.test(cleanCvv)) {
+      return "Mã CVV phải gồm 3 hoặc 4 chữ số.";
+    }
+
+    return null;
+  }
+
   useEffect(() => {
     Promise.resolve().then(() => {
       const raw = localStorage.getItem("brewlite_checkout");
@@ -62,6 +125,14 @@ function PaymentSandboxContent() {
 
   async function completePayment(mockResult: "SUCCESS" | "FAILURE") {
     if (!checkout?.internalOrderId || processing) return;
+
+    if (mockResult === "SUCCESS" && method === "card") {
+      const cardError = validateCard();
+      if (cardError) {
+        setError(cardError);
+        return;
+      }
+    }
 
     const token = localStorage.getItem("brewlite_accessToken");
     if (!token) {
@@ -198,27 +269,30 @@ function PaymentSandboxContent() {
                 Số thẻ mô phỏng
                 <input
                   inputMode="numeric"
+                  maxLength={19}
                   placeholder="9704 0000 0000 0000"
                   value={cardNumber}
-                  onChange={(event) => setCardNumber(event.target.value)}
+                  onChange={(event) => handleCardNumberChange(event.target.value)}
                 />
               </label>
               <div className="sandbox-field-row">
                 <label>
-                  Hết hạn
+                  Hết hạn (MM/YY)
                   <input
+                    maxLength={5}
                     placeholder="MM/YY"
                     value={expiry}
-                    onChange={(event) => setExpiry(event.target.value)}
+                    onChange={(event) => handleExpiryChange(event.target.value)}
                   />
                 </label>
                 <label>
                   CVV
                   <input
                     inputMode="numeric"
+                    maxLength={4}
                     placeholder="•••"
                     value={cvv}
-                    onChange={(event) => setCvv(event.target.value)}
+                    onChange={(event) => handleCvvChange(event.target.value)}
                   />
                 </label>
               </div>
@@ -238,9 +312,19 @@ function PaymentSandboxContent() {
               type="button"
               className="sandbox-cancel"
               disabled={processing}
-              onClick={() => completePayment("FAILURE")}
+              onClick={() => {
+                if (result === "failure") {
+                  router.push(
+                    `/4TrangThanhToan?orderId=${encodeURIComponent(
+                      checkout.orderId,
+                    )}`,
+                  );
+                } else {
+                  void completePayment("FAILURE");
+                }
+              }}
             >
-              Hủy giao dịch
+              {result === "failure" ? "Quay lại đơn hàng" : "Hủy giao dịch"}
             </button>
             <button
               type="button"
@@ -248,7 +332,11 @@ function PaymentSandboxContent() {
               disabled={processing}
               onClick={() => completePayment("SUCCESS")}
             >
-              {processing ? "Đang xử lý..." : "Thanh toán"}
+              {processing
+                ? "Đang xử lý..."
+                : result === "failure"
+                  ? "Thử lại thanh toán"
+                  : "Thanh toán"}
               <span aria-hidden="true">→</span>
             </button>
           </div>

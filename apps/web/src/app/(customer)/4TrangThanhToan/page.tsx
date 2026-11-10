@@ -57,7 +57,7 @@ type DiscountItem = {
   so_luong_toi_da: number | null;
   so_luong_da_dung: number;
   ngay_bat_dau: string;
-  ngay_ket_thuc: string;
+  ngay_ket_thuc: string | null;
   trang_thai: string;
 };
 
@@ -109,6 +109,7 @@ export default function ThanhToanPage() {
     useState<DiscountItem | null>(null);
   const [loadingDiscounts, setLoadingDiscounts] = useState(false);
   const [discountListError, setDiscountListError] = useState("");
+  const [manualInputCode, setManualInputCode] = useState("");
 
   const [paymentStep, setPaymentStep] = useState(false);
   const [checkout, setCheckout] = useState<CheckoutData | null>(null);
@@ -277,19 +278,37 @@ export default function ThanhToanPage() {
   }
 
   function selectDiscount(item: DiscountItem) {
+    if (subtotal < Number(item.don_hang_toi_thieu)) {
+      setDiscountMessage(
+        `Đơn hàng phải đạt tối thiểu ${formatPrice(Number(item.don_hang_toi_thieu))} để sử dụng mã "${item.ma}".`,
+      );
+      return;
+    }
+
     setSelectedDiscount(item);
     setDiscountCode(item.ma);
+    setManualInputCode("");
     setShowDiscountModal(false);
     setDiscountMessage("");
+    void applyDiscount(item.ma);
   }
 
-  async function applyDiscount() {
-    const ma = discountCode.trim();
+  function removeDiscount() {
+    setSelectedDiscount(null);
+    setDiscountCode("");
+    setAppliedDiscountCode("");
+    setDiscount(0);
+    setDiscountMessage("");
+    setManualInputCode("");
+  }
+
+  async function applyDiscount(codeToApply?: string) {
+    const ma = (typeof codeToApply === "string" ? codeToApply : discountCode).trim().toUpperCase();
 
     if (!ma) {
       setDiscount(0);
       setAppliedDiscountCode("");
-      setDiscountMessage("Vui lòng chọn mã giảm giá.");
+      setDiscountMessage("Vui lòng nhập hoặc chọn mã giảm giá.");
       return;
     }
 
@@ -338,6 +357,7 @@ export default function ThanhToanPage() {
     } catch (error) {
       setDiscount(0);
       setAppliedDiscountCode("");
+      setSelectedDiscount(null);
 
       setDiscountMessage(
         error instanceof Error
@@ -398,6 +418,20 @@ export default function ThanhToanPage() {
     if (Object.keys(errors).length > 0) {
       setSubmitError("Vui lòng kiểm tra lại thông tin nhận hàng.");
       return;
+    }
+
+    // Kiểm tra mã giảm giá: Nếu đã nhập/chọn mã mà mã chưa được áp dụng thành công, không cho phép đặt hàng
+    if (discountCode.trim()) {
+      if (
+        !appliedDiscountCode ||
+        appliedDiscountCode.trim().toUpperCase() !==
+          discountCode.trim().toUpperCase()
+      ) {
+        setSubmitError(
+          `Mã giảm giá "${discountCode}" không hợp lệ hoặc chưa được áp dụng thành công. Vui lòng bấm "Áp dụng", kiểm tra lại hoặc tắt mã giảm giá để tiếp tục đặt hàng.`,
+        );
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -878,19 +912,37 @@ export default function ThanhToanPage() {
                     disabled={submitting}
                   >
                     <span>
-                      {discountCode || "Chọn mã ưu đãi"}
+                      {appliedDiscountCode
+                        ? `${appliedDiscountCode} (-${formatPrice(appliedDiscount)})`
+                        : discountCode
+                          ? `${discountCode} (Chưa áp dụng)`
+                          : "Chọn mã ưu đãi"}
                     </span>
                     <span>▾</span>
                   </button>
 
-                  <button
-                    type="button"
-                    className="discount-apply-button"
-                    onClick={applyDiscount}
-                    disabled={submitting || !discountCode}
-                  >
-                    Áp dụng
-                  </button>
+                  {discountCode && (
+                    <button
+                      type="button"
+                      className="discount-remove-button"
+                      onClick={removeDiscount}
+                      disabled={submitting}
+                      title="Tắt mã giảm giá"
+                    >
+                      ✕ Tắt mã
+                    </button>
+                  )}
+
+                  {!appliedDiscountCode && discountCode && (
+                    <button
+                      type="button"
+                      className="discount-apply-button"
+                      onClick={() => void applyDiscount()}
+                      disabled={submitting || !discountCode}
+                    >
+                      Áp dụng
+                    </button>
+                  )}
                 </div>
 
                 {discountMessage && (
@@ -981,6 +1033,39 @@ export default function ThanhToanPage() {
             </div>
 
             <div className="discount-modal-body">
+              <div className="discount-modal-manual-input">
+                <input
+                  placeholder="Nhập mã ưu đãi..."
+                  value={manualInputCode}
+                  onChange={(e) => setManualInputCode(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const code = manualInputCode.trim();
+                      if (code) {
+                        setShowDiscountModal(false);
+                        setDiscountCode(code);
+                        void applyDiscount(code);
+                      }
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={!manualInputCode.trim()}
+                  onClick={() => {
+                    const code = manualInputCode.trim();
+                    if (code) {
+                      setShowDiscountModal(false);
+                      setDiscountCode(code);
+                      void applyDiscount(code);
+                    }
+                  }}
+                >
+                  Áp dụng
+                </button>
+              </div>
+
               {loadingDiscounts ? (
                 <p className="discount-empty">
                   Đang tải danh sách mã giảm giá...
@@ -994,49 +1079,89 @@ export default function ThanhToanPage() {
                   Hiện chưa có mã giảm giá nào.
                 </p>
               ) : (
-                discountList.map((item) => (
-                  <div
-                    className={`discount-item ${
-                      selectedDiscount?.id === item.id
-                        ? "selected"
-                        : ""
-                    }`}
-                    key={item.id}
-                  >
-                    <div className="discount-item-info">
-                      <strong>{item.ten}</strong>
+                discountList.map((item) => {
+                  const minOrder = Number(item.don_hang_toi_thieu);
+                  const isEligible = subtotal >= minOrder;
+                  const isCurrentlySelected =
+                    selectedDiscount?.id === item.id ||
+                    appliedDiscountCode === item.ma;
 
-                      <span className="discount-item-code">
-                        {item.ma}
-                      </span>
+                  return (
+                    <div
+                      className={`discount-item ${
+                        isCurrentlySelected ? "selected" : ""
+                      } ${!isEligible ? "ineligible" : ""}`}
+                      key={item.id}
+                    >
+                      <div className="discount-item-info">
+                        <strong>{item.ten}</strong>
 
-                      <p>
-                        Giảm {formatPrice(Number(item.so_tien_giam))}
-                      </p>
+                        <span className="discount-item-code">
+                          {item.ma}
+                        </span>
 
-                      <small>
-                        Đơn tối thiểu:{" "}
-                        {formatPrice(Number(item.don_hang_toi_thieu))}
-                      </small>
+                        <p>
+                          Giảm {formatPrice(Number(item.so_tien_giam))}
+                        </p>
 
-                      <small>
-                        Hạn sử dụng:{" "}
-                        {new Date(item.ngay_ket_thuc).toLocaleDateString("vi-VN")}
-                      </small>
+                        <small>
+                          Đơn tối thiểu: {formatPrice(minOrder)}
+                        </small>
 
-                      {item.mo_ta && (
-                        <small>{item.mo_ta}</small>
+                        {!isEligible && (
+                          <span className="discount-item-badge-ineligible">
+                            Chưa đủ điều kiện (cần thêm {formatPrice(minOrder - subtotal)})
+                          </span>
+                        )}
+
+                        <small>
+                          Hạn sử dụng:{" "}
+                          {item.ngay_ket_thuc
+                            ? new Date(item.ngay_ket_thuc).toLocaleDateString("vi-VN")
+                            : "Vô thời hạn"}
+                        </small>
+
+                        {item.mo_ta && (
+                          <small>{item.mo_ta}</small>
+                        )}
+                      </div>
+
+                      {isCurrentlySelected && appliedDiscountCode ? (
+                        <button
+                          type="button"
+                          className="discount-item-active-btn"
+                          onClick={() => {
+                            removeDiscount();
+                            setShowDiscountModal(false);
+                          }}
+                        >
+                          Bỏ chọn
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!isEligible}
+                          onClick={() => selectDiscount(item)}
+                        >
+                          {isEligible ? "Chọn" : "Chưa đủ ĐK"}
+                        </button>
                       )}
                     </div>
+                  );
+                })
+              )}
 
-                    <button
-                      type="button"
-                      onClick={() => selectDiscount(item)}
-                    >
-                      Chọn
-                    </button>
-                  </div>
-                ))
+              {(appliedDiscountCode || discountCode) && (
+                <button
+                  type="button"
+                  className="discount-modal-clear"
+                  onClick={() => {
+                    removeDiscount();
+                    setShowDiscountModal(false);
+                  }}
+                >
+                  ✕ Tắt / Hủy mã giảm giá đang dùng
+                </button>
               )}
             </div>
           </div>

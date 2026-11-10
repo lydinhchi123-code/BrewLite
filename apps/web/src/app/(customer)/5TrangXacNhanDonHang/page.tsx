@@ -27,6 +27,11 @@ interface OrderDetail {
   paymentStatus: string;
   paymentMethod: string | null;
   createdAt: string | null;
+  recipientName: string | null;
+  recipientPhone: string | null;
+  deliveryAddress: string | null;
+  province: string | null;
+  note: string | null;
   items: OrderItem[];
   subtotal: number;
   deliveryFee: number;
@@ -178,6 +183,36 @@ function toOrderDetail(
       typeof value.createdAt === "string"
         ? value.createdAt
         : null,
+    recipientName:
+      typeof value.recipientName === "string"
+        ? value.recipientName
+        : typeof value.hotennguoinhan === "string"
+          ? value.hotennguoinhan
+          : null,
+    recipientPhone:
+      typeof value.recipientPhone === "string"
+        ? value.recipientPhone
+        : typeof value.sodienthoainguoinhan === "string"
+          ? value.sodienthoainguoinhan
+          : null,
+    deliveryAddress:
+      typeof value.deliveryAddress === "string"
+        ? value.deliveryAddress
+        : typeof value.diachigiaohang === "string"
+          ? value.diachigiaohang
+          : null,
+    province:
+      typeof value.province === "string"
+        ? value.province
+        : typeof value.phuong === "string"
+          ? value.phuong
+          : null,
+    note:
+      typeof value.note === "string"
+        ? value.note
+        : typeof value.ghichu === "string"
+          ? value.ghichu
+          : null,
     items,
     subtotal:
       asMoney(value.subtotal) ??
@@ -194,7 +229,12 @@ const previewOrder: OrderDetail = {
   orderStatus: "DA_TIEP_NHAN",
   paymentStatus: "DA_THANH_TOAN",
   paymentMethod: "MOMO",
-  createdAt: null,
+  createdAt: "2026-11-10T20:00:00Z",
+  recipientName: "Nguyễn Văn A",
+  recipientPhone: "0901234567",
+  deliveryAddress: "123 Nguyễn Thị Minh Khai, Phường Bến Thành, TP. Hồ Chí Minh",
+  province: "Phường Bến Thành",
+  note: "Giao đồ uống trước 10h sáng",
   items: [{ name: "Cà phê sữa", size: "M", options: "Size: M", quantity: 1, price: 40000, lineTotal: 40000 }],
   subtotal: 40000,
   deliveryFee: 0,
@@ -460,6 +500,53 @@ export default function XacNhanDonHangPage() {
             <strong className={`confirm-payment-label confirm-payment-${view}`}>
               {order.paymentStatus || "CHƯA CẬP NHẬT"} · {stateText.label}
             </strong>
+          </div>
+        </section>
+
+        {/* Thông tin người nhận và giao hàng */}
+        <section className="confirm-delivery-card" aria-labelledby="confirm-delivery-title">
+          <div className="confirm-card-heading">
+            <h2 id="confirm-delivery-title">Thông tin giao nhận</h2>
+            <span>📍 Giao tận nơi</span>
+          </div>
+
+          <div className="confirm-delivery-grid">
+            <div className="confirm-delivery-field">
+              <span className="confirm-field-label">Người nhận:</span>
+              <strong className="confirm-field-value">{order.recipientName || "Khách hàng"}</strong>
+            </div>
+
+            <div className="confirm-delivery-field">
+              <span className="confirm-field-label">Số điện thoại:</span>
+              <strong className="confirm-field-value">{order.recipientPhone || "Chưa cập nhật"}</strong>
+            </div>
+
+            <div className="confirm-delivery-field full-width">
+              <span className="confirm-field-label">Địa chỉ giao hàng:</span>
+              <strong className="confirm-field-value">
+                {order.deliveryAddress || "Chưa cập nhật"}
+                {order.province && !order.deliveryAddress?.includes(order.province) ? `, ${order.province}` : ""}
+              </strong>
+            </div>
+
+            {order.note && (
+              <div className="confirm-delivery-field full-width">
+                <span className="confirm-field-label">Ghi chú:</span>
+                <span className="confirm-field-note">"{order.note}"</span>
+              </div>
+            )}
+
+            <div className="confirm-delivery-field">
+              <span className="confirm-field-label">Thời gian đặt:</span>
+              <span className="confirm-field-value">
+                {order.createdAt ? new Date(order.createdAt).toLocaleString("vi-VN") : "Hôm nay"}
+              </span>
+            </div>
+
+            <div className="confirm-delivery-field">
+              <span className="confirm-field-label">Hình thức thanh toán:</span>
+              <strong className="confirm-field-value">{paymentMethodLabel(order.paymentMethod)}</strong>
+            </div>
           </div>
         </section>
 

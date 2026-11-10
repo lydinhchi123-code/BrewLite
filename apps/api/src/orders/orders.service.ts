@@ -218,13 +218,10 @@ export class OrdersService {
             `
             SELECT t.name, t.price
             FROM menu_toppings t
-            JOIN menu_product_toppings pt
-              ON pt.topping_id = t.id
-            WHERE pt.product_id = $1
-              AND t.name = ANY($2::text[])
+            WHERE t.name = ANY($1::text[])
               AND t.is_available = TRUE
             `,
-            [productId, toppingNames],
+            [toppingNames],
           );
 
           if (toppingResult.rowCount !== toppingNames.length) {

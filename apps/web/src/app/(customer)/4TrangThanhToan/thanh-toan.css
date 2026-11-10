@@ -394,11 +394,109 @@
   color: #fff;
   cursor: pointer;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .discount-apply-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.discount-remove-button {
+  padding: 12px 14px;
+  border: 1px solid #e2b9b3;
+  border-radius: 8px;
+  background: #fdf2f2;
+  color: #c53030;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.discount-remove-button:hover {
+  background: #fde8e8;
+  border-color: #c53030;
+}
+
+.discount-item.ineligible {
+  opacity: 0.65;
+  background: #fafafa;
+  border-color: #eee;
+}
+
+.discount-item-badge-ineligible {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #fee2e2;
+  color: #b91c1c;
+  width: fit-content;
+}
+
+.discount-item > button:disabled {
+  background: #bbb !important;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.discount-item-active-btn {
+  background: #c53030 !important;
+  color: #fff !important;
+}
+
+.discount-item-active-btn:hover {
+  background: #9b2c2c !important;
+}
+
+.discount-modal-manual-input {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed #e2d8ce;
+}
+
+.discount-modal-manual-input input {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #d5c8be;
+  border-radius: 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.discount-modal-manual-input button {
+  padding: 0 16px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: #6f4e37;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.discount-modal-clear {
+  margin-top: 14px;
+  width: 100%;
+  padding: 11px;
+  border: 1px dashed #e2b9b3;
+  border-radius: 8px;
+  background: #fff5f5;
+  color: #c53030;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+}
+
+.discount-modal-clear:hover {
+  background: #fee2e2;
 }
 
 /* Modal mã giảm giá */
