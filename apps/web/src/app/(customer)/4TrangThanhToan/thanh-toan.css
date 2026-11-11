@@ -55,6 +55,57 @@
 .method-copy small { color: var(--muted); font-size: 11px; }
 .method-check { width: 21px; height: 21px; margin-left: auto; border: 1px solid var(--beige); border-radius: 50%; color: transparent; text-align: center; line-height: 19px; font-size: 12px; font-weight: 800; }
 .payment-method.selected .method-check { border-color: var(--caramel); color: white; background: var(--caramel); }
+
+/* Thông báo đồ án mock payment */
+.payment-project-notice {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  margin: 16px 0;
+  border: 1px solid #d4b896;
+  border-radius: 12px;
+  background: #fdf6ee;
+}
+
+.payment-project-notice-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.payment-project-notice-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.payment-project-notice-body strong {
+  color: #5a3415;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.payment-project-notice-body p {
+  margin: 0;
+  color: #7a5235;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.vnpay-method-badge {
+  display: grid;
+  place-items: center;
+  min-width: 58px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: #005baa;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
 .payment-summary { position: sticky; top: 96px; }
 .summary-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 24px; }
 .summary-heading a { color: var(--caramel-dark); font-size: 11px; font-weight: 700; text-decoration: none; }

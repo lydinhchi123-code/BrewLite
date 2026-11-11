@@ -63,7 +63,7 @@ export class PaymentsController {
       responseCode: result.responseCode,
     });
     return response.redirect(
-      `${frontendUrl}/4TrangThanhToan?${params.toString()}`,
+      `${frontendUrl}/4TrangThanhToan/sandbox?${params.toString()}`,
     );
   }
 }

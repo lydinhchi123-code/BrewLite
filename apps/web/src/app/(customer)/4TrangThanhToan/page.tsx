@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import "./thanh-toan.css";
 
-type PaymentMethod = "wallet" | "card";
 type FormField = "name" | "phone" | "address" | "phuong" | "note";
 type FormErrors = Partial<Record<FormField, string>>;
 
@@ -42,7 +41,6 @@ type CheckoutData = {
   maGiamGia?: string;
   totalAmount: number;
   status: string;
-  paymentMethod?: PaymentMethod;
   paymentStatus?: string;
 };
 
@@ -95,9 +93,6 @@ export default function ThanhToanPage() {
   const [paymentError, setPaymentError] = useState("");
   const [formErrors, setFormErrors] = useState<FormErrors>({});
 
-  const [paymentMethod, setPaymentMethod] =
-    useState<PaymentMethod>("wallet");
-
   const [discountCode, setDiscountCode] = useState("");
   const [appliedDiscountCode, setAppliedDiscountCode] = useState("");
   const [discount, setDiscount] = useState(0);
@@ -122,8 +117,13 @@ export default function ThanhToanPage() {
       Promise.resolve().then(() => {
         if (cancelled) return;
 
-        const queryOrderId =
-          new URLSearchParams(window.location.search).get("orderId") ?? "";
+        const searchParams = new URLSearchParams(window.location.search);
+        const queryOrderId = searchParams.get("orderId") ?? "";
+        const queryStatus = searchParams.get("status");
+
+        if (queryStatus === "failure") {
+          setPaymentError("Giao dịch qua VNPay Sandbox thất bại hoặc đã bị huỷ. Bạn có thể thử thanh toán lại.");
+        }
 
         try {
           const raw = localStorage.getItem("brewlite_checkout");
@@ -143,12 +143,6 @@ export default function ThanhToanPage() {
                 setCheckout(parsed);
                 setUrlOrderId(savedOrderId);
                 setDiscount(parsed.discount ?? 0);
-
-                if (parsed.paymentMethod) {
-                  setPaymentMethod(
-                    parsed.paymentMethod === "card" ? "card" : "wallet",
-                  );
-                }
 
                 if (isTempUrlWithRealSavedOrder) {
                   const newUrl = new URL(window.location.href);
@@ -549,7 +543,6 @@ export default function ThanhToanPage() {
         address,
         phuong,
         note,
-        paymentMethod,
         subtotal,
         discount: appliedDiscount,
         maGiamGia: appliedDiscountCode || undefined,
@@ -595,7 +588,7 @@ export default function ThanhToanPage() {
     router.push(
       `/4TrangThanhToan/sandbox?orderId=${encodeURIComponent(
         checkout.orderId,
-      )}&method=${paymentMethod}`,
+      )}`,
     );
   }
   if (!loaded) {
@@ -635,8 +628,6 @@ export default function ThanhToanPage() {
   }
 
   if (paymentStep) {
-    const selectedMethod = checkout.paymentMethod ?? paymentMethod;
-
     return (
       <main className="payment-page">
         <div className="container">
@@ -649,7 +640,7 @@ export default function ThanhToanPage() {
           <section className="payment-card mock-payment-page-card">
             <span className="payment-eyebrow">BREWLITE PAYMENT</span>
 
-            <h1>Thanh toán đơn hàng</h1>
+            <h1>Xác nhận đơn hàng</h1>
 
             <p>
               Mã đơn hàng: <strong>#{checkout.orderId}</strong>
@@ -662,17 +653,22 @@ export default function ThanhToanPage() {
               </strong>
             </p>
 
+            <div className="payment-project-notice">
+              <div className="payment-project-notice-icon">🎓</div>
+              <div className="payment-project-notice-body">
+                <strong>Mô phỏng thanh toán đồ án (Mock Payment)</strong>
+                <p>
+                  Đồ án sử dụng mô hình <b>Mock Payment</b> kết nối cổng <b>VNPay Sandbox</b> để thử nghiệm luồng đặt hàng. <b>Không sử dụng tiền thật</b>.
+                </p>
+              </div>
+            </div>
+
             <div className="mock-payment-info">
-              <h3>
-                {selectedMethod === "wallet"
-                  ? "Thanh toán bằng ví điện tử"
-                  : "Thanh toán bằng thẻ ngân hàng"}
-              </h3>
               <p>
-                Bạn sẽ được chuyển đến cổng thanh toán mô phỏng để hoàn tất
-                giao dịch.
+                Bấm nút bên dưới để chuyển đến cổng thanh toán VNPay Sandbox và hoàn tất giao dịch thử nghiệm bằng thẻ test.
               </p>
             </div>
+
             {paymentError && (
               <p role="alert" className="payment-error">
                 {paymentError}
@@ -684,12 +680,12 @@ export default function ThanhToanPage() {
               className="payment-submit"
               onClick={handlePayment}
             >
-              Xác nhận thanh toán
+              Chuyển đến cổng VNPay Sandbox
               <span aria-hidden="true">→</span>
             </button>
 
             <p className="secure-note">
-              Môi trường mô phỏng không phát sinh giao dịch tiền thật.
+              🔒 Môi trường thử nghiệm Mock Payment VNPay Sandbox — Không phát sinh giao dịch tiền thật.
             </p>
           </section>
         </div>
@@ -823,49 +819,23 @@ export default function ThanhToanPage() {
             <section className="payment-card">
               <div className="payment-card-heading">
                 <span className="payment-step">02</span>
-
                 <div>
                   <h2>Phương thức thanh toán</h2>
-                  <p>Chọn cách thanh toán thuận tiện nhất cho bạn.</p>
+                  <p>Mô phỏng thanh toán trực tuyến qua VNPay Sandbox.</p>
                 </div>
               </div>
 
               <div className="payment-methods">
-                <label className={`payment-method ${
-                  paymentMethod === "wallet" ? "selected" : ""
-                }`}>
-                  <input
-                    type="radio"
-                    name="payment"
-                    value="wallet"
-                    checked={paymentMethod === "wallet"}
-                    onChange={() => setPaymentMethod("wallet")}
-                  />
-                  <span className="method-icon" aria-hidden="true">V</span>
-                  <span className="method-copy">
-                    <strong>Ví điện tử</strong>
-                    <small>Thanh toán bằng ví điện tử mô phỏng.</small>
-                  </span>
+                <div className="payment-method selected" style={{ cursor: "default" }}>
+                  <span className="vnpay-method-badge" aria-hidden="true">VNPay</span>
+                  <div className="method-copy">
+                    <strong>Cổng thanh toán VNPay Sandbox (Mock Payment)</strong>
+                    <small>
+                      Thanh toán qua cổng VNPay Sandbox mô phỏng, không phát sinh giao dịch tiền thật.
+                    </small>
+                  </div>
                   <span className="method-check" aria-hidden="true">✓</span>
-                </label>
-
-                <label className={`payment-method ${
-                  paymentMethod === "card" ? "selected" : ""
-                }`}>
-                  <input
-                    type="radio"
-                    name="payment"
-                    value="card"
-                    checked={paymentMethod === "card"}
-                    onChange={() => setPaymentMethod("card")}
-                  />
-                  <span className="method-icon" aria-hidden="true">▣</span>
-                  <span className="method-copy">
-                    <strong>Thẻ ngân hàng</strong>
-                    <small>Thanh toán bằng thẻ ngân hàng mô phỏng.</small>
-                  </span>
-                  <span className="method-check" aria-hidden="true">✓</span>
-                </label>
+                </div>
               </div>
             </section>
           </div>
