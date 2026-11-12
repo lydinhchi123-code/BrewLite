@@ -3,6 +3,7 @@ name: BrewLite CI
 on:
   push:
     branches: [master]
+    tags: ["v*.*.*"]
   pull_request:
     branches: [master]
 
@@ -66,3 +67,112 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  build-and-push:
+    name: Build & Push Docker Images
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract Metadata (Backend)
+        id: meta-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/brewlite-api
+          tags: |
+            type=sha,format=short,prefix=
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+      - name: Build and Push Backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
+
+  deploy-and-verify:
+    name: Deploy & Verify Production
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy & Migration via SSH Secret
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            set -e
+
+            IMAGE_TAG="${{ github.sha }}"
+            API_IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/brewlite-api"
+
+            echo "1. Pulling image..."
+            docker pull $API_IMAGE:$IMAGE_TAG || docker pull $API_IMAGE:latest
+
+            echo "2. Saving current image tag for potential Rollback..."
+            OLD_TAG=$(docker inspect --format='{{.Config.Image}}' brewlite-api-container 2>/dev/null || echo "")
+            echo $OLD_TAG > /tmp/brewlite_prev_tag.txt
+
+            echo "3. Running safe Database Migration..."
+            docker run --rm \
+              -e DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}" \
+              $API_IMAGE:latest npx prisma migrate deploy
+
+            echo "4. Deploying new container into Production..."
+            docker stop brewlite-api-container || true
+            docker rm brewlite-api-container || true
+            docker run -d \
+              --name brewlite-api-container \
+              --restart always \
+              -p 3000:3000 \
+              -e DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}" \
+              $API_IMAGE:latest
+
+      # Yêu cầu 6: Smoke Test / Health Check
+      - name: Smoke Test (Health Check)
+        run: |
+          echo "Waiting 10s for container initialization..."
+          sleep 10
+
+          STATUS_CODE=$(curl -o /dev/null -s -w "%{http_code}" https://${{ secrets.PROD_HOST }}/api/health || echo "000")
+
+          if [ "$STATUS_CODE" -eq 200 ]; then
+            echo "Smoke test PASSED with status code 200!"
+          else
+            echo "Smoke test FAILED with status code $STATUS_CODE!"
+            exit 1
+          fi
+
+      # Yêu cầu 7: Dừng pipeline và Rollback khi triển khai thất bại
+      - name: Automatic Rollback on Failure
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            echo "!!! DEPLOYMENT/SMOKE TEST FAILED - INITIATING AUTOMATIC ROLLBACK !!!"
+
+            if [ -f /tmp/brewlite_prev_tag.txt ]; then
+              PREV_IMAGE=$(cat /tmp/brewlite_prev_tag.txt)
+              if [ -n "$PREV_IMAGE" ]; then
+                echo "Rolling back to stable image: $PREV_IMAGE"
+                docker stop brewlite-api-container || true
+                docker rm brewlite-api-container || true
+                docker run -d --name brewlite-api-container --restart always -p 3000:3000 $PREV_IMAGE
+                echo "Rollback execution completed."
+              fi
+            fi
