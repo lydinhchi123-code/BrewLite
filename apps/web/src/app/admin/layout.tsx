@@ -2,8 +2,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import "./admin.css";
+import { useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 
 const menuItems = [
   { label: "Tổng quan", href: "/admin", icon: "📊" },
@@ -17,6 +18,39 @@ export default function AdminLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const [checking, setChecking] = useState(true);
+  const [authenticated, setAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const loggedIn = sessionStorage.getItem(
+      "brewlite_admin_loggedIn"
+    );
+
+    if (loggedIn !== "true") {
+      router.replace("/dang-nhap-admin");
+      return;
+    }
+
+    setAuthenticated(true);
+    setChecking(false);
+  }, [router]);
+
+  if (checking || !authenticated) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          color: "#795334",
+        }}
+      >
+        Đang kiểm tra đăng nhập...
+      </div>
+    );
+  }
 
   return (
     <div className="admin-shell">

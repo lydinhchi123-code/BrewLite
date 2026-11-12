@@ -36,8 +36,6 @@ export class OrdersController {
     @Body() createOrderDto: CreateOrderDto,
     @Req() req: any,
   ) {
-    console.log("JWT USER:", req.user);
-
     return this.ordersService.create(
       createOrderDto,
       Number(req.user.sub),
@@ -98,4 +96,23 @@ export class OrdersController {
     );
   }
 
+  @Patch(':orderId/cancel')
+  @UseGuards(JwtAuthGuard)
+  cancelOrder(
+    @Param('orderId') orderId: string,
+    @Req() req: any,
+  ) {
+    const makh = req.user?.sub;
+
+    if (makh == null || !/^\d+$/.test(String(makh))) {
+      throw new UnauthorizedException(
+        'Không xác định được khách hàng đăng nhập.',
+      );
+    }
+
+    return this.ordersService.cancelOrder(
+      orderId,
+      String(makh),
+    );
+  }
 }

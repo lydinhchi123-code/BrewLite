@@ -557,3 +557,16 @@ footer { padding: 68px 0 24px; color: rgba(255,255,255,.72); background: var(--c
     height: 34px;
   }
 }
+
+.header a,
+.header a:hover,
+.header a:focus,
+.header a:active,
+.header a:visited,
+.mobile-menu a,
+.mobile-menu a:hover,
+.mobile-menu a:focus,
+.mobile-menu a:active,
+.mobile-menu a:visited {
+    text-decoration: none !important;
+}

@@ -406,6 +406,7 @@ export default function MenuPage() {
     setToppings([]);
   }
 
+  
   function addToCart() {
     if (!selected) return;
 
@@ -433,7 +434,40 @@ export default function MenuPage() {
     };
 
     try {
-      const oldCart = JSON.parse(localStorage.getItem("brewlite_cart") || "[]");
+      // Xác định giỏ hàng theo tài khoản đang đăng nhập
+      const savedUser = localStorage.getItem("brewlite_user");
+
+      let cartKey = "brewlite_cart_guest";
+
+      if (savedUser) {
+        const user = JSON.parse(savedUser);
+        const makh = Number(user?.makh);
+
+        if (Number.isInteger(makh) && makh > 0) {
+          cartKey = `brewlite_cart_${makh}`;
+        }
+      }
+
+      if (savedUser) {
+        try {
+          const user = JSON.parse(savedUser);
+          const makh = Number(user?.makh);
+
+          if (Number.isInteger(makh) && makh > 0) {
+            cartKey = `brewlite_cart_${makh}`;
+          }
+        } catch {
+          cartKey = "brewlite_cart_guest";
+        }
+      }
+
+      // Đọc giỏ hàng riêng của tài khoản
+      const savedCart = localStorage.getItem(cartKey);
+      const oldCart = savedCart ? JSON.parse(savedCart) : [];
+
+      if (!Array.isArray(oldCart)) {
+        throw new Error("Dữ liệu giỏ hàng không hợp lệ.");
+      }
 
       const exists = oldCart.findIndex(
         (item: ApiRecord) => item.key === cartItem.key,
@@ -445,9 +479,10 @@ export default function MenuPage() {
         oldCart.push(cartItem);
       }
 
-      localStorage.setItem("brewlite_cart", JSON.stringify(oldCart));
+      // Lưu vào giỏ hàng riêng
+      localStorage.setItem(cartKey, JSON.stringify(oldCart));
 
-      // Báo cho Header cập nhật số lượng giỏ hàng ngay lập tức
+      // Báo cho Header và CartPage cập nhật
       window.dispatchEvent(new Event("brewlite-cart-updated"));
 
       setNotice("Đã thêm món vào giỏ hàng!");
@@ -457,6 +492,7 @@ export default function MenuPage() {
       setNotice("Không thể lưu giỏ hàng trên trình duyệt này.");
     }
   }
+
 
   return (
     <main className="bl-menu-page">

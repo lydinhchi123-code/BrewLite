@@ -26,6 +26,7 @@ type CheckoutItem = {
 
 type CheckoutData = {
   orderId: string;
+  deliveryMethod?: "DELIVERY" | "PICKUP";
   internalOrderId?: number;
   makh: number;
   items: CheckoutItem[];
@@ -42,6 +43,8 @@ type CheckoutData = {
   totalAmount: number;
   status: string;
   paymentStatus?: string;
+  maFreeship?: string;
+  freeShipDiscount?: number;
 };
 
 type DiscountItem = {
@@ -49,14 +52,17 @@ type DiscountItem = {
   ma: string;
   ten: string;
   mo_ta?: string;
-  loai_ma: "NEW_CUSTOMER" | "MONTHLY";
+  loai_ma: "NEW_CUSTOMER" | "MONTHLY" | "HOLIDAY" | "OTHER";
+  hinh_thuc_giam: "TIEN_HANG" | "FREESHIP";
   so_tien_giam: number;
   don_hang_toi_thieu: number;
   so_luong_toi_da: number | null;
   so_luong_da_dung: number;
-  ngay_bat_dau: string;
+  ngay_bat_dau: string | null;
   ngay_ket_thuc: string | null;
   trang_thai: string;
+  du_dieu_kien?: boolean;
+  ly_do_khong_du_dieu_kien?: string | null;
 };
 
 type ApiRecord = Record<string, unknown>;
@@ -67,6 +73,22 @@ function isApiRecord(value: unknown): value is ApiRecord {
     value !== null &&
     !Array.isArray(value)
   );
+}
+
+function getCurrentMakh(): number | null {
+  const token = localStorage.getItem("brewlite_accessToken");
+  const rawUser = localStorage.getItem("brewlite_user");
+
+  if (!token || !rawUser) return null;
+
+  try {
+    const user = JSON.parse(rawUser);
+    const makh = Number(user?.makh);
+
+    return Number.isSafeInteger(makh) && makh > 0 ? makh : null;
+  } catch {
+    return null;
+  }
 }
 
 const formatPrice = (price: number) =>
@@ -98,6 +120,18 @@ export default function ThanhToanPage() {
   const [discount, setDiscount] = useState(0);
   const [discountMessage, setDiscountMessage] = useState("");
 
+  const [freeShipCode, setFreeShipCode] = useState("");
+  const [appliedFreeShipCode, setAppliedFreeShipCode] = useState("");
+  const [freeShipDiscount, setFreeShipDiscount] = useState(0);
+  const [freeShipMessage, setFreeShipMessage] = useState("");
+
+  const [selectedFreeShip, setSelectedFreeShip] =
+    useState<DiscountItem | null>(null);
+
+  // Xác định modal đang chọn loại voucher nào
+  const [discountModalType, setDiscountModalType] =
+    useState<"TIEN_HANG" | "FREESHIP">("TIEN_HANG");
+
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountList, setDiscountList] = useState<DiscountItem[]>([]);
   const [selectedDiscount, setSelectedDiscount] =
@@ -111,18 +145,59 @@ export default function ThanhToanPage() {
   const [loaded, setLoaded] = useState(false);
   const [urlOrderId, setUrlOrderId] = useState("");
 
+  function resetCheckoutState() {
+    setCheckout(null);
+    setUrlOrderId("");
+    setPaymentStep(false);
+
+    setDiscountCode("");
+    setAppliedDiscountCode("");
+    setDiscount(0);
+    setDiscountMessage("");
+
+    setFreeShipCode("");
+    setAppliedFreeShipCode("");
+    setFreeShipDiscount(0);
+    setFreeShipMessage("");
+
+    setSelectedDiscount(null);
+    setSelectedFreeShip(null);
+
+    setDiscountList([]);
+    setShowDiscountModal(false);
+    setDiscountListError("");
+    setManualInputCode("");
+
+    setFormErrors({});
+    setSubmitError("");
+    setPaymentError("");
+    setSubmitting(false);
+    setLoaded(true);
+  }
+
     useEffect(() => {
       let cancelled = false;
 
       Promise.resolve().then(() => {
         if (cancelled) return;
 
+        // Kiểm tra tài khoản đang đăng nhập
+        const currentMakh = getCurrentMakh();
+
+        if (!currentMakh) {
+          setLoaded(true);
+          router.replace("/2TrangMenu");
+          return;
+        }
+
         const searchParams = new URLSearchParams(window.location.search);
         const queryOrderId = searchParams.get("orderId") ?? "";
         const queryStatus = searchParams.get("status");
 
         if (queryStatus === "failure") {
-          setPaymentError("Giao dịch qua VNPay Sandbox thất bại hoặc đã bị huỷ. Bạn có thể thử thanh toán lại.");
+          setPaymentError(
+            "Giao dịch qua VNPay Sandbox thất bại hoặc đã bị huỷ. Bạn có thể thử thanh toán lại."
+          );
         }
 
         try {
@@ -131,10 +206,22 @@ export default function ThanhToanPage() {
           if (raw) {
             const parsed = JSON.parse(raw) as CheckoutData;
 
-            if (parsed && Array.isArray(parsed.items) && parsed.orderId) {
+            if (
+              parsed &&
+              Array.isArray(parsed.items) &&
+              parsed.orderId
+            ) {
+              // Không cho tài khoản khác xem checkout
+              if (Number(parsed.makh) !== currentMakh) {
+                setLoaded(true);
+                router.replace("/2TrangMenu");
+                return;
+              }
+
               const savedOrderId = String(parsed.orderId);
 
               const isMatchingOrder = savedOrderId === queryOrderId;
+
               const isTempUrlWithRealSavedOrder =
                 queryOrderId.startsWith("TEMP-") &&
                 !savedOrderId.startsWith("TEMP-");
@@ -142,7 +229,16 @@ export default function ThanhToanPage() {
               if (isMatchingOrder || isTempUrlWithRealSavedOrder) {
                 setCheckout(parsed);
                 setUrlOrderId(savedOrderId);
+
+                // Khôi phục voucher giảm tiền hàng
                 setDiscount(parsed.discount ?? 0);
+                setDiscountCode(parsed.maGiamGia ?? "");
+                setAppliedDiscountCode(parsed.maGiamGia ?? "");
+
+                // Khôi phục voucher Freeship
+                setFreeShipDiscount(parsed.freeShipDiscount ?? 0);
+                setFreeShipCode(parsed.maFreeship ?? "");
+                setAppliedFreeShipCode(parsed.maFreeship ?? "");
 
                 if (isTempUrlWithRealSavedOrder) {
                   const newUrl = new URL(window.location.href);
@@ -176,21 +272,74 @@ export default function ThanhToanPage() {
       return () => {
         cancelled = true;
       };
-    }, []);
+    }, [router]);
+
+    useEffect(() => {
+      function handleAuthChange() {
+        const currentMakh = getCurrentMakh();
+
+        // Đã đăng xuất hoặc tài khoản không hợp lệ
+        if (!currentMakh) {
+          resetCheckoutState();
+          router.replace("/2TrangMenu");
+          return;
+        }
+
+        // Tài khoản hiện tại không phải chủ sở hữu đơn hàng
+        if (checkout && Number(checkout.makh) !== currentMakh) {
+          resetCheckoutState();
+          router.replace("/2TrangMenu");
+        }
+      }
+
+      window.addEventListener("brewlite-auth-updated", handleAuthChange);
+
+      return () => {
+        window.removeEventListener("brewlite-auth-updated", handleAuthChange);
+      };
+    }, [checkout, router]);
 
   const orderItems = checkout?.items ?? [];
+  const filteredDiscountList = discountList.filter(
+    (item) => item.hinh_thuc_giam === discountModalType,
+  );
 
   const subtotal = checkout?.subtotal ??
     orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const deliveryFee = checkout?.deliveryFee ?? 0;
+  // Không tính phí giao hàng nếu khách lấy tại quán
+  const isPickup = checkout?.deliveryMethod === "PICKUP";
 
-  const appliedDiscount = Math.min(
-    Math.max(0, discount),
-    subtotal + deliveryFee,
+  // Phí giao hàng ban đầu theo tổng tiền sản phẩm
+  const shippingFeeBeforeDiscount = isPickup
+    ? 0
+    : subtotal < 100000
+      ? 20000
+      : subtotal < 200000
+        ? 10000
+        : 0;
+
+  // Tiền Freeship thực tế, không vượt quá phí ship
+  const appliedFreeShipDiscount = Math.min(
+    Math.max(0, freeShipDiscount),
+    shippingFeeBeforeDiscount,
   );
 
-  const total = Math.max(0, subtotal + deliveryFee - appliedDiscount);
+  // Phí giao hàng sau khi áp dụng Freeship
+  const deliveryFee =
+    shippingFeeBeforeDiscount - appliedFreeShipDiscount;
+
+  // Voucher giảm tiền hàng, không được giảm quá tiền sản phẩm
+  const appliedDiscount = Math.min(
+    Math.max(0, discount),
+    subtotal,
+  );
+
+  // Tổng thanh toán
+  const total = Math.max(
+    0,
+    subtotal + deliveryFee - appliedDiscount,
+  );
 
   function validateField(field: FormField, value: string) {
     const normalized = field === "phone"
@@ -228,7 +377,10 @@ export default function ThanhToanPage() {
     });
   }
 
-  async function openDiscountModal() {
+  async function openDiscountModal(
+    type: "TIEN_HANG" | "FREESHIP",
+  ) {
+    setDiscountModalType(type);
     setShowDiscountModal(true);
     setDiscountListError("");
 
@@ -259,7 +411,6 @@ export default function ThanhToanPage() {
       }
 
       setDiscountList(Array.isArray(data) ? data : []);
-
     } catch (error) {
       setDiscountListError(
         error instanceof Error
@@ -272,19 +423,46 @@ export default function ThanhToanPage() {
   }
 
   function selectDiscount(item: DiscountItem) {
-    if (subtotal < Number(item.don_hang_toi_thieu)) {
-      setDiscountMessage(
-        `Đơn hàng phải đạt tối thiểu ${formatPrice(Number(item.don_hang_toi_thieu))} để sử dụng mã "${item.ma}".`,
-      );
+    const isFreeShip = item.hinh_thuc_giam === "FREESHIP";
+
+    if (
+      subtotal < Number(item.don_hang_toi_thieu) ||
+      (
+        isFreeShip &&
+        (isPickup || shippingFeeBeforeDiscount <= 0)
+      )
+    ) {
+      const message =
+        subtotal < Number(item.don_hang_toi_thieu)
+          ? `Đơn hàng phải đạt tối thiểu ${
+              formatPrice(Number(item.don_hang_toi_thieu))
+            } để sử dụng mã "${item.ma}".`
+          : isPickup
+            ? "Không thể sử dụng mã Freeship khi chọn lấy tại quán."
+            : "Đơn hàng hiện không có phí vận chuyển để áp dụng Freeship.";
+
+      if (item.hinh_thuc_giam === "FREESHIP") {
+        setFreeShipMessage(message);
+      } else {
+        setDiscountMessage(message);
+      }
+
       return;
     }
 
-    setSelectedDiscount(item);
-    setDiscountCode(item.ma);
-    setManualInputCode("");
     setShowDiscountModal(false);
     setDiscountMessage("");
-    void applyDiscount(item.ma);
+    setFreeShipMessage("");
+
+    if (item.hinh_thuc_giam === "FREESHIP") {
+      setSelectedFreeShip(item);
+      setFreeShipCode(item.ma);
+      void applyDiscount(item.ma, "FREESHIP");
+    } else {
+      setSelectedDiscount(item);
+      setDiscountCode(item.ma);
+      void applyDiscount(item.ma, "TIEN_HANG");
+    }
   }
 
   function removeDiscount() {
@@ -296,22 +474,43 @@ export default function ThanhToanPage() {
     setManualInputCode("");
   }
 
-  async function applyDiscount(codeToApply?: string) {
-    const ma = (typeof codeToApply === "string" ? codeToApply : discountCode).trim().toUpperCase();
+  function removeFreeShip() {
+    setSelectedFreeShip(null);
+    setFreeShipCode("");
+    setAppliedFreeShipCode("");
+    setFreeShipDiscount(0);
+    setFreeShipMessage("");
+    setManualInputCode("");
+  }
+
+  async function applyDiscount(
+    codeToApply?: string,
+    expectedType?: "TIEN_HANG" | "FREESHIP",
+  ) {
+    const type = expectedType ?? discountModalType;
+
+    const ma = (
+      typeof codeToApply === "string"
+        ? codeToApply
+        : type === "FREESHIP"
+          ? freeShipCode
+          : discountCode
+    ).trim().toUpperCase();
+
+    const setMessage =
+      type === "FREESHIP"
+        ? setFreeShipMessage
+        : setDiscountMessage;
 
     if (!ma) {
-      setDiscount(0);
-      setAppliedDiscountCode("");
-      setDiscountMessage("Vui lòng nhập hoặc chọn mã giảm giá.");
+      setMessage("Vui lòng nhập hoặc chọn mã giảm giá.");
       return;
     }
 
     const token = localStorage.getItem("brewlite_accessToken");
 
     if (!token) {
-      setDiscount(0);
-      setAppliedDiscountCode("");
-      setDiscountMessage("Vui lòng đăng nhập để sử dụng mã giảm giá.");
+      setMessage("Vui lòng đăng nhập để sử dụng mã giảm giá.");
       return;
     }
 
@@ -325,6 +524,7 @@ export default function ThanhToanPage() {
         body: JSON.stringify({
           ma,
           tamTinh: subtotal,
+          phiVanChuyenGoc: shippingFeeBeforeDiscount,
         }),
       });
 
@@ -338,26 +538,71 @@ export default function ThanhToanPage() {
         );
       }
 
-      const soTienGiam = Number(data.data.so_tien_giam);
+      const voucher = data.data;
+      const actualType = voucher.hinh_thuc_giam;
 
-      setDiscount(soTienGiam);
-      setAppliedDiscountCode(data.data.ma);
-      setDiscountCode(data.data.ma);
+      // Không cho dùng nhầm loại voucher
+      if (actualType !== type) {
+        throw new Error(
+          type === "FREESHIP"
+            ? "Vui lòng chọn mã Freeship."
+            : "Vui lòng chọn mã giảm giá tiền hàng.",
+        );
+      }
 
-      setDiscountMessage(
-        `Áp dụng thành công! Bạn được giảm ${formatPrice(soTienGiam)}.`,
-      );
+      const soTienGiam = Number(voucher.so_tien_giam);
 
+      if (!Number.isFinite(soTienGiam) || soTienGiam <= 0) {
+        throw new Error("Giá trị giảm giá không hợp lệ.");
+      }
+
+      if (type === "FREESHIP") {
+        setFreeShipDiscount(soTienGiam);
+        setAppliedFreeShipCode(voucher.ma);
+        setFreeShipCode(voucher.ma);
+        setFreeShipMessage(
+          `Áp dụng Freeship thành công! Miễn tối đa ${formatPrice(soTienGiam)} phí vận chuyển.`,
+        );
+      } else {
+        setDiscount(soTienGiam);
+        setAppliedDiscountCode(voucher.ma);
+        setDiscountCode(voucher.ma);
+        setDiscountMessage(
+          `Áp dụng thành công! Bạn được giảm ${formatPrice(soTienGiam)} tiền hàng.`,
+        );
+      }
     } catch (error) {
-      setDiscount(0);
-      setAppliedDiscountCode("");
-      setSelectedDiscount(null);
+      if (type === "FREESHIP") {
+        setFreeShipDiscount(0);
+        setAppliedFreeShipCode("");
+        setSelectedFreeShip(null);
+      } else {
+        setDiscount(0);
+        setAppliedDiscountCode("");
+        setSelectedDiscount(null);
+      }
 
-      setDiscountMessage(
+      setMessage(
         error instanceof Error
           ? error.message
           : "Không thể kiểm tra mã giảm giá.",
       );
+    }
+  }
+
+  function applyManualDiscount(code: string) {
+    const ma = code.trim().toUpperCase();
+
+    if (!ma) return;
+
+    setShowDiscountModal(false);
+
+    if (discountModalType === "FREESHIP") {
+      setFreeShipCode(ma);
+      void applyDiscount(ma, "FREESHIP");
+    } else {
+      setDiscountCode(ma);
+      void applyDiscount(ma, "TIEN_HANG");
     }
   }
 
@@ -371,10 +616,19 @@ export default function ThanhToanPage() {
       return;
     }
 
+    const currentMakh = getCurrentMakh();
+
+    if (!currentMakh || currentMakh !== Number(checkout.makh)) {
+      resetCheckoutState();
+      router.replace("/2TrangMenu");
+      return;
+    }
+
     const token = localStorage.getItem("brewlite_accessToken");
 
     if (!token) {
-      setSubmitError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+      resetCheckoutState();
+      router.replace("/2TrangMenu");
       return;
     }
 
@@ -384,30 +638,45 @@ export default function ThanhToanPage() {
     const rawPhone = String(formData.get("phone") ?? "").trim();
     const customerPhone = rawPhone.replace(/[\s()-]/g, "");
 
-    if (!/^[0-9]{10}$/.test(customerPhone)) {
+    if (!/^0[0-9]{9}$/.test(customerPhone)) {
       setSubmitError(
         "Số điện thoại phải gồm đúng 10 chữ số, ví dụ 0901234567.",
       );
       return;
     }
 
-    const address = String(formData.get("address") ?? "").trim();
-    const phuong = String(formData.get("phuong") ?? checkout.phuong ?? checkout.ward ?? "",).trim();
+    const isPickup = checkout.deliveryMethod === "PICKUP";
+    const address = isPickup ? "" : String(formData.get("address") ?? "").trim();
+    const phuong = isPickup ? "" : String(
+        formData.get("phuong") ?? checkout.phuong ?? checkout.ward ?? "",
+      ).trim();
+
     const note = String(formData.get("note") ?? "").trim();
 
     const errors: FormErrors = {};
-    const values: Record<FormField, string> = {
-      name: customerName,
-      phone: customerPhone,
-      address,
-      phuong,
-      note,
-    };
-    (Object.keys(values) as FormField[]).forEach((field) => {
-      const error = validateField(field, values[field]);
-      if (error) errors[field] = error;
-    });
+    const nameError = validateField("name", customerName);
+    const phoneError = validateField("phone", customerPhone);
+    const noteError = validateField("note", note);
 
+    if (nameError) errors.name = nameError;
+    if (phoneError) errors.phone = phoneError;
+    if (noteError) errors.note = noteError;
+
+    // Chỉ kiểm tra địa chỉ và phường khi giao hàng
+    if (!isPickup) {
+      const addressError = validateField("address", address);
+      const phuongError = validateField("phuong", phuong);
+
+      if (addressError) errors.address = addressError;
+      if (phuongError) errors.phuong = phuongError;
+    }
+
+    setFormErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      setSubmitError("Vui lòng kiểm tra lại thông tin nhận hàng.");
+      return;
+    }
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) {
       setSubmitError("Vui lòng kiểm tra lại thông tin nhận hàng.");
@@ -415,17 +684,34 @@ export default function ThanhToanPage() {
     }
 
     // Kiểm tra mã giảm giá: Nếu đã nhập/chọn mã mà mã chưa được áp dụng thành công, không cho phép đặt hàng
-    if (discountCode.trim()) {
-      if (
+    // Kiểm tra voucher giảm tiền hàng
+    if (
+      discountCode.trim() &&
+      (
         !appliedDiscountCode ||
         appliedDiscountCode.trim().toUpperCase() !==
           discountCode.trim().toUpperCase()
-      ) {
-        setSubmitError(
-          `Mã giảm giá "${discountCode}" không hợp lệ hoặc chưa được áp dụng thành công. Vui lòng bấm "Áp dụng", kiểm tra lại hoặc tắt mã giảm giá để tiếp tục đặt hàng.`,
-        );
-        return;
-      }
+      )
+    ) {
+      setSubmitError(
+        `Voucher giảm giá "${discountCode}" chưa được áp dụng thành công.`,
+      );
+      return;
+    }
+
+    // Kiểm tra voucher Freeship
+    if (
+      freeShipCode.trim() &&
+      (
+        !appliedFreeShipCode ||
+        appliedFreeShipCode.trim().toUpperCase() !==
+          freeShipCode.trim().toUpperCase()
+      )
+    ) {
+      setSubmitError(
+        `Voucher Freeship "${freeShipCode}" chưa được áp dụng thành công.`,
+      );
+      return;
     }
 
     setSubmitting(true);
@@ -433,6 +719,7 @@ export default function ThanhToanPage() {
 
     const payload = {
       makh: checkout.makh,
+      deliveryMethod: checkout.deliveryMethod ?? "DELIVERY",
       items: checkout.items.map((item) => ({
         id: String(item.id),
         name: item.name,
@@ -452,9 +739,20 @@ export default function ThanhToanPage() {
         address,
         phuong,
         subtotal,
+        // Phí ship ban đầu
+        phiVanChuyenGoc: shippingFeeBeforeDiscount,
+
+        // Phí ship khách thực sự phải trả sau Freeship
         deliveryFee,
+
+        // Voucher giảm tiền hàng
         maGiamGia: appliedDiscountCode || null,
         discount: appliedDiscount,
+
+        // Voucher Freeship
+        maFreeship: appliedFreeShipCode || null,
+        freeShipDiscount: appliedFreeShipDiscount,
+
         totalAmount: total,
         note: note || undefined,
     };
@@ -536,6 +834,7 @@ export default function ThanhToanPage() {
 
       const updatedCheckout: CheckoutData = {
         ...checkout,
+        deliveryMethod: checkout.deliveryMethod ?? "DELIVERY",
         orderId: String(realOrderId),
         internalOrderId,
         customerName,
@@ -544,8 +843,11 @@ export default function ThanhToanPage() {
         phuong,
         note,
         subtotal,
+        deliveryFee,
         discount: appliedDiscount,
         maGiamGia: appliedDiscountCode || undefined,
+        maFreeship: appliedFreeShipCode || undefined,
+        freeShipDiscount: appliedFreeShipDiscount,
         totalAmount: total,
         status: "PENDING",
         paymentStatus: undefined,
@@ -556,6 +858,12 @@ export default function ThanhToanPage() {
         "brewlite_checkout",
         JSON.stringify(updatedCheckout),
       );
+
+      // Xóa giỏ hàng của đúng tài khoản vừa đặt hàng thành công.
+      localStorage.removeItem(`brewlite_cart_${checkout.makh}`);
+
+      // Thông báo để Header và các trang khác cập nhật số lượng giỏ hàng.
+      window.dispatchEvent(new Event("brewlite-cart-updated"));
 
       setCheckout(updatedCheckout);
       setUrlOrderId(String(realOrderId));
@@ -585,12 +893,21 @@ export default function ThanhToanPage() {
   function handlePayment() {
     if (!checkout?.internalOrderId) return;
 
+    const currentMakh = getCurrentMakh();
+
+    if (!currentMakh || currentMakh !== Number(checkout.makh)) {
+      resetCheckoutState();
+      router.replace("/2TrangMenu");
+      return;
+    }
+
     router.push(
       `/4TrangThanhToan/sandbox?orderId=${encodeURIComponent(
         checkout.orderId,
       )}`,
     );
   }
+
   if (!loaded) {
     return (
       <main className="payment-page">
@@ -718,7 +1035,11 @@ export default function ThanhToanPage() {
 
                 <div>
                   <h2>Thông tin nhận hàng</h2>
-                  <p>Nhập thông tin để BrewLite giao hàng đến bạn.</p>
+                  <p>
+                    {checkout.deliveryMethod === "PICKUP"
+                      ? "Bạn sẽ đến quán để nhận đơn hàng."
+                      : "Nhập thông tin để BrewLite giao hàng đến bạn."}
+                  </p>
                 </div>
               </div>
 
@@ -760,39 +1081,61 @@ export default function ThanhToanPage() {
                   {formErrors.phone && <small className="field-error">{formErrors.phone}</small>}
                 </label>
 
-                <label className="field-wide">
-                  Địa chỉ nhận hàng
-                  <input
-                    name="address"
-                    type="text"
-                    defaultValue={checkout.address}
-                    placeholder="Số nhà, tên đường"
-                    required
-                    aria-invalid={Boolean(formErrors.address)}
-                    className={formErrors.address ? "field-invalid" : ""}
-                    onChange={(event) =>
-                      handleFieldChange("address", event.target.value)
-                    }
-                  />
-                  {formErrors.address && <small className="field-error">{formErrors.address}</small>}
-                </label>
+                {checkout.deliveryMethod === "PICKUP" ? (
+                  <label className="field-wide">
+                    Hình thức nhận hàng
+                    <input
+                      type="text"
+                      value="Lấy tại quán"
+                      readOnly
+                      className="pickup-readonly-field"
+                    />
+                  </label>
+                ) : (
+                  <>
+                    <label className="field-wide">
+                      Địa chỉ nhận hàng
+                      <input
+                        name="address"
+                        type="text"
+                        defaultValue={checkout.address}
+                        placeholder="Số nhà, tên đường"
+                        required
+                        aria-invalid={Boolean(formErrors.address)}
+                        className={formErrors.address ? "field-invalid" : ""}
+                        onChange={(event) =>
+                          handleFieldChange("address", event.target.value)
+                        }
+                      />
+                      {formErrors.address && (
+                        <small className="field-error">
+                          {formErrors.address}
+                        </small>
+                      )}
+                    </label>
 
-                <label>
-                  Phường
-                  <input
-                    name="phuong"
-                    type="text"
-                    defaultValue={checkout.phuong ?? checkout.ward ?? ""}
-                    placeholder="Tên phường"
-                    required
-                    aria-invalid={Boolean(formErrors.phuong)}
-                    className={formErrors.phuong ? "field-invalid" : ""}
-                    onChange={(event) =>
-                      handleFieldChange("phuong", event.target.value)
-                    }
-                  />
-                  {formErrors.phuong && <small className="field-error">{formErrors.phuong}</small>}
-                </label>
+                    <label>
+                      Phường
+                      <input
+                        name="phuong"
+                        type="text"
+                        defaultValue={checkout.phuong ?? checkout.ward ?? ""}
+                        placeholder="Tên phường"
+                        required
+                        aria-invalid={Boolean(formErrors.phuong)}
+                        className={formErrors.phuong ? "field-invalid" : ""}
+                        onChange={(event) =>
+                          handleFieldChange("phuong", event.target.value)
+                        }
+                      />
+                      {formErrors.phuong && (
+                        <small className="field-error">
+                          {formErrors.phuong}
+                        </small>
+                      )}
+                    </label>
+                  </>
+                )}
 
                 <label className="note-field">
                   <span className="note-label">
@@ -872,13 +1215,14 @@ export default function ThanhToanPage() {
               </div>
 
               <div className="discount-form">
-                <label>Mã giảm giá</label>
+                {/* VOUCHER GIẢM TIỀN HÀNG */}
+                <label>Voucher giảm giá</label>
 
                 <div className="discount-actions">
                   <button
                     type="button"
                     className="discount-select-button"
-                    onClick={openDiscountModal}
+                    onClick={() => openDiscountModal("TIEN_HANG")}
                     disabled={submitting}
                   >
                     <span>
@@ -886,7 +1230,7 @@ export default function ThanhToanPage() {
                         ? `${appliedDiscountCode} (-${formatPrice(appliedDiscount)})`
                         : discountCode
                           ? `${discountCode} (Chưa áp dụng)`
-                          : "Chọn mã ưu đãi"}
+                          : "Chọn mã giảm giá"}
                     </span>
                     <span>▾</span>
                   </button>
@@ -897,9 +1241,8 @@ export default function ThanhToanPage() {
                       className="discount-remove-button"
                       onClick={removeDiscount}
                       disabled={submitting}
-                      title="Tắt mã giảm giá"
                     >
-                      ✕ Tắt mã
+                      ✕ Bỏ chọn
                     </button>
                   )}
 
@@ -907,8 +1250,8 @@ export default function ThanhToanPage() {
                     <button
                       type="button"
                       className="discount-apply-button"
-                      onClick={() => void applyDiscount()}
-                      disabled={submitting || !discountCode}
+                      onClick={() => void applyDiscount(discountCode, "TIEN_HANG")}
+                      disabled={submitting}
                     >
                       Áp dụng
                     </button>
@@ -916,14 +1259,59 @@ export default function ThanhToanPage() {
                 </div>
 
                 {discountMessage && (
-                  <small
-                    className={
-                      appliedDiscountCode
-                        ? "discount-valid"
-                        : "discount-invalid"
-                    }
-                  >
+                  <small className={appliedDiscountCode ? "discount-valid" : "discount-invalid"}>
                     {discountMessage}
+                  </small>
+                )}
+
+                {/* VOUCHER FREESHIP RIÊNG */}
+                <label className="freeship-label">
+                  Voucher Freeship
+                </label>
+
+                <div className="discount-actions">
+                  <button
+                    type="button"
+                    className="discount-select-button"
+                    onClick={() => openDiscountModal("FREESHIP")}
+                    disabled={submitting}
+                  >
+                    <span>
+                      {appliedFreeShipCode
+                        ? `${appliedFreeShipCode} (Miễn ${formatPrice(appliedFreeShipDiscount)})`
+                        : freeShipCode
+                          ? `${freeShipCode} (Chưa áp dụng)`
+                          : "Chọn mã Freeship"}
+                    </span>
+                    <span>▾</span>
+                  </button>
+
+                  {freeShipCode && (
+                    <button
+                      type="button"
+                      className="discount-remove-button"
+                      onClick={removeFreeShip}
+                      disabled={submitting}
+                    >
+                      ✕ Bỏ chọn
+                    </button>
+                  )}
+
+                  {!appliedFreeShipCode && freeShipCode && (
+                    <button
+                      type="button"
+                      className="discount-apply-button"
+                      onClick={() => void applyDiscount(freeShipCode, "FREESHIP")}
+                      disabled={submitting}
+                    >
+                      Áp dụng
+                    </button>
+                  )}
+                </div>
+
+                {freeShipMessage && (
+                  <small className={appliedFreeShipCode ? "discount-valid" : "discount-invalid"}>
+                    {freeShipMessage}
                   </small>
                 )}
               </div>
@@ -934,14 +1322,30 @@ export default function ThanhToanPage() {
                   <strong>{formatPrice(subtotal)}</strong>
                 </div>
 
-                <div>
-                  <span>Phí giao hàng</span>
-                  <strong>{formatPrice(deliveryFee)}</strong>
-                </div>
+                {!isPickup && (
+                  <>
+                    <div>
+                      <span>Phí giao hàng</span>
+                      <strong>{formatPrice(shippingFeeBeforeDiscount)}</strong>
+                    </div>
 
+                    {appliedFreeShipDiscount > 0 && (
+                      <div className="discount-row">
+                        <span>Miễn phí vận chuyển</span>
+                        <strong>-{formatPrice(appliedFreeShipDiscount)}</strong>
+                      </div>
+                    )}
+
+                    <div>
+                      <span>Phí ship cần thanh toán</span>
+                      <strong>{formatPrice(deliveryFee)}</strong>
+                    </div>
+                  </>
+                )}
+                
                 {appliedDiscount > 0 && (
                   <div className="discount-row">
-                    <span>Giảm giá</span>
+                    <span>Giảm giá sản phẩm</span>
                     <strong>-{formatPrice(appliedDiscount)}</strong>
                   </div>
                 )}
@@ -1013,9 +1417,7 @@ export default function ThanhToanPage() {
                       e.preventDefault();
                       const code = manualInputCode.trim();
                       if (code) {
-                        setShowDiscountModal(false);
-                        setDiscountCode(code);
-                        void applyDiscount(code);
+                        applyManualDiscount(code);
                       }
                     }
                   }}
@@ -1026,9 +1428,7 @@ export default function ThanhToanPage() {
                   onClick={() => {
                     const code = manualInputCode.trim();
                     if (code) {
-                      setShowDiscountModal(false);
-                      setDiscountCode(code);
-                      void applyDiscount(code);
+                      applyManualDiscount(code);
                     }
                   }}
                 >
@@ -1044,17 +1444,45 @@ export default function ThanhToanPage() {
                 <p className="discount-empty">
                   {discountListError}
                 </p>
-              ) : discountList.length === 0 ? (
+              ) : filteredDiscountList.length === 0 ? (
                 <p className="discount-empty">
                   Hiện chưa có mã giảm giá nào.
                 </p>
               ) : (
-                discountList.map((item) => {
+                filteredDiscountList.map((item) => {
                   const minOrder = Number(item.don_hang_toi_thieu);
-                  const isEligible = subtotal >= minOrder;
+                  const isFreeShip = item.hinh_thuc_giam === "FREESHIP";
+
+                  let ineligibleReason = "";
+
+                  // 1. Kiểm tra đơn hàng tối thiểu
+                  if (subtotal < minOrder) {
+                    ineligibleReason = `Cần mua thêm ${formatPrice(minOrder - subtotal)}`;
+                  }
+
+                  // 2. Kiểm tra điều kiện riêng của khách hàng từ backend
+                  else if (item.du_dieu_kien === false) {
+                    ineligibleReason =
+                      item.ly_do_khong_du_dieu_kien ||
+                      "Bạn không đủ điều kiện sử dụng mã này";
+                  }
+
+                  // 3. Kiểm tra điều kiện Freeship
+                  else if (isFreeShip && isPickup) {
+                    ineligibleReason = "Không áp dụng khi lấy tại quán";
+                  }
+
+                  else if (isFreeShip && shippingFeeBeforeDiscount <= 0) {
+                    ineligibleReason = "Đơn hàng không có phí vận chuyển";
+                  }
+
+                  const isEligible = ineligibleReason === "";
                   const isCurrentlySelected =
-                    selectedDiscount?.id === item.id ||
-                    appliedDiscountCode === item.ma;
+                    discountModalType === "FREESHIP"
+                      ? selectedFreeShip?.id === item.id ||
+                        appliedFreeShipCode === item.ma
+                      : selectedDiscount?.id === item.id ||
+                        appliedDiscountCode === item.ma;
 
                   return (
                     <div
@@ -1071,8 +1499,10 @@ export default function ThanhToanPage() {
                         </span>
 
                         <p>
-                          Giảm {formatPrice(Number(item.so_tien_giam))}
-                        </p>
+                          {item.hinh_thuc_giam === "FREESHIP"
+                            ? `Miễn phí ship tối đa ${formatPrice(Number(item.so_tien_giam))}`
+                            : `Giảm ${formatPrice(Number(item.so_tien_giam))}`}
+                        </p>                       
 
                         <small>
                           Đơn tối thiểu: {formatPrice(minOrder)}
@@ -1080,7 +1510,7 @@ export default function ThanhToanPage() {
 
                         {!isEligible && (
                           <span className="discount-item-badge-ineligible">
-                            Chưa đủ điều kiện (cần thêm {formatPrice(minOrder - subtotal)})
+                            {ineligibleReason}
                           </span>
                         )}
 
@@ -1096,12 +1526,22 @@ export default function ThanhToanPage() {
                         )}
                       </div>
 
-                      {isCurrentlySelected && appliedDiscountCode ? (
+                      {isCurrentlySelected &&
+                        (
+                          discountModalType === "FREESHIP"
+                            ? appliedFreeShipCode
+                            : appliedDiscountCode
+                        ) ? (
                         <button
                           type="button"
                           className="discount-item-active-btn"
                           onClick={() => {
-                            removeDiscount();
+                            if (discountModalType === "FREESHIP") {
+                              removeFreeShip();
+                            } else {
+                              removeDiscount();
+                            }
+
                             setShowDiscountModal(false);
                           }}
                         >
@@ -1113,7 +1553,7 @@ export default function ThanhToanPage() {
                           disabled={!isEligible}
                           onClick={() => selectDiscount(item)}
                         >
-                          {isEligible ? "Chọn" : "Chưa đủ ĐK"}
+                          {isEligible ? "Chọn" : "Không đủ điều kiện"}
                         </button>
                       )}
                     </div>
@@ -1121,12 +1561,20 @@ export default function ThanhToanPage() {
                 })
               )}
 
-              {(appliedDiscountCode || discountCode) && (
+              {(
+                discountModalType === "FREESHIP"
+                  ? appliedFreeShipCode || freeShipCode
+                  : appliedDiscountCode || discountCode
+              ) && (
                 <button
                   type="button"
                   className="discount-modal-clear"
                   onClick={() => {
-                    removeDiscount();
+                    if (discountModalType === "FREESHIP") {
+                      removeFreeShip();
+                    } else {
+                      removeDiscount();
+                    }
                     setShowDiscountModal(false);
                   }}
                 >

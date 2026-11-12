@@ -34,13 +34,16 @@ type Order = {
   items: OrderItem[];
   subtotal: number;
   shippingFee: number;
+  freeShipDiscount: number;
   discount: number;
   totalAmount: number;
+  deliveryMethod?: "DELIVERY" | "PICKUP";
   recipientName?: string;
   recipientPhone?: string;
   deliveryAddress?: string;
   province?: string;
   note?: string;
+  apiStatus: string;
 };
 
 type ApiOrder = {
@@ -52,7 +55,11 @@ type ApiOrder = {
   tongtien: number;
   tamtinh: number;
   phigiaohang: number;
+  originalDeliveryFee?: number;
+  giamgia_freeship?: number;
   giamgia: number;
+  hinhthucnhanhang?: "DELIVERY" | "PICKUP";
+  deliveryMethod?: "DELIVERY" | "PICKUP";
   items: ApiOrderItem[];
   hotennguoinhan?: string;
   sodienthoainguoinhan?: string;
@@ -123,7 +130,15 @@ function mapApiOrder(order: ApiOrder): Order {
       ),
   );
 
-  const shippingFee = Number(order.phigiaohang ?? 0);
+  // Phí giao hàng gốc trước khi trừ Freeship
+  const freeShipDiscount = Number(order.giamgia_freeship ?? 0);
+
+  // Phí giao hàng gốc = phí thực tế phải trả + tiền được giảm Freeship
+  const shippingFee =
+    Number(order.originalDeliveryFee ?? (
+      Number(order.phigiaohang ?? 0) + freeShipDiscount
+    ));
+
   const discount = Number(order.giamgia ?? 0);
 
   return {
@@ -133,13 +148,20 @@ function mapApiOrder(order: ApiOrder): Order {
     items,
     subtotal,
     shippingFee,
+    freeShipDiscount,
     discount,
     totalAmount: Number(order.tongtien),
+    deliveryMethod:
+      order.deliveryMethod === "PICKUP" ||
+      order.hinhthucnhanhang === "PICKUP"
+        ? "PICKUP"
+        : "DELIVERY",
     recipientName: order.hotennguoinhan,
     recipientPhone: order.sodienthoainguoinhan,
     deliveryAddress: order.diachigiaohang,
     province: order.phuong,
     note: order.ghichu,
+    apiStatus: order.trangthai,
   };
 }
 
@@ -169,6 +191,41 @@ function isImageSource(image: string) {
   );
 }
 
+function getCurrentTaiKhoan(): TaiKhoan | null {
+  const token = localStorage.getItem("brewlite_accessToken");
+  const duLieu = localStorage.getItem("brewlite_user");
+
+  if (!token || !duLieu) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(duLieu);
+
+    if (!parsed || typeof parsed !== "object") return null;
+
+    const user = parsed as Record<string, unknown>;
+    const makh = Number(user.makh);
+
+    if (
+      !Number.isSafeInteger(makh) ||
+      makh <= 0 ||
+      typeof user.hoten !== "string" ||
+      typeof user.sodienthoai !== "string"
+    ) {
+      return null;
+    }
+
+    return {
+      makh,
+      hoten: user.hoten,
+      email: typeof user.email === "string" ? user.email : null,
+      sodienthoai: user.sodienthoai,
+      trangthai: Number(user.trangthai ?? 0),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default function OrderHistoryPage() {
   const [activeFilter, setActiveFilter] = useState<Filter>("Tất cả");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -180,45 +237,36 @@ export default function OrderHistoryPage() {
   const [dangTaiDonHang, setDangTaiDonHang] = useState(false);
   const [loiDonHang, setLoiDonHang] = useState("");
 
+  const [dangHuyDon, setDangHuyDon] = useState(false);
+  const [loiHuyDon, setLoiHuyDon] = useState("");
+
   useEffect(() => {
-    let cancelled = false;
+    function capNhatTaiKhoan() {
+      // Xóa dữ liệu của tài khoản trước
+      setOrders([]);
+      setSelectedOrder(null);
+      setLoiDonHang("");
+      setDangTaiDonHang(false);
+      setActiveFilter("Tất cả");
 
-    Promise.resolve().then(() => {
-      if (cancelled) return;
-
-      const duLieu = localStorage.getItem("brewlite_user");
-
-      if (duLieu) {
-        try {
-          const parsed: unknown = JSON.parse(duLieu);
-
-          if (
-            typeof parsed === "object" &&
-            parsed !== null &&
-            "makh" in parsed &&
-            "hoten" in parsed &&
-            "sodienthoai" in parsed
-          ) {
-            setTaiKhoan(parsed as TaiKhoan);
-          } else {
-            localStorage.removeItem("brewlite_user");
-          }
-        } catch {
-          localStorage.removeItem("brewlite_user");
-        }
-      }
-
+      // Đọc lại tài khoản sau khi đăng nhập hoặc đăng xuất
+      setTaiKhoan(getCurrentTaiKhoan());
       setDaKiemTra(true);
-    });
+    }
+
+    capNhatTaiKhoan();
+
+    window.addEventListener("brewlite-auth-updated", capNhatTaiKhoan);
 
     return () => {
-      cancelled = true;
+      window.removeEventListener("brewlite-auth-updated", capNhatTaiKhoan);
     };
   }, []);
 
   useEffect(() => {
     if (!taiKhoan) return;
 
+    const currentMakh = taiKhoan.makh;
     const controller = new AbortController();
 
     async function taiLichSuDonHang() {
@@ -245,16 +293,33 @@ export default function OrderHistoryPage() {
 
         const data: ApiOrder[] = await response.json();
 
-        if (controller.signal.aborted) return;
+        console.log("Dữ liệu lịch sử đơn hàng từ API:", data);
 
-        console.log(
-          "Trạng thái đơn hàng từ backend:",
+        console.table(
           data.map((order) => ({
-            id: order.madonhanghienthi || order.madonhang,
-            trangthai: order.trangthai,
-          })),
+            maDonHang: order.madonhanghienthi || order.madonhang,
+            phiGiaoHang: order.phigiaohang,
+            originalDeliveryFee: order.originalDeliveryFee,
+            freeShipDiscount: order.giamgia_freeship,
+            giamgia: order.giamgia,
+          }))
         );
 
+        if (controller.signal.aborted) return;
+
+        // Kiểm tra tài khoản hiện tại vẫn là tài khoản đã gửi request
+        const latestToken = localStorage.getItem("brewlite_accessToken");
+        const latestUser = getCurrentTaiKhoan();
+
+        if (
+          latestToken !== token ||
+          !latestUser ||
+          latestUser.makh !== currentMakh
+        ) {
+          return;
+        }
+
+        // API đã lọc đơn hàng theo tài khoản từ JWT
         setOrders(data.map(mapApiOrder));
       } catch (error) {
         if (
@@ -296,6 +361,69 @@ export default function OrderHistoryPage() {
     if (filter === "Tất cả") return orders.length;
 
     return orders.filter((order) => order.status === filter).length;
+  }
+
+  async function handleCancelOrder() {
+    if (!selectedOrder || dangHuyDon) return;
+
+    const confirmed = window.confirm(
+      `Bạn có chắc chắn muốn hủy đơn hàng ${selectedOrder.id} không?`,
+    );
+
+    if (!confirmed) return;
+
+    setDangHuyDon(true);
+    setLoiHuyDon("");
+
+    try {
+      const token = localStorage.getItem("brewlite_accessToken");
+
+      if (!token) {
+        throw new Error("Vui lòng đăng nhập lại.");
+      }
+
+      const response = await fetch(
+        `${API_URL}/orders/${encodeURIComponent(selectedOrder.id)}/cancel`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message || "Không thể hủy đơn hàng. Vui lòng thử lại.",
+        );
+      }
+
+      const cancelledOrder: Order = {
+        ...selectedOrder,
+        status: "Đã hủy",
+        apiStatus: "CANCELLED",
+      };
+
+      setOrders((previousOrders) =>
+        previousOrders.map((order) =>
+          order.id === selectedOrder.id
+            ? cancelledOrder
+            : order,
+        ),
+      );
+
+      setSelectedOrder(cancelledOrder);
+    } catch (error) {
+      setLoiHuyDon(
+        error instanceof Error
+          ? error.message
+          : "Đã xảy ra lỗi khi hủy đơn hàng.",
+      );
+    } finally {
+      setDangHuyDon(false);
+    }
   }
 
   if (!daKiemTra) {
@@ -524,6 +652,27 @@ export default function OrderHistoryPage() {
               </span>
             </div>
 
+            {["PENDING", "PAYMENT_FAILED", "PAID"].includes(
+              selectedOrder.apiStatus,
+            ) && (
+              <div className="history-cancel-section">
+                {loiHuyDon && (
+                  <p className="history-cancel-error">
+                    {loiHuyDon}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  className="history-cancel-button"
+                  onClick={handleCancelOrder}
+                  disabled={dangHuyDon}
+                >
+                  {dangHuyDon ? "Đang hủy đơn..." : "Hủy đơn hàng"}
+                </button>
+              </div>
+            )}
+
             {/* Thông tin giao nhận */}
             <div className="history-modal-delivery">
               <h4>Thông tin giao nhận</h4>
@@ -537,12 +686,27 @@ export default function OrderHistoryPage() {
                   <strong>{selectedOrder.recipientPhone || "Chưa cập nhật"}</strong>
                 </div>
                 <div className="history-delivery-full">
-                  <span>Địa chỉ nhận hàng:</span>
+                  <span>Hình thức nhận hàng:</span>
+
                   <strong>
-                    {selectedOrder.deliveryAddress || "Chưa cập nhật"}
-                    {selectedOrder.province && !selectedOrder.deliveryAddress?.includes(selectedOrder.province) ? `, ${selectedOrder.province}` : ""}
+                    {selectedOrder.deliveryMethod === "PICKUP"
+                      ? "☕ Nhận tại quán BrewLite"
+                      : "📍 Giao tận nơi"}
                   </strong>
                 </div>
+
+                {selectedOrder.deliveryMethod !== "PICKUP" && (
+                  <div className="history-delivery-full">
+                    <span>Địa chỉ giao hàng:</span>
+                    <strong>
+                      {selectedOrder.deliveryAddress || "Chưa cập nhật"}
+                      {selectedOrder.province &&
+                      !selectedOrder.deliveryAddress?.includes(selectedOrder.province)
+                        ? `, ${selectedOrder.province}`
+                        : ""}
+                    </strong>
+                  </div>
+                )}
                 {selectedOrder.note && (
                   <div className="history-delivery-full">
                     <span>Ghi chú đơn hàng:</span>
@@ -597,11 +761,18 @@ export default function OrderHistoryPage() {
                 <span>{formatPrice(selectedOrder.shippingFee)}</span>
               </div>
 
+              {selectedOrder.freeShipDiscount > 0 && (
+                <div>
+                  <span>Giảm phí giao hàng </span>
+                  <span>-{formatPrice(selectedOrder.freeShipDiscount)}</span>
+                </div>
+              )}
+
               <div>
                 <span>Giảm giá</span>
                 <span>-{formatPrice(selectedOrder.discount)}</span>
               </div>
-
+              
               <div className="history-payment-total">
                 <strong>Tổng thanh toán</strong>
                 <strong>{formatPrice(getOrderTotal(selectedOrder))}</strong>

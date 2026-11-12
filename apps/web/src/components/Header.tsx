@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -16,6 +17,7 @@ type TaiKhoan = {
 };
 
 export default function Header() {
+  const router = useRouter();
   const [moForm, setMoForm] = useState(false);
   const [moMenuTaiKhoan, setMoMenuTaiKhoan] = useState(false);
   const [moMenuMobile, setMoMenuMobile] = useState(false);
@@ -62,30 +64,32 @@ export default function Header() {
     setMoForm(true);
   }
 
-  function capNhatSoLuongGioHang() {
-    try {
-      const duLieu = localStorage.getItem("brewlite_cart");
-      const gioHang = duLieu ? JSON.parse(duLieu) : [];
+function capNhatSoLuongGioHang() {
+  try {
+    const cartKey = getCartStorageKey();
 
-      if (!Array.isArray(gioHang)) {
-        setSoLuongGioHang(0);
-        return;
-      }
+    const duLieu = localStorage.getItem(cartKey);
+    const gioHang = duLieu ? JSON.parse(duLieu) : [];
 
-      const tongSoLuong = gioHang.reduce(
-        (tong: number, mon: { qty?: number }) => {
-          const qty = Number(mon.qty ?? 0);
-
-          return tong + (Number.isFinite(qty) && qty > 0 ? qty : 0);
-        },
-        0,
-      );
-
-      setSoLuongGioHang(tongSoLuong);
-    } catch {
+    if (!Array.isArray(gioHang)) {
       setSoLuongGioHang(0);
+      return;
     }
+
+    const tongSoLuong = gioHang.reduce(
+      (tong: number, mon: { qty?: number }) => {
+        const qty = Number(mon.qty ?? 0);
+
+        return tong + (Number.isFinite(qty) && qty > 0 ? qty : 0);
+      },
+      0,
+    );
+
+    setSoLuongGioHang(tongSoLuong);
+  } catch {
+    setSoLuongGioHang(0);
   }
+}
 
   useEffect(() => {
     function xuLyClickBenNgoai(e: MouseEvent) {
@@ -155,11 +159,44 @@ export default function Header() {
     };
   }, []);
 
+  useEffect(() => {
+    capNhatSoLuongGioHang();
+  }, [taiKhoan]);
+
   async function xuLySubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setThongBao("");
     setLoi(false);
 
+    // Chuẩn hóa dữ liệu
+    const ten = hoten.trim();
+    const sdt = sodienthoai.trim();
+
+    // Kiểm tra họ tên
+    const regexHoTen = /^[A-Za-zÀ-ỹĐđ][A-Za-zÀ-ỹĐđ\s'-]*$/;
+
+    // Kiểm tra số điện thoại: 10 số, bắt đầu bằng 0
+    const regexSoDienThoai = /^0[0-9]{9}$/;
+
+    if (cheDo === "dang-ky") {
+      if (!regexHoTen.test(ten)) {
+        setLoi(true);
+        setThongBao(
+          "Họ và tên phải bắt đầu bằng chữ cái và không được chứa số hoặc ký tự đặc biệt."
+        );
+        return;
+      }
+
+      if (!regexSoDienThoai.test(sdt)) {
+        setLoi(true);
+        setThongBao(
+          "Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0."
+        );
+        return;
+      }
+    }
+
+    // Kiểm tra mật khẩu nhập lại
     if (cheDo === "dang-ky" && matkhau !== nhapLaiMatKhau) {
       setLoi(true);
       setThongBao("Mật khẩu nhập lại không khớp.");
@@ -173,8 +210,8 @@ export default function Header() {
 
       const duLieu = dangKy
         ? {
-            hoten,
-            sodienthoai,
+            hoten: ten,
+            sodienthoai: sdt,
             email: email.trim() || undefined,
             matkhau,
           }
@@ -215,7 +252,52 @@ export default function Header() {
         localStorage.setItem("brewlite_accessToken", data.accessToken);
         localStorage.setItem("brewlite_user", JSON.stringify(data.user));
 
+        // Gộp giỏ khách vào giỏ của tài khoản vừa đăng nhập
+        const makh = Number(data.user.makh);
+        const accountCartKey = `brewlite_cart_${makh}`;
+
+        const guestCartRaw = localStorage.getItem("brewlite_cart_guest");
+        const accountCartRaw = localStorage.getItem(accountCartKey);
+
+        const guestCart = guestCartRaw ? JSON.parse(guestCartRaw) : [];
+        const accountCart = accountCartRaw ? JSON.parse(accountCartRaw) : [];
+
+        if (
+          Number.isInteger(makh) &&
+          makh > 0 &&
+          Array.isArray(guestCart) &&
+          Array.isArray(accountCart)
+        ) {
+          const mergedCart = [...accountCart];
+
+          guestCart.forEach((guestItem) => {
+            const existingIndex = mergedCart.findIndex(
+              (item) => item.key === guestItem.key
+            );
+
+            if (existingIndex >= 0) {
+              mergedCart[existingIndex] = {
+                ...mergedCart[existingIndex],
+                qty:
+                  Number(mergedCart[existingIndex].qty || 0) +
+                  Number(guestItem.qty || 0),
+              };
+            } else {
+              mergedCart.push(guestItem);
+            }
+          });
+
+          localStorage.setItem(accountCartKey, JSON.stringify(mergedCart));
+        }
+
+        // Xóa giỏ khách sau khi đã gộp
+        localStorage.removeItem("brewlite_cart_guest");
+
         setTaiKhoan(data.user);
+
+        // Cập nhật Header và trang giỏ hàng
+        window.dispatchEvent(new Event("brewlite-auth-updated"));
+        window.dispatchEvent(new Event("brewlite-cart-updated"));
         setThongBao("Đăng nhập thành công!");
         setMatkhau("");
         setMoForm(false);
@@ -231,11 +313,22 @@ export default function Header() {
   }
 
   function dangXuat() {
-    setTaiKhoan(null);
     localStorage.removeItem("brewlite_user");
     localStorage.removeItem("brewlite_accessToken");
+    localStorage.removeItem("brewlite_cart_guest");
+
+    setTaiKhoan(null);
+    setMoMenuTaiKhoan(false);
+    setMoForm(false);
     setThongBao("");
     setMatkhau("");
+    setNhapLaiMatKhau("");
+
+    // Cập nhật Header và trang giỏ hàng theo trạng thái khách
+    window.dispatchEvent(new Event("brewlite-auth-updated"));
+    window.dispatchEvent(new Event("brewlite-cart-updated"));
+    // Chuyển về trang thực đơn sau khi đăng xuất
+    router.replace("/2TrangMenu");
   }
 
   async function capNhatThongTin(e: React.FormEvent<HTMLFormElement>) {
@@ -475,6 +568,8 @@ export default function Header() {
                     onChange={(e) => setHoten(e.target.value)}
                     maxLength={100}
                     autoComplete="name"
+                    pattern="[\p{L}][\p{L}\p{M}\s'-]*"
+                    title="Họ tên phải bắt đầu bằng chữ cái, không chứa số hoặc ký tự đặc biệt."
                     required
                   />
 
@@ -485,7 +580,11 @@ export default function Header() {
                     placeholder="Nhập số điện thoại"
                     value={sodienthoai}
                     onChange={(e) => setSodienthoai(e.target.value)}
-                    maxLength={20}
+                    minLength={10}
+                    maxLength={10}
+                    pattern="0[0-9]{9}"
+                    inputMode="numeric"
+                    title="Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0."
                     autoComplete="tel"
                     required
                   />
@@ -905,4 +1004,24 @@ export default function Header() {
       `}</style>
     </>
   );
+}
+
+function getCartStorageKey() {
+  const savedUser = localStorage.getItem("brewlite_user");
+
+  if (savedUser) {
+    try {
+      const user = JSON.parse(savedUser);
+      const makh = Number(user?.makh);
+
+      if (Number.isInteger(makh) && makh > 0) {
+        return `brewlite_cart_${makh}`;
+      }
+    } catch {
+      // Nếu thông tin tài khoản không hợp lệ,
+      // sử dụng giỏ hàng khách.
+    }
+  }
+
+  return "brewlite_cart_guest";
 }

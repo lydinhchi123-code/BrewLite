@@ -118,7 +118,9 @@ export class PaymentsService {
             tongtien,
             trangthai,
             magiamgia,
-            giamgia
+            giamgia,
+            ma_freeship,
+            giamgia_freeship
         FROM donhang
         WHERE madonhang = $1
         FOR UPDATE`,
@@ -196,6 +198,7 @@ export class PaymentsService {
         ],
       );
 
+      
       // COD giữ đơn ở PENDING; giao dịch online cập nhật theo kết quả mô phỏng.
       if (!isCod) {
         try {
@@ -213,51 +216,69 @@ export class PaymentsService {
 
         await client.query(
           `UPDATE donhang
-          SET trangthai = $1,
-              ngaycapnhat = CURRENT_TIMESTAMP
-          WHERE madonhang = $2`,
+           SET trangthai = $1,
+               ngaycapnhat = CURRENT_TIMESTAMP
+           WHERE madonhang = $2`,
           [nextOrderStatus, dto.madonhang],
         );
 
-        // Chỉ ghi nhận mã giảm giá khi thanh toán thành công.
-        if (
-          paymentStatus === 'DA_THANH_TOAN' &&
-          order.magiamgia &&
-          Number(order.giamgia) > 0
-        ) {
-          const discountResult = await client.query(
-            `
-            INSERT INTO lich_su_su_dung_ma_giam_gia (
-              ma_giam_gia_id,
-              makh,
-              madonhang,
-              so_tien_duoc_giam
-            )
-            SELECT
-              m.id,
-              d.makh,
-              d.madonhang,
-              d.giamgia
-            FROM donhang d
-            JOIN magiamgia m
-              ON UPPER(TRIM(m.ma)) = UPPER(TRIM(d.magiamgia))
-            WHERE d.madonhang = $1
-              AND d.magiamgia IS NOT NULL
-              AND d.giamgia > 0
-            `,
-            [dto.madonhang],
-          );
+        // Chỉ ghi nhận lịch sử voucher khi thanh toán thành công.
+        if (paymentStatus === 'DA_THANH_TOAN') {
+          const orderDiscounts = [
+            {
+              code: order.magiamgia,
+              amount: Number(order.giamgia),
+            },
+            {
+              code: order.ma_freeship,
+              amount: Number(order.giamgia_freeship),
+            },
+          ];
 
-          // Đảm bảo lịch sử sử dụng mã được ghi nhận.
-          if (discountResult.rowCount !== 1) {
-            throw new BadRequestException(
-              'Không thể ghi nhận lịch sử sử dụng mã giảm giá.',
+          for (const item of orderDiscounts) {
+            if (!item.code || item.amount <= 0) {
+              continue;
+            }
+
+            const discountResult = await client.query(
+              `
+              INSERT INTO lich_su_su_dung_ma_giam_gia (
+                ma_giam_gia_id,
+                makh,
+                madonhang,
+                so_tien_duoc_giam
+              )
+              SELECT
+                m.id,
+                d.makh,
+                d.madonhang,
+                $2
+              FROM donhang d
+              JOIN magiamgia m
+                ON UPPER(TRIM(m.ma)) = UPPER(TRIM($1))
+              WHERE d.madonhang = $3
+                AND d.makh = $4
+              RETURNING id
+              `,
+              [
+                item.code,
+                item.amount,
+                dto.madonhang,
+                makh,
+              ],
             );
+
+            if (discountResult.rowCount !== 1) {
+              throw new BadRequestException(
+                `Không thể ghi nhận lịch sử voucher ${item.code}.`,
+              );
+            }
           }
         }
       }
 
       await client.query('COMMIT');
+
 
       return {
         message: isCod

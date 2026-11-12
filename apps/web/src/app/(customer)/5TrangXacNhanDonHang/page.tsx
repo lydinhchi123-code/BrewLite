@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import "./xac-nhan.css";
 
@@ -23,6 +24,7 @@ interface OrderItem {
 
 interface OrderDetail {
   orderId: string;
+  deliveryMethod: "DELIVERY" | "PICKUP";
   orderStatus: string;
   paymentStatus: string;
   paymentMethod: string | null;
@@ -35,6 +37,7 @@ interface OrderDetail {
   items: OrderItem[];
   subtotal: number;
   deliveryFee: number;
+  freeShipDiscount: number;
   discount: number;
   totalAmount: number;
 }
@@ -195,6 +198,11 @@ function toOrderDetail(
         : typeof value.sodienthoainguoinhan === "string"
           ? value.sodienthoainguoinhan
           : null,
+    deliveryMethod:
+      value.deliveryMethod === "PICKUP" ||
+      value.hinhthucnhanhang === "PICKUP"
+        ? "PICKUP"
+        : "DELIVERY",
     deliveryAddress:
       typeof value.deliveryAddress === "string"
         ? value.deliveryAddress
@@ -219,6 +227,7 @@ function toOrderDetail(
       items.reduce((sum, item) => sum + item.lineTotal, 0),
     deliveryFee: asMoney(value.deliveryFee) ?? 0,
     discount: asMoney(value.discount) ?? 0,
+    freeShipDiscount: asMoney(value.freeShipDiscount) ?? 0,
     totalAmount,
   };
 }
@@ -232,6 +241,7 @@ const previewOrder: OrderDetail = {
   createdAt: "2026-11-10T20:00:00Z",
   recipientName: "Nguyễn Văn A",
   recipientPhone: "0901234567",
+  deliveryMethod: "DELIVERY",
   deliveryAddress: "123 Nguyễn Thị Minh Khai, Phường Bến Thành, TP. Hồ Chí Minh",
   province: "Phường Bến Thành",
   note: "Giao đồ uống trước 10h sáng",
@@ -239,6 +249,7 @@ const previewOrder: OrderDetail = {
   subtotal: 40000,
   deliveryFee: 0,
   discount: 0,
+  freeShipDiscount: 0,
   totalAmount: 40000,
 };
 
@@ -303,6 +314,7 @@ function EmptyState({
 }
 
 export default function XacNhanDonHangPage() {
+  const router = useRouter();
   const [pageState, setPageState] = useState<PageState>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
 
@@ -335,8 +347,22 @@ export default function XacNhanDonHangPage() {
       }
 
       const token = localStorage.getItem("brewlite_accessToken");
+      const rawUser = localStorage.getItem("brewlite_user");
 
-      if (!token) {
+      let currentMakh: number | null = null;
+
+      try {
+        const user = rawUser ? JSON.parse(rawUser) : null;
+        const makh = Number(user?.makh);
+
+        if (Number.isSafeInteger(makh) && makh > 0) {
+          currentMakh = makh;
+        }
+      } catch {
+        currentMakh = null;
+      }
+
+      if (!token || currentMakh === null) {
         setPageState({ kind: "login-required" });
         return;
       }
@@ -380,6 +406,29 @@ export default function XacNhanDonHangPage() {
 
           if (!active) return;
 
+          const latestToken = localStorage.getItem("brewlite_accessToken");
+          const latestUserRaw = localStorage.getItem("brewlite_user");
+
+          let latestMakh: number | null = null;
+
+          try {
+            const latestUser = latestUserRaw
+              ? JSON.parse(latestUserRaw)
+              : null;
+
+            const makh = Number(latestUser?.makh);
+
+            if (Number.isSafeInteger(makh) && makh > 0) {
+              latestMakh = makh;
+            }
+          } catch {
+            latestMakh = null;
+          }
+
+          if (latestToken !== token || latestMakh !== currentMakh) {
+            return;
+          }
+
           const order = toOrderDetail(raw, orderId);
 
           if (!order) {
@@ -414,6 +463,20 @@ export default function XacNhanDonHangPage() {
       controller?.abort();
     };
   }, [attempt]);
+
+  useEffect(() => {
+    function handleAuthChange() {
+      setPageState({ kind: "login-required" });
+      setAttempt((value) => value + 1);
+      router.replace("/2TrangMenu");
+    }
+
+    window.addEventListener("brewlite-auth-updated", handleAuthChange);
+
+    return () => {
+      window.removeEventListener("brewlite-auth-updated", handleAuthChange);
+    };
+  }, [router]);
 
   const retry = () => {
     setPageState({ kind: "loading" });
@@ -466,6 +529,7 @@ export default function XacNhanDonHangPage() {
   const { order, isPreview } = pageState;
   const view = getPaymentView(order.paymentStatus);
   const isPaid = view === "paid";
+  const isPickup = order.deliveryMethod === "PICKUP";
   const stateText = {
     paid: { eyebrow: "THANH TOÁN HOÀN TẤT", title: "Đặt hàng thành công!", subtitle: "Cảm ơn bạn đã lựa chọn BrewLite. Đơn hàng của bạn đã được xác nhận thanh toán.", label: "Đã thanh toán", note: "Vui lòng giữ mã đơn để đối chiếu khi nhận đồ uống." },
     pending: { eyebrow: "ĐANG CHỜ THANH TOÁN", title: "Đơn hàng đang chờ xử lý", subtitle: "BrewLite đã ghi nhận đơn hàng. Kết quả thanh toán hiện chưa được xác nhận.", label: "Chờ thanh toán", note: "Đơn hàng chưa được xác nhận thanh toán. Vui lòng kiểm tra lại trạng thái sau." },
@@ -507,7 +571,9 @@ export default function XacNhanDonHangPage() {
         <section className="confirm-delivery-card" aria-labelledby="confirm-delivery-title">
           <div className="confirm-card-heading">
             <h2 id="confirm-delivery-title">Thông tin giao nhận</h2>
-            <span>📍 Giao tận nơi</span>
+            <span>
+              {isPickup ? "☕ Nhận tại quán" : "📍 Giao tận nơi"}
+            </span>
           </div>
 
           <div className="confirm-delivery-grid">
@@ -521,13 +587,27 @@ export default function XacNhanDonHangPage() {
               <strong className="confirm-field-value">{order.recipientPhone || "Chưa cập nhật"}</strong>
             </div>
 
-            <div className="confirm-delivery-field full-width">
-              <span className="confirm-field-label">Địa chỉ giao hàng:</span>
-              <strong className="confirm-field-value">
-                {order.deliveryAddress || "Chưa cập nhật"}
-                {order.province && !order.deliveryAddress?.includes(order.province) ? `, ${order.province}` : ""}
-              </strong>
-            </div>
+            {isPickup ? (
+              <div className="confirm-delivery-field full-width">
+                <span className="confirm-field-label">Hình thức nhận hàng:</span>
+                <strong className="confirm-field-value">
+                  Nhận tại quán BrewLite
+                </strong>
+                <span className="confirm-field-note">
+                  Vui lòng cung cấp mã đơn hàng khi đến nhận đồ uống.
+                </span>
+              </div>
+            ) : (
+              <div className="confirm-delivery-field full-width">
+                <span className="confirm-field-label">Địa chỉ giao hàng:</span>
+                <strong className="confirm-field-value">
+                  {order.deliveryAddress || "Chưa cập nhật"}
+                  {order.province && !order.deliveryAddress?.includes(order.province)
+                    ? `, ${order.province}`
+                    : ""}
+                </strong>
+              </div>
+            )}
 
             {order.note && (
               <div className="confirm-delivery-field full-width">
@@ -570,13 +650,40 @@ export default function XacNhanDonHangPage() {
             )) : <p className="confirm-no-items">Đơn hàng hiện chưa có thông tin sản phẩm.</p>}
           </div>
 
-          {(order.deliveryFee > 0 || order.discount > 0) && (
+          
+          {(order.subtotal > 0 ||
+            order.deliveryFee > 0 ||
+            order.discount > 0 ||
+            order.freeShipDiscount > 0) && (
             <div className="confirm-fee-lines">
-              <div><span>Tạm tính</span><strong>{formatPrice(order.subtotal)}</strong></div>
-              {order.deliveryFee > 0 && <div><span>Phí giao hàng</span><strong>{formatPrice(order.deliveryFee)}</strong></div>}
-              {order.discount > 0 && <div><span>Giảm giá</span><strong>−{formatPrice(order.discount)}</strong></div>}
+              <div>
+                <span>Tạm tính</span>
+                <strong>{formatPrice(order.subtotal)}</strong>
+              </div>
+
+              {order.deliveryFee > 0 && (
+                <div>
+                  <span>Phí giao hàng</span>
+                  <strong>{formatPrice(order.deliveryFee)}</strong>
+                </div>
+              )}
+
+              {order.discount > 0 && (
+                <div>
+                  <span>Giảm giá sản phẩm</span>
+                  <strong>−{formatPrice(order.discount)}</strong>
+                </div>
+              )}
+
+              {order.freeShipDiscount > 0 && (
+                <div>
+                  <span>Giảm phí giao hàng </span>
+                  <strong>−{formatPrice(order.freeShipDiscount)}</strong>
+                </div>
+              )}
             </div>
           )}
+
           <div className="confirm-grand-total">
             <span>{isPaid ? "Đã thanh toán" : "Tổng đơn hàng"}</span>
             <strong>{formatPrice(order.totalAmount)}</strong>
