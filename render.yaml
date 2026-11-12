@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: brewlite-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: apps/api
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 24.0.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: brewlite-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        fromService:
+          name: brewlite-web
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
+  - type: web
+    name: brewlite-web
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: apps/web
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 24.0.0
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: brewlite-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
+databases:
+  - name: brewlite-db
+    plan: free
+    region: singapore
+    databaseName: brewlite
+    ipAllowList: []
