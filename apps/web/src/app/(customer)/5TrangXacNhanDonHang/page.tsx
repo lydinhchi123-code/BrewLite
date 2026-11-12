@@ -612,7 +612,9 @@ export default function XacNhanDonHangPage() {
             {order.note && (
               <div className="confirm-delivery-field full-width">
                 <span className="confirm-field-label">Ghi chú:</span>
-                <span className="confirm-field-note">"{order.note}"</span>
+                <span className="confirm-field-note">
+                  &quot;{order.note}&quot;
+                </span>
               </div>
             )}
 

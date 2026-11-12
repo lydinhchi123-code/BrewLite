@@ -24,17 +24,27 @@ export default function AdminLayout({
   const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
-    const loggedIn = sessionStorage.getItem(
-      "brewlite_admin_loggedIn"
-    );
+    let active = true;
 
-    if (loggedIn !== "true") {
-      router.replace("/dang-nhap-admin");
-      return;
-    }
+    Promise.resolve().then(() => {
+      if (!active) return;
 
-    setAuthenticated(true);
-    setChecking(false);
+      const loggedIn = sessionStorage.getItem(
+        "brewlite_admin_loggedIn"
+      );
+
+      if (loggedIn !== "true") {
+        router.replace("/dang-nhap-admin");
+        return;
+      }
+
+      setAuthenticated(true);
+      setChecking(false);
+    });
+
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   if (checking || !authenticated) {

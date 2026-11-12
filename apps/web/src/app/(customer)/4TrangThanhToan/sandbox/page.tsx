@@ -37,45 +37,6 @@ function PaymentSandboxContent() {
 
   const autoProcessed = useRef(false);
 
-  useEffect(() => {
-    Promise.resolve().then(() => {
-      const raw = localStorage.getItem("brewlite_checkout");
-      if (!raw) return;
-
-      let parsed: CheckoutData;
-      try {
-        parsed = JSON.parse(raw) as CheckoutData;
-      } catch {
-        setError("Không thể đọc thông tin đơn hàng.");
-        return;
-      }
-
-      const vnpStatus = searchParams.get("status");
-      const urlOrderId = searchParams.get("orderId");
-
-      if (vnpStatus) {
-        // Redirect về từ VNPay sandbox
-        if (!parsed.internalOrderId) {
-          setError("Không tìm thấy đơn hàng trong phiên. Vui lòng quay lại trang thanh toán.");
-          return;
-        }
-        setVnpayReturning(true);
-        setCheckout(parsed);
-
-        if (!autoProcessed.current) {
-          autoProcessed.current = true;
-          void completeMockPaymentWith(
-            parsed,
-            vnpStatus === "success" ? "SUCCESS" : "FAILURE",
-          );
-        }
-      } else if (parsed.orderId === urlOrderId) {
-        setCheckout(parsed);
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
   async function completeMockPaymentWith(
     checkoutData: CheckoutData,
     mockResult: "SUCCESS" | "FAILURE",
@@ -162,6 +123,47 @@ function PaymentSandboxContent() {
       setProcessing(false);
     }
   }
+
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      const raw = localStorage.getItem("brewlite_checkout");
+      if (!raw) return;
+
+      let parsed: CheckoutData;
+      try {
+        parsed = JSON.parse(raw) as CheckoutData;
+      } catch {
+        setError("Không thể đọc thông tin đơn hàng.");
+        return;
+      }
+
+      const vnpStatus = searchParams.get("status");
+      const urlOrderId = searchParams.get("orderId");
+
+      if (vnpStatus) {
+        // Redirect về từ VNPay sandbox
+        if (!parsed.internalOrderId) {
+          setError("Không tìm thấy đơn hàng trong phiên. Vui lòng quay lại trang thanh toán.");
+          return;
+        }
+        setVnpayReturning(true);
+        setCheckout(parsed);
+
+        if (!autoProcessed.current) {
+          autoProcessed.current = true;
+          void completeMockPaymentWith(
+            parsed,
+            vnpStatus === "success" ? "SUCCESS" : "FAILURE",
+          );
+        }
+      } else if (parsed.orderId === urlOrderId) {
+        setCheckout(parsed);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+
 
   async function handleVnpayPayment() {
     if (!checkout?.internalOrderId || vnpayLoading) return;

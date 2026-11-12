@@ -91,6 +91,26 @@ function capNhatSoLuongGioHang() {
   }
 }
 
+function docSoLuongGioHang(): number {
+  try {
+    const cartKey = getCartStorageKey();
+    const duLieu = localStorage.getItem(cartKey);
+    const gioHang = duLieu ? JSON.parse(duLieu) : [];
+
+    if (!Array.isArray(gioHang)) return 0;
+
+    return gioHang.reduce(
+      (tong: number, mon: { qty?: number }) => {
+        const qty = Number(mon.qty ?? 0);
+        return tong + (Number.isFinite(qty) && qty > 0 ? qty : 0);
+      },
+      0,
+    );
+  } catch {
+    return 0;
+  }
+}
+
   useEffect(() => {
     function xuLyClickBenNgoai(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -160,7 +180,27 @@ function capNhatSoLuongGioHang() {
   }, []);
 
   useEffect(() => {
-    capNhatSoLuongGioHang();
+    let active = true;
+
+    const capNhatGioHang = () => {
+      if (active) {
+        setSoLuongGioHang(docSoLuongGioHang());
+      }
+    };
+
+    // Đọc giỏ hàng sau khi effect được thực thi
+    Promise.resolve().then(capNhatGioHang);
+
+    window.addEventListener("focus", capNhatGioHang);
+    window.addEventListener("storage", capNhatGioHang);
+    window.addEventListener("brewlite-cart-updated", capNhatGioHang);
+
+    return () => {
+      active = false;
+      window.removeEventListener("focus", capNhatGioHang);
+      window.removeEventListener("storage", capNhatGioHang);
+      window.removeEventListener("brewlite-cart-updated", capNhatGioHang);
+    };
   }, [taiKhoan]);
 
   async function xuLySubmit(e: React.FormEvent<HTMLFormElement>) {

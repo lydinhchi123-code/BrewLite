@@ -710,7 +710,7 @@ export default function OrderHistoryPage() {
                 {selectedOrder.note && (
                   <div className="history-delivery-full">
                     <span>Ghi chú đơn hàng:</span>
-                    <em>"{selectedOrder.note}"</em>
+                    <em>&quot;{selectedOrder.note}&quot;</em>
                   </div>
                 )}
               </div>
