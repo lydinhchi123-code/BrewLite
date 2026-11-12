@@ -197,8 +197,11 @@ INSERT INTO ingredient_inventory
     (ingredient_id, stock_quantity, low_stock_threshold, updated_at)
 SELECT
     i.id,
-    COALESCE(p.quantity_per_package * 100, 1000),
-    COALESCE(p.quantity_per_package * 10, 10),
+    CASE
+        WHEN i.name = 'Đá viên' THEN 1000000
+        ELSE COALESCE(p.quantity_per_package * 100, 100000)
+    END,
+    COALESCE(p.quantity_per_package * 10, 100),
     NOW()
 FROM ingredients i
 LEFT JOIN LATERAL (

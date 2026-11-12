@@ -497,6 +497,110 @@
   background: #553722;
 }
 
+/* ===== Thông tin giao nhận ===== */
+
+.history-modal-delivery {
+  padding: 14px 0;
+  border-bottom: 1px solid #eee7df;
+}
+
+.history-modal-delivery h4 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4d3024;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.history-delivery-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.history-delivery-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.history-delivery-grid > div span {
+  font-size: 11px;
+  color: #958a80;
+  font-weight: 600;
+}
+
+.history-delivery-grid > div strong,
+.history-delivery-grid > div em {
+  font-size: 13px;
+  color: #392d23;
+}
+
+.history-delivery-grid > div em {
+  font-style: italic;
+  color: #7f4714;
+}
+
+.history-delivery-full {
+  grid-column: 1 / -1;
+}
+
+
+/* ===== Hủy đơn hàng ===== */
+
+.history-cancel-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #eee7df;
+}
+
+.history-cancel-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 130px;
+  padding: 11px 16px;
+  border: 1px solid #b94a48;
+  border-radius: 9px;
+  background: #fff;
+  color: #b94a48;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    opacity 0.2s;
+}
+
+.history-cancel-button:hover:not(:disabled) {
+  background: #b94a48;
+  color: #fff;
+}
+
+.history-cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.history-cancel-error {
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #f0caca;
+  border-radius: 8px;
+  background: #fff1f1;
+  color: #a44747;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 /* ===== Responsive ===== */
 
 @media (max-width: 600px) {
@@ -584,6 +688,10 @@
     padding: 21px 17px;
     border-radius: 16px;
   }
+
+  .history-delivery-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -595,6 +703,11 @@
   .history-card,
   .history-detail-button,
   .history-modal-done {
+    transition: none;
+  }
+
+  .history-cancel-button,
+  .history-cancel-error {
     transition: none;
   }
 }

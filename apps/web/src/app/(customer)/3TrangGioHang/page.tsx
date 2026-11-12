@@ -44,6 +44,7 @@ type CartItem = {
 type PendingCheckout = {
   orderId: string;
   makh: number;
+  deliveryMethod: "DELIVERY" | "PICKUP";
   items: {
     id: string;
     name: string;
@@ -141,6 +142,7 @@ export default function CartPage() {
   const [address, setAddress] = useState("");
   const [ward, setWard] = useState("");
   const [note, setNote] = useState("");
+  const [deliveryMethod, setDeliveryMethod] = useState< "DELIVERY" | "PICKUP" >("DELIVERY");
 
   const [submitting, setSubmitting] = useState(false);
   const [orderMessage, setOrderMessage] = useState("");
@@ -155,38 +157,118 @@ export default function CartPage() {
   useEffect(() => {
     function loadCart() {
       try {
-        const savedCart = localStorage.getItem("brewlite_cart");
+        const savedUser = localStorage.getItem("brewlite_user");
 
-        if (savedCart) {
-          const parsed = JSON.parse(savedCart);
-          setItems(Array.isArray(parsed) ? parsed : []);
+        // Lấy thông tin người nhận từ tài khoản đang đăng nhập
+        if (savedUser) {
+          const user = JSON.parse(savedUser);
+
+          setCustomerName(user.hoten ?? "");
+          setCustomerPhone(user.sodienthoai ?? "");
         } else {
-          setItems([]);
+          setCustomerName("");
+          setCustomerPhone("");
         }
 
+        // Xác định giỏ hàng của tài khoản hiện tại
+        const cartKey = getCartStorageKey();
+        const isLoggedIn = Boolean(savedUser);
+
+        // Lấy giỏ hàng hiện tại
+        const currentCartRaw = localStorage.getItem(cartKey);
+        const currentCart: CartItem[] = currentCartRaw
+          ? JSON.parse(currentCartRaw)
+          : [];
+
+        // Nếu vừa đăng nhập từ tài khoản khách:
+        // gộp giỏ khách vào giỏ của tài khoản vừa đăng nhập
+        if (isLoggedIn) {
+          const guestCartRaw = localStorage.getItem("brewlite_cart_guest");
+          const guestCart: CartItem[] = guestCartRaw
+            ? JSON.parse(guestCartRaw)
+            : [];
+
+          if (Array.isArray(guestCart) && guestCart.length > 0) {
+            const mergedCart = [...currentCart];
+
+            guestCart.forEach((guestItem) => {
+              const existingIndex = mergedCart.findIndex(
+                (item) => item.key === guestItem.key
+              );
+
+              if (existingIndex >= 0) {
+                mergedCart[existingIndex] = {
+                  ...mergedCart[existingIndex],
+                  qty:
+                    mergedCart[existingIndex].qty + guestItem.qty,
+                };
+              } else {
+                mergedCart.push(guestItem);
+              }
+            });
+
+            localStorage.setItem(
+              cartKey,
+              JSON.stringify(mergedCart)
+            );
+
+            // Đã chuyển giỏ khách sang tài khoản
+            localStorage.removeItem("brewlite_cart_guest");
+
+            setItems(mergedCart);
+          } else {
+            setItems(currentCart);
+          }
+        } else {
+          // Đang ở chế độ khách
+          setItems(currentCart);
+        }
+
+        // Không sử dụng key giỏ hàng dùng chung cũ nữa
+        localStorage.removeItem("brewlite_cart");
+
+        // Giữ nguyên cách khôi phục thông tin checkout hiện tại
         const savedCheckout = localStorage.getItem("brewlite_checkout");
 
         if (savedCheckout) {
           const checkout = JSON.parse(savedCheckout);
 
+          const currentUser = savedUser ? JSON.parse(savedUser) : null;
+          const currentMakh = Number(currentUser?.makh);
+
+          // Chỉ khôi phục checkout nếu đúng tài khoản đã tạo checkout
           if (
             checkout?.status === "PENDING" &&
-            String(checkout.orderId).startsWith("TEMP-")
+            String(checkout.orderId).startsWith("TEMP-") &&
+            Number(checkout.makh) === currentMakh &&
+            Number.isInteger(currentMakh) &&
+            currentMakh > 0
           ) {
-            setCustomerName(checkout.customerName ?? "");
-            setCustomerPhone(checkout.customerPhone ?? "");
-            setAddress(
-              checkout.addressDetail ?? checkout.address ?? ""
-            );
+            setAddress(checkout.addressDetail ?? checkout.address ?? "");
             setWard(checkout.phuong ?? checkout.ward ?? "");
             setNote(checkout.note ?? "");
+            setDeliveryMethod(
+              checkout.deliveryMethod === "PICKUP" ? "PICKUP" : "DELIVERY"
+            );
+          } else {
+            // Không để thông tin checkout của tài khoản khác tồn tại trên giao diện
+            setAddress("");
+            setWard("");
+            setNote("");
+            setDeliveryMethod("DELIVERY");
           }
+        } else {
+          setAddress("");
+          setWard("");
+          setNote("");
+          setDeliveryMethod("DELIVERY");
         }
       } catch (error) {
         console.error("Không thể đọc giỏ hàng:", error);
         setItems([]);
       } finally {
         setLoaded(true);
+        setSubmitting(false);
       }
     }
 
@@ -195,11 +277,13 @@ export default function CartPage() {
     window.addEventListener("focus", loadCart);
     window.addEventListener("pageshow", loadCart);
     window.addEventListener("brewlite-cart-updated", loadCart);
+    window.addEventListener("brewlite-auth-updated", loadCart);
 
     return () => {
       window.removeEventListener("focus", loadCart);
       window.removeEventListener("pageshow", loadCart);
       window.removeEventListener("brewlite-cart-updated", loadCart);
+      window.removeEventListener("brewlite-auth-updated", loadCart);
     };
   }, []);
 
@@ -207,7 +291,10 @@ export default function CartPage() {
     setItems(newItems);
 
     try {
-      localStorage.setItem("brewlite_cart", JSON.stringify(newItems));
+      const cartKey = getCartStorageKey();
+
+      localStorage.setItem(cartKey, JSON.stringify(newItems));
+
       window.dispatchEvent(new Event("brewlite-cart-updated"));
     } catch (error) {
       console.error("Không thể lưu giỏ hàng:", error);
@@ -238,12 +325,12 @@ export default function CartPage() {
 
     if (submitting || items.length === 0) return;
 
-    const token = localStorage.getItem("brewlite_accessToken");
+    const token = sessionStorage.getItem("brewlite_admin_accessToken");
     const savedUser = localStorage.getItem("brewlite_user");
 
     if (!token) {
       setOrderError(
-        "Bạn cần đăng nhập trước khi đặt hàng. Hãy đăng nhập rồi quay lại."
+        "Vui lòng đăng nhập trước khi đặt hàng. "
       );
       return;
     }
@@ -264,18 +351,21 @@ export default function CartPage() {
       return;
     }
 
-    if (!ward) {
-      setOrderError("Vui lòng chọn phường hoặc xã giao hàng.");
-      return;
-    }
+    if (deliveryMethod === "DELIVERY") {
+      if (!ward) {
+        setOrderError("Vui lòng chọn phường hoặc xã giao hàng.");
+        return;
+      }
 
-    if (!address.trim()) {
-      setOrderError("Vui lòng nhập số nhà và tên đường.");
-      return;
+      if (!address.trim()) {
+        setOrderError("Vui lòng nhập số nhà và tên đường.");
+        return;
+      }
     }
 
     setOrderError("");
     setOrderMessage("");
+    setSubmitting(true);
 
     const subtotal = items.reduce(
       (sum, item) => sum + item.unitPrice * item.qty,
@@ -283,11 +373,14 @@ export default function CartPage() {
     );
 
     const fullAddress =
-      `${address.trim()}, ${ward}, TP. Hồ Chí Minh`;
+      deliveryMethod === "DELIVERY"
+        ? `${address.trim()}, ${ward}, TP. Hồ Chí Minh`
+        : "";
     
     const checkoutData: PendingCheckout = {
       orderId: `TEMP-${Date.now()}`,
       makh,
+      deliveryMethod,
       items: items.map((item) => ({
       id: String(item.product.id),
       name: item.product.name,
@@ -314,8 +407,8 @@ export default function CartPage() {
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
       address: fullAddress,
-      phuong: ward,
-      addressDetail: address.trim(),
+      phuong: deliveryMethod === "DELIVERY" ? ward : "",
+      addressDetail: deliveryMethod === "DELIVERY" ? address.trim() : "",
       note: note.trim() || undefined,
       subtotal,
       deliveryFee: 0,
@@ -338,6 +431,8 @@ export default function CartPage() {
     } catch (error) {
       console.error("Không thể lưu thông tin thanh toán:", error);
       setOrderError("Không thể lưu thông tin đơn hàng. Vui lòng thử lại.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -590,7 +685,57 @@ export default function CartPage() {
           className="bl-cart-form"
         >
           <h2 className="bl-cart-section-title">
-            Thông tin nhận hàng
+            Hình thức nhận hàng
+          </h2>
+
+          {/* Lựa chọn hình thức nhận hàng */}
+          <div className="bl-delivery-options">
+            <label
+              className={`bl-delivery-option ${
+                deliveryMethod === "DELIVERY" ? "active" : ""
+              }`}
+            >
+              <input
+                type="radio"
+                name="deliveryMethod"
+                value="DELIVERY"
+                checked={deliveryMethod === "DELIVERY"}
+                onChange={() => setDeliveryMethod("DELIVERY")}
+              />
+
+              <span className="bl-delivery-option-icon">🚚</span>
+
+              <span className="bl-delivery-option-content">
+                <strong>Giao hàng tận nơi</strong>
+                <small>Nhận đồ uống tại địa chỉ của bạn</small>
+              </span>
+            </label>
+
+            <label
+              className={`bl-delivery-option ${
+                deliveryMethod === "PICKUP" ? "active" : ""
+              }`}
+            >
+              <input
+                type="radio"
+                name="deliveryMethod"
+                value="PICKUP"
+                checked={deliveryMethod === "PICKUP"}
+                onChange={() => setDeliveryMethod("PICKUP")}
+              />
+
+              <span className="bl-delivery-option-icon">🏪</span>
+
+              <span className="bl-delivery-option-content">
+                <strong>Nhận tại quán</strong>
+                <small>Đến quán để nhận đơn hàng</small>
+              </span>
+            </label>
+          </div>
+
+          {/* Thông tin người nhận */}
+          <h2 className="bl-cart-section-title">
+            Thông tin người nhận
           </h2>
 
           <div className="bl-cart-form-grid">
@@ -613,46 +758,66 @@ export default function CartPage() {
               className="bl-cart-field"
             />
 
-            <input
-              value="TP. Hồ Chí Minh"
-              readOnly
-              aria-label="Tỉnh hoặc thành phố"
-              className="bl-cart-field bl-cart-field-readonly"
-            />
+            {/* Chỉ hiện địa chỉ khi giao hàng tận nơi */}
+            {deliveryMethod === "DELIVERY" && (
+              <>
+                <input
+                  value="TP. Hồ Chí Minh"
+                  readOnly
+                  aria-label="Tỉnh hoặc thành phố"
+                  className="bl-cart-field bl-cart-field-readonly"
+                />
 
-            <select
-              required
-              value={ward}
-              onChange={(e) => setWard(e.target.value)}
-              className="bl-cart-field"
-              aria-label="Phường hoặc xã"
-            >
-              <option value="">-- Chọn phường / xã --</option>
-              {HO_CHI_MINH_WARDS.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
+                <select
+                  required
+                  value={ward}
+                  onChange={(e) => setWard(e.target.value)}
+                  className="bl-cart-field"
+                  aria-label="Phường hoặc xã"
+                >
+                  <option value="">-- Chọn phường / xã --</option>
 
-            <input
-              required
-              maxLength={300}
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="Số nhà, tên đường, căn hộ..."
-              className="bl-cart-field"
-            />
+                  {HO_CHI_MINH_WARDS.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  required
+                  maxLength={300}
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Số nhà, tên đường, căn hộ..."
+                  className="bl-cart-field"
+                />
+              </>
+            )}
           </div>
 
-          <div className="bl-cart-address-preview">
-            <strong>Địa chỉ giao hàng:</strong>
-            <p>
-              {address.trim() || "Số nhà, tên đường"}
-              {ward ? `, ${ward}` : ", Phường / xã"}
-              , TP. Hồ Chí Minh
-            </p>
-          </div>
+          {/* Xem trước địa chỉ chỉ khi giao hàng */}
+          {deliveryMethod === "DELIVERY" && (
+            <div className="bl-cart-address-preview">
+              <strong>Địa chỉ giao hàng:</strong>
+              <p>
+                {address.trim() || "Số nhà, tên đường"}
+                {ward ? `, ${ward}` : ", Phường / xã"}
+                , TP. Hồ Chí Minh
+              </p>
+            </div>
+          )}
+
+          {/* Thông báo khi nhận tại quán */}
+          {deliveryMethod === "PICKUP" && (
+            <div className="bl-cart-address-preview">
+              <strong>Nhận hàng tại quán</strong>
+              <p>
+                Bạn sẽ đến quán để nhận đơn hàng. Vui lòng cung cấp
+                chính xác họ tên và số điện thoại để quán xác nhận đơn.
+              </p>
+            </div>
+          )}
 
           <textarea
             maxLength={1000}
@@ -877,4 +1042,23 @@ export default function CartPage() {
       )}
     </main>
   );
+}
+
+function getCartStorageKey() {
+  const savedUser = localStorage.getItem("brewlite_user");
+
+  if (savedUser) {
+    try {
+      const user = JSON.parse(savedUser);
+      const makh = Number(user?.makh);
+
+      if (Number.isInteger(makh) && makh > 0) {
+        return `brewlite_cart_${makh}`;
+      }
+    } catch {
+      // Sử dụng giỏ hàng khách nếu tài khoản không hợp lệ.
+    }
+  }
+
+  return "brewlite_cart_guest";
 }

@@ -687,3 +687,67 @@ select.bl-cart-field {
   }
 }
 
+/* Hình thức nhận hàng */
+.bl-delivery-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.bl-delivery-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  cursor: pointer;
+  background: #fff;
+  transition: all 0.2s ease;
+}
+
+.bl-delivery-option:hover {
+  border-color: #b87945;
+}
+
+.bl-delivery-option.active {
+  border: 2px solid #b87945;
+  background: #fffaf5;
+  padding: 17px;
+}
+
+.bl-delivery-option input {
+  width: 17px;
+  height: 17px;
+  accent-color: #b87945;
+  flex-shrink: 0;
+}
+
+.bl-delivery-option-icon {
+  font-size: 26px;
+}
+
+.bl-delivery-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.bl-delivery-option-content strong {
+  font-size: 15px;
+  color: #333;
+}
+
+.bl-delivery-option-content small {
+  font-size: 12px;
+  color: #777;
+  line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+  .bl-delivery-options {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}

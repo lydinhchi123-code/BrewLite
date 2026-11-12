@@ -30,7 +30,6 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 
   [OrderStatus.PREPARING]: [
     OrderStatus.READY,
-    OrderStatus.CANCELLED,
   ],
 
   [OrderStatus.READY]: [

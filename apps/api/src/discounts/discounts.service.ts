@@ -17,32 +17,112 @@ export class DiscountsService {
   ) {}
 
   // Danh sách mã đang hoạt động dành cho khách hàng
-  async findAll() {
+  async findAll(makh: number) {
+    const customerResult = await this.pool.query(
+      `
+      SELECT makh
+      FROM taikhoankhachhang
+      WHERE makh = $1
+        AND trangthai = 0
+      `,
+      [makh],
+    );
+
+    if (customerResult.rows.length === 0) {
+      throw new BadRequestException(
+        'Tài khoản không tồn tại hoặc đã bị khóa',
+      );
+    }
+
     const result = await this.pool.query(
       `
       SELECT
-        id,
-        ma,
-        ten,
-        mo_ta,
-        loai_ma,
-        so_tien_giam,
-        don_hang_toi_thieu,
-        so_luong_toi_da,
-        so_luong_da_dung,
-        ngay_bat_dau,
-        ngay_ket_thuc,
-        trang_thai,
-        moi_khach_mot_lan
-      FROM magiamgia
-      WHERE trang_thai = 'DANG_SU_DUNG'
-        AND CURRENT_TIMESTAMP BETWEEN ngay_bat_dau AND ngay_ket_thuc
+        mg.id,
+        mg.ma,
+        mg.ten,
+        mg.mo_ta,
+        mg.loai_ma,
+        mg.so_tien_giam,
+        mg.hinh_thuc_giam,
+        mg.don_hang_toi_thieu,
+        mg.so_luong_toi_da,
+        mg.so_luong_da_dung,
+        mg.ngay_bat_dau,
+        mg.ngay_ket_thuc,
+        mg.trang_thai,
+        mg.moi_khach_mot_lan,
+
+        CASE
+          WHEN mg.moi_khach_mot_lan = TRUE
+            AND EXISTS (
+              SELECT 1
+              FROM lich_su_su_dung_ma_giam_gia ls
+              WHERE ls.ma_giam_gia_id = mg.id
+                AND ls.makh = $1
+            )
+          THEN FALSE
+
+          WHEN mg.loai_ma = 'NEW_CUSTOMER'
+            AND EXISTS (
+              SELECT 1
+              FROM donhang dh
+              WHERE dh.makh = $1
+                AND dh.trangthai IN (
+                  'PAID',
+                  'PREPARING',
+                  'READY',
+                  'COMPLETED'
+                )
+            )
+          THEN FALSE
+
+          ELSE TRUE
+        END AS du_dieu_kien,
+
+        CASE
+          WHEN mg.moi_khach_mot_lan = TRUE
+            AND EXISTS (
+              SELECT 1
+              FROM lich_su_su_dung_ma_giam_gia ls
+              WHERE ls.ma_giam_gia_id = mg.id
+                AND ls.makh = $1
+            )
+          THEN 'Bạn đã sử dụng mã giảm giá này'
+
+          WHEN mg.loai_ma = 'NEW_CUSTOMER'
+            AND EXISTS (
+              SELECT 1
+              FROM donhang dh
+              WHERE dh.makh = $1
+                AND dh.trangthai IN (
+                  'PAID',
+                  'PREPARING',
+                  'READY',
+                  'COMPLETED'
+                )
+            )
+          THEN 'Mã khuyến mãi dành cho đơn hàng đầu tiên của tài khoản'
+
+          ELSE NULL
+        END AS ly_do_khong_du_dieu_kien
+
+      FROM magiamgia mg
+      WHERE mg.trang_thai = 'DANG_SU_DUNG'
         AND (
-          so_luong_toi_da IS NULL
-          OR so_luong_da_dung < so_luong_toi_da
+          mg.ngay_bat_dau IS NULL
+          OR CURRENT_TIMESTAMP >= mg.ngay_bat_dau
         )
-      ORDER BY ngay_tao DESC
+        AND (
+          mg.ngay_ket_thuc IS NULL
+          OR CURRENT_TIMESTAMP <= mg.ngay_ket_thuc
+        )
+        AND (
+          mg.so_luong_toi_da IS NULL
+          OR mg.so_luong_da_dung < mg.so_luong_toi_da
+        )
+      ORDER BY mg.ngay_tao DESC
       `,
+      [makh],
     );
 
     return result.rows;
@@ -106,6 +186,7 @@ export class DiscountsService {
         ten,
         mo_ta,
         loai_ma,
+        hinh_thuc_giam,
         so_tien_giam,
         don_hang_toi_thieu,
         so_luong_toi_da,
@@ -116,8 +197,8 @@ export class DiscountsService {
       )
       VALUES (
         $1, $2, $3, $4, $5,
-        $6, $7, $8, $9,
-        'DANG_SU_DUNG', $10
+        $6, $7, $8, $9, $10,
+        'DANG_SU_DUNG', $11
       )
       RETURNING *
       `,
@@ -126,6 +207,7 @@ export class DiscountsService {
         dto.ten.trim(),
         dto.mo_ta ?? null,
         dto.loai_ma,
+        dto.hinh_thuc_giam,
         dto.so_tien_giam,
         dto.don_hang_toi_thieu ?? 0,
         dto.so_luong_toi_da ?? null,
@@ -181,6 +263,7 @@ export class DiscountsService {
       ten: dto.ten?.trim(),
       mo_ta: dto.mo_ta,
       loai_ma: dto.loai_ma,
+      hinh_thuc_giam: dto.hinh_thuc_giam,
       so_tien_giam: dto.so_tien_giam,
       don_hang_toi_thieu: dto.don_hang_toi_thieu,
       so_luong_toi_da: dto.so_luong_toi_da,
@@ -295,7 +378,8 @@ export class DiscountsService {
     ma: string,
     makh: number,
     tamTinh: number,
-  ) {
+    phiVanChuyenGoc?: number,
+  ) { 
     const customerResult = await this.pool.query(
       `
       SELECT makh
@@ -327,6 +411,19 @@ export class DiscountsService {
     }
 
     const discount = discountResult.rows[0];
+    if (!Number.isFinite(tamTinh) || tamTinh < 0) {
+      throw new BadRequestException(
+        'Giá trị tiền hàng không hợp lệ',
+      );
+    }
+
+    const soTienGiamToiDa = Number(discount.so_tien_giam);
+
+    if (!Number.isFinite(soTienGiamToiDa) || soTienGiamToiDa <= 0) {
+      throw new BadRequestException(
+        'Giá trị giảm giá không hợp lệ',
+      );
+    }
 
     if (discount.trang_thai !== 'DANG_SU_DUNG') {
       throw new BadRequestException(
@@ -335,12 +432,16 @@ export class DiscountsService {
     }
 
     const now = new Date();
-    const start = new Date(discount.ngay_bat_dau);
-    const end = new Date(discount.ngay_ket_thuc);
 
-    if (now < start || now > end) {
+    if (discount.ngay_bat_dau && now < new Date(discount.ngay_bat_dau)) {
       throw new BadRequestException(
-        'Mã giảm giá chưa đến thời gian hoặc đã hết hạn',
+        'Mã giảm giá chưa đến thời gian sử dụng',
+      );
+    }
+
+    if (discount.ngay_ket_thuc && now > new Date(discount.ngay_ket_thuc)) {
+      throw new BadRequestException(
+        'Mã giảm giá đã hết hạn',
       );
     }
 
@@ -361,21 +462,24 @@ export class DiscountsService {
     }
 
     // Kiểm tra khách đã sử dụng mã này chưa
-    const usedResult = await this.pool.query(
-      `
-      SELECT 1
-      FROM lich_su_su_dung_ma_giam_gia
-      WHERE ma_giam_gia_id = $1
-        AND makh = $2
-      LIMIT 1
-      `,
-      [discount.id, makh],
-    );
-
-    if (usedResult.rows.length > 0) {
-      throw new BadRequestException(
-        'Bạn đã sử dụng mã giảm giá này',
+    // Chỉ kiểm tra nếu mã được giới hạn mỗi khách một lần
+    if (discount.moi_khach_mot_lan) {
+      const usedResult = await this.pool.query(
+        `
+        SELECT 1
+        FROM lich_su_su_dung_ma_giam_gia
+        WHERE ma_giam_gia_id = $1
+          AND makh = $2
+        LIMIT 1
+        `,
+        [discount.id, makh],
       );
+
+      if (usedResult.rows.length > 0) {
+        throw new BadRequestException(
+          'Bạn đã sử dụng mã giảm giá này',
+        );
+      }
     }
 
     // Mã dành cho khách hàng mới
@@ -403,10 +507,41 @@ export class DiscountsService {
       }
     }
 
-    const soTienGiam = Math.min(
-      Number(discount.so_tien_giam),
-      tamTinh,
-    );
+    
+    let soTienGiam = 0;
+
+    if (discount.hinh_thuc_giam === 'TIEN_HANG') {
+      // Voucher giảm trực tiếp vào tiền hàng
+      soTienGiam = Math.min(
+        soTienGiamToiDa,
+        tamTinh,
+      );
+    } else if (discount.hinh_thuc_giam === 'FREESHIP') {
+      // Voucher Freeship giảm vào phí vận chuyển
+      if (
+        phiVanChuyenGoc === undefined ||
+        !Number.isFinite(phiVanChuyenGoc) ||
+        phiVanChuyenGoc < 0
+      ) {
+        throw new BadRequestException(
+          'Phí vận chuyển không hợp lệ',
+        );
+      }
+
+      soTienGiam = Math.min(
+        soTienGiamToiDa,
+        phiVanChuyenGoc,
+      );
+    } else {
+      throw new BadRequestException(
+        'Hình thức giảm giá không hợp lệ',
+      );
+    }
+
+
+    const phiVanChuyen = phiVanChuyenGoc ?? 0;
+
+    const tongTienSauGiam = tamTinh + phiVanChuyen - soTienGiam;
 
     return {
       message: 'Mã giảm giá hợp lệ',
@@ -415,9 +550,11 @@ export class DiscountsService {
         ma: discount.ma,
         ten: discount.ten,
         loai_ma: discount.loai_ma,
+        hinh_thuc_giam: discount.hinh_thuc_giam,
         so_tien_giam: soTienGiam,
         tam_tinh: tamTinh,
-        tong_tien_sau_giam: tamTinh - soTienGiam,
+        phi_van_chuyen_goc: phiVanChuyen,
+        tong_tien_sau_giam: tongTienSauGiam,
       },
     };
   }

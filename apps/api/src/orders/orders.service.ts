@@ -54,11 +54,13 @@ export class OrdersService {
       customerPhone,
       address,
       phuong,
-      deliveryFee = 0,
       maGiamGia,
+      maFreeship,
       note,
+      deliveryMethod,
     } = createOrderDto;
 
+    const isPickup = deliveryMethod === 'PICKUP';
     const makh = authenticatedMakh;
 
     if (
@@ -218,13 +220,10 @@ export class OrdersService {
             `
             SELECT t.name, t.price
             FROM menu_toppings t
-            JOIN menu_product_toppings pt
-              ON pt.topping_id = t.id
-            WHERE pt.product_id = $1
-              AND t.name = ANY($2::text[])
+            WHERE t.name = ANY($1::text[])
               AND t.is_available = TRUE
             `,
-            [productId, toppingNames],
+            [toppingNames],
           );
 
           if (toppingResult.rowCount !== toppingNames.length) {
@@ -254,74 +253,111 @@ export class OrdersService {
         });
       }
 
-      let calculatedDiscount = 0;
+    let calculatedDiscount = 0;
+    let calculatedFreeShipDiscount = 0;
 
-      if (maGiamGia?.trim()) {
-        const code = maGiamGia.trim().toUpperCase();
+    // Phí vận chuyển gốc do backend tự tính.
+    // Cần thống nhất các mức phí này với quy tắc frontend.
+    const calculatedDeliveryFee = isPickup ? 0
+      : calculatedSubtotal < 100000 ? 20000
+        : calculatedSubtotal < 200000 ? 10000
+          : 0;
 
-        const discountResult = await client.query(
-          `
-          SELECT *
-          FROM magiamgia
-          WHERE UPPER(TRIM(ma)) = $1
-          FOR UPDATE
-          `,
-          [code],
+    // Hàm kiểm tra và tính số tiền giảm của từng voucher.
+    const applyDiscount = async (
+      code: string | undefined,
+      expectedType: 'TIEN_HANG' | 'FREESHIP',
+    ): Promise<number> => {
+      if (!code?.trim()) {
+        return 0;
+      }
+
+      const normalizedCode = code.trim().toUpperCase();
+
+      const discountResult = await client.query(
+        `
+        SELECT *
+        FROM magiamgia
+        WHERE UPPER(TRIM(ma)) = $1
+        FOR UPDATE
+        `,
+        [normalizedCode],
+      );
+
+      if (discountResult.rowCount === 0) {
+        throw new BadRequestException(
+          `Mã giảm giá ${normalizedCode} không tồn tại.`,
         );
+      }
 
-        if (discountResult.rowCount === 0) {
-          throw new BadRequestException(
-            'Mã giảm giá không tồn tại.',
-          );
-        }
+      const discount = discountResult.rows[0];
 
-        const discount = discountResult.rows[0];
-        const now = new Date();
+      if (discount.trang_thai !== 'DANG_SU_DUNG') {
+        throw new BadRequestException(
+          `Mã ${normalizedCode} hiện không khả dụng.`,
+        );
+      }
 
-        if (discount.trang_thai !== 'DANG_SU_DUNG') {
-          throw new BadRequestException(
-            'Mã giảm giá hiện không khả dụng.',
-          );
-        }
+      const now = new Date();
 
-        if (
-          discount.ngay_bat_dau &&
-          now < new Date(discount.ngay_bat_dau)
-        ) {
-          throw new BadRequestException(
-            'Mã giảm giá chưa đến thời gian sử dụng.',
-          );
-        }
+      if (
+        discount.ngay_bat_dau &&
+        now < new Date(discount.ngay_bat_dau)
+      ) {
+        throw new BadRequestException(
+          `Mã ${normalizedCode} chưa đến thời gian sử dụng.`,
+        );
+      }
 
-        if (
-          discount.ngay_ket_thuc &&
-          now > new Date(discount.ngay_ket_thuc)
-        ) {
-          throw new BadRequestException(
-            'Mã giảm giá đã hết hạn.',
-          );
-        }
+      if (
+        discount.ngay_ket_thuc &&
+        now > new Date(discount.ngay_ket_thuc)
+      ) {
+        throw new BadRequestException(
+          `Mã ${normalizedCode} đã hết hạn.`,
+        );
+      }
 
-        if (
-          discount.so_luong_toi_da !== null &&
-          Number(discount.so_luong_da_dung) >=
-            Number(discount.so_luong_toi_da)
-        ) {
-          throw new BadRequestException(
-            'Mã giảm giá đã hết lượt sử dụng.',
-          );
-        }
+      if (
+        discount.so_luong_toi_da !== null &&
+        Number(discount.so_luong_da_dung) >=
+          Number(discount.so_luong_toi_da)
+      ) {
+        throw new BadRequestException(
+          `Mã ${normalizedCode} đã hết lượt sử dụng.`,
+        );
+      }
 
-        if (
-          calculatedSubtotal <
-          Number(discount.don_hang_toi_thieu)
-        ) {
-          throw new BadRequestException(
-            `Đơn hàng phải đạt tối thiểu ${Number(discount.don_hang_toi_thieu).toLocaleString('vi-VN')}đ để sử dụng mã này.`,
-          );
-        }
+      if (
+        discount.hinh_thuc_giam !== expectedType
+      ) {
+        throw new BadRequestException(
+          `Mã ${normalizedCode} không đúng loại voucher.`,
+        );
+      }
 
-        // Kiểm tra khách đã sử dụng mã này chưa.
+      if (
+        calculatedSubtotal <
+        Number(discount.don_hang_toi_thieu)
+      ) {
+        throw new BadRequestException(
+          `Đơn hàng phải đạt tối thiểu ${
+            Number(discount.don_hang_toi_thieu)
+              .toLocaleString('vi-VN')
+          }đ để sử dụng mã ${normalizedCode}.`,
+        );
+      }
+
+      const maxDiscount = Number(discount.so_tien_giam);
+
+      if (!Number.isFinite(maxDiscount) || maxDiscount <= 0) {
+        throw new BadRequestException(
+          `Giá trị giảm của mã ${normalizedCode} không hợp lệ.`,
+        );
+      }
+
+      // Chỉ kiểm tra lịch sử nếu voucher giới hạn mỗi khách một lần.
+      if (discount.moi_khach_mot_lan) {
         const usedResult = await client.query(
           `
           SELECT 1
@@ -335,93 +371,128 @@ export class OrdersService {
 
         if (usedResult.rows.length > 0) {
           throw new BadRequestException(
-            'Bạn đã sử dụng mã giảm giá này rồi.',
+            `Bạn đã sử dụng mã ${normalizedCode} rồi.`,
           );
         }
-
-        // Mã khách mới: kiểm tra khách đã có đơn thành công chưa.
-        if (discount.loai_ma === 'NEW_CUSTOMER') {
-          const previousOrder = await client.query(
-            `
-            SELECT 1
-            FROM donhang
-            WHERE makh = $1
-              AND trangthai IN (
-                'PAID',
-                'PREPARING',
-                'READY',
-                'COMPLETED'
-              )
-            LIMIT 1
-            `,
-            [Number(makh)],
-          );
-
-          if (previousOrder.rows.length > 0) {
-            throw new BadRequestException(
-              'Mã này chỉ dành cho khách hàng đặt đơn lần đầu.',
-            );
-          }
-        }
-
-        calculatedDiscount = Math.min(
-          Number(discount.so_tien_giam),
-          calculatedSubtotal,
-        );
       }
 
-      const calculatedTotal =
-        calculatedSubtotal + Number(deliveryFee) - calculatedDiscount;
+      // Kiểm tra khách hàng mới.
+      if (discount.loai_ma === 'NEW_CUSTOMER') {
+        const previousOrder = await client.query(
+          `
+          SELECT 1
+          FROM donhang
+          WHERE makh = $1
+            AND trangthai IN (
+              'PAID',
+              'PREPARING',
+              'READY',
+              'COMPLETED'
+            )
+          LIMIT 1
+          `,
+          [Number(makh)],
+        );
 
-      if (calculatedTotal < 0) {
+        if (previousOrder.rows.length > 0) {
+          throw new BadRequestException(
+            `Mã ${normalizedCode} chỉ dành cho khách hàng mới.`,
+          );
+        }
+      }
+
+      // Tính tiền giảm theo loại voucher.
+      const baseAmount =
+        expectedType === 'TIEN_HANG'
+          ? calculatedSubtotal
+          : calculatedDeliveryFee;
+
+      if (baseAmount <= 0) {
         throw new BadRequestException(
-          'Tổng tiền đơn hàng không hợp lệ.',
+          expectedType === 'FREESHIP'
+            ? 'Đơn hàng đã được miễn phí vận chuyển, không cần sử dụng mã Freeship.'
+            : 'Đơn hàng không đủ điều kiện áp dụng mã giảm giá.',
         );
       }
+
+      const amount = Math.min(maxDiscount, baseAmount);
+
+      return amount;
+    };
+
+    // Voucher giảm tiền hàng.
+    calculatedDiscount = await applyDiscount(
+      maGiamGia,
+      'TIEN_HANG',
+    );
+
+    // Voucher Freeship chỉ áp dụng cho đơn giao hàng.
+    calculatedFreeShipDiscount = isPickup
+      ? 0
+      : await applyDiscount(maFreeship, 'FREESHIP');
+
+    // Tính tổng tiền cuối cùng.
+    const calculatedTotal =
+      calculatedSubtotal +
+      calculatedDeliveryFee -
+      calculatedDiscount -
+      calculatedFreeShipDiscount;
+
+    if (calculatedTotal < 0) {
+      throw new BadRequestException(
+        'Tổng tiền đơn hàng không hợp lệ.',
+      );
+    }
 
       const displayOrderId =
         `ORD-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
       // 1. Tạo đơn hàng trong transaction.
       const orderResult = await client.query(
-      `
-      INSERT INTO donhang (
-        madonhanghienthi,
-        makh,
-        hotennguoinhan,
-        sodienthoainguoinhan,
-        diachigiaohang,
-        phuong,
-        ghichu,
-        tamtinh,
-        phigiaohang,
-        giamgia,
-        magiamgia,
-        tongtien
-      )
-      VALUES (
-        $1, $2, $3, $4, $5, $6,
-        $7, $8, $9, $10, $11, $12
-      )
-      RETURNING *
-      `,
-      [
-        displayOrderId,
-        Number(makh),
-        customerName,
-        customerPhone,
-        address,
-        phuong,
-        note ?? null,
-        calculatedSubtotal,
-        deliveryFee,
-        calculatedDiscount,
-        maGiamGia?.trim().toUpperCase() || null,
-        calculatedTotal,
-      ],
-    );
+        `
+        INSERT INTO donhang (
+          madonhanghienthi,
+          makh,
+          hotennguoinhan,
+          sodienthoainguoinhan,
+          diachigiaohang,
+          phuong,
+          ghichu,
+          hinhthucnhanhang,
+          tamtinh,
+          phigiaohang,
+          giamgia,
+          magiamgia,
+          ma_freeship,
+          giamgia_freeship,
+          tongtien
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, 
+          $9, $10, $11, $12, $13, $14, $15
+        )
+        RETURNING *
+        `,
+        [
+          displayOrderId,
+          Number(makh),
+          customerName,
+          customerPhone,
+          address,
+          phuong,
+          note ?? null,
+          deliveryMethod ?? 'DELIVERY',
+          calculatedSubtotal,
+          calculatedDeliveryFee,
+          calculatedDiscount,
+          maGiamGia?.trim().toUpperCase() || null,
+          isPickup ? null : maFreeship?.trim().toUpperCase() || null,
+          calculatedFreeShipDiscount,
+          calculatedTotal,
+        ],
+      );
 
-    const order = orderResult.rows[0];
+      const order = orderResult.rows[0];
 
       let hasProductStockDeduction = false;
 
@@ -949,13 +1020,20 @@ export class OrdersService {
 
         d.hotennguoinhan AS "recipientName",
         d.sodienthoainguoinhan AS "recipientPhone",
+        d.hinhthucnhanhang AS "deliveryMethod",
         d.diachigiaohang AS "deliveryAddress",
         d.phuong AS province,
         d.ghichu AS note,
 
         d.tamtinh AS subtotal,
-        d.phigiaohang AS "deliveryFee",
+        (
+          d.phigiaohang - d.giamgia_freeship
+        ) AS "deliveryFee",
+        d.phigiaohang AS "originalDeliveryFee",
         d.giamgia AS discount,
+        d.giamgia_freeship AS "freeShipDiscount",
+        d.magiamgia AS "discountCode",
+        d.ma_freeship AS "freeShipCode",
         d.tongtien AS "totalAmount",
 
         COALESCE(
@@ -1026,9 +1104,284 @@ export class OrdersService {
       ...order,
       subtotal: Number(order.subtotal),
       deliveryFee: Number(order.deliveryFee),
+      originalDeliveryFee: Number(order.originalDeliveryFee),
       discount: Number(order.discount),
+      freeShipDiscount: Number(order.freeShipDiscount),
       totalAmount: Number(order.totalAmount),
     };
+  }
+
+  private async releaseInventoryAndRefund(
+    client: import('pg').PoolClient,
+    order: {
+      madonhang: number;
+      madonhanghienthi: string;
+      inventory_reserved: boolean;
+      inventory_released: boolean;
+    },
+  ): Promise<void> {
+    // Không có tồn kho nào được trừ thì không cần hoàn.
+    if (order.inventory_reserved && !order.inventory_released) {
+      // 1. Hoàn tồn kho thành phẩm.
+      // Chỉ hoàn các chi tiết thực sự đã bị trừ kho.
+      const productStockResult = await client.query(
+        `
+        SELECT
+          product_id,
+          SUM(soluong)::INTEGER AS quantity
+        FROM chitietdonhang
+        WHERE madonhang = $1
+          AND stock_deducted = TRUE
+          AND product_id IS NOT NULL
+        GROUP BY product_id
+        ORDER BY product_id
+        `,
+        [order.madonhang],
+      );
+
+      for (const item of productStockResult.rows) {
+        await client.query(
+          `
+          UPDATE menu_products
+          SET stock_quantity = stock_quantity + $1
+          WHERE id = $2
+          `,
+          [
+            Number(item.quantity),
+            Number(item.product_id),
+          ],
+        );
+      }
+
+      // 2. Lấy tổng nguyên liệu đã xuất cho đơn hàng.
+      // Không tính lại recipe vì công thức có thể đã thay đổi.
+      const ingredientResult = await client.query(
+        `
+        SELECT
+          ingredient_id,
+          unit,
+          SUM(quantity)::NUMERIC AS quantity
+        FROM ingredient_transactions
+        WHERE transaction_type = 'OUT'
+          AND reference_type = 'ORDER'
+          AND reference_id = $1
+        GROUP BY ingredient_id, unit
+        ORDER BY ingredient_id
+        `,
+        [order.madonhang],
+      );
+
+      // 3. Hoàn nguyên liệu và ghi lịch sử IN.
+      for (const ingredient of ingredientResult.rows) {
+        const ingredientId = Number(ingredient.ingredient_id);
+        const quantity = Number(ingredient.quantity);
+
+        if (!Number.isFinite(quantity) || quantity <= 0) {
+          throw new BadRequestException(
+            `Số lượng nguyên liệu hoàn kho không hợp lệ.`,
+          );
+        }
+
+        // Khóa dòng tồn kho trước khi cập nhật.
+        const inventoryResult = await client.query(
+          `
+          SELECT
+            inv.ingredient_id,
+            i.base_unit
+          FROM ingredient_inventory inv
+          JOIN ingredients i
+            ON i.id = inv.ingredient_id
+          WHERE inv.ingredient_id = $1
+          FOR UPDATE OF inv
+          `,
+          [ingredientId],
+        );
+
+        if (inventoryResult.rowCount === 0) {
+          throw new BadRequestException(
+            `Không tìm thấy tồn kho nguyên liệu ID ${ingredientId}. Không thể hoàn đơn.`,
+          );
+        }
+
+        if (inventoryResult.rows[0].base_unit !== ingredient.unit) {
+          throw new BadRequestException(
+            `Đơn vị nguyên liệu ID ${ingredientId} không khớp đơn vị tồn kho. Không thể hoàn đơn.`,
+          );
+        }
+
+        if (inventoryResult.rowCount === 0) {
+          throw new BadRequestException(
+            `Không tìm thấy tồn kho nguyên liệu ID ${ingredientId}. Không thể hoàn đơn.`,
+          );
+        }
+
+        await client.query(
+          `
+          UPDATE ingredient_inventory
+          SET stock_quantity = stock_quantity + $1,
+              updated_at = NOW()
+          WHERE ingredient_id = $2
+          `,
+          [quantity, ingredientId],
+        );
+
+        await client.query(
+          `
+          INSERT INTO ingredient_transactions (
+            ingredient_id,
+            transaction_type,
+            quantity,
+            unit,
+            reference_type,
+            reference_id,
+            note
+          )
+          VALUES ($1, 'IN', $2, $3, 'ORDER_CANCEL', $4, $5)
+          `,
+          [
+            ingredientId,
+            quantity,
+            ingredient.unit,
+            order.madonhang,
+            `Hoàn nguyên liệu do hủy đơn ${order.madonhanghienthi}.`,
+          ],
+        );
+      }
+    }
+
+    // 4. Hoàn giao dịch thanh toán mô phỏng.
+    // Chỉ chuyển giao dịch đã thanh toán thành đã hoàn.
+    const paymentResult = await client.query(
+      `
+      SELECT mathanhtoan, trangthai
+      FROM thanhtoan
+      WHERE madonhang = $1
+      ORDER BY mathanhtoan DESC
+      LIMIT 1
+      FOR UPDATE
+      `,
+      [order.madonhang],
+    );
+
+    if (
+      paymentResult.rows.length > 0 &&
+      paymentResult.rows[0].trangthai === 'DA_THANH_TOAN'
+    ) {
+      await client.query(
+        `
+        UPDATE thanhtoan
+        SET trangthai = 'DA_HOAN',
+            ngaycapnhat = CURRENT_TIMESTAMP
+        WHERE mathanhtoan = $1
+        `,
+        [paymentResult.rows[0].mathanhtoan],
+      );
+    }
+  }
+
+  async cancelOrder(
+    orderId: string,
+    authenticatedMakh?: string | number,
+  ) {
+    const makh = Number(authenticatedMakh);
+
+    if (!Number.isSafeInteger(makh) || makh < 1) {
+      throw new UnauthorizedException(
+        'Vui lòng đăng nhập để hủy đơn hàng.',
+      );
+    }
+
+    if (!/^ORD-[A-Za-z0-9-]+$/.test(orderId)) {
+      throw new BadRequestException(
+        'Mã đơn hàng không hợp lệ.',
+      );
+    }
+
+    const client = await this.pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Chỉ cho phép khách hàng hủy đơn thuộc tài khoản của mình.
+      const result = await client.query(
+        `
+        SELECT
+          madonhang,
+          madonhanghienthi,
+          makh,
+          trangthai,
+          inventory_reserved,
+          inventory_released
+        FROM donhang
+        WHERE madonhanghienthi = $1
+          AND makh = $2
+        FOR UPDATE
+        `,
+        [orderId, makh],
+      );
+
+      if (result.rowCount === 0) {
+        throw new NotFoundException(
+          'Không tìm thấy đơn hàng.',
+        );
+      }
+
+      const order = result.rows[0];
+      const currentStatus = order.trangthai as OrderStatus;
+
+      // Kiểm tra chuyển trạng thái.
+      try {
+        assertTransition(
+          currentStatus,
+          OrderStatus.CANCELLED,
+        );
+      } catch (error: unknown) {
+        throw new BadRequestException(
+          error instanceof Error
+            ? error.message
+            : 'Không thể hủy đơn hàng này.',
+        );
+      }
+
+      // Hoàn kho và hoàn thanh toán trong cùng transaction.
+      await this.releaseInventoryAndRefund(client, order);
+
+      // Cập nhật trạng thái đơn và đánh dấu đã hoàn kho.
+      const updated = await client.query(
+        `
+        UPDATE donhang
+        SET trangthai = 'CANCELLED',
+            inventory_released = CASE
+              WHEN inventory_reserved = TRUE THEN TRUE
+              ELSE inventory_released
+            END,
+            ngaycapnhat = CURRENT_TIMESTAMP
+        WHERE madonhang = $1
+        RETURNING *
+        `,
+        [order.madonhang],
+      );
+
+      await client.query('COMMIT');
+
+      return {
+        message: 'Hủy đơn hàng thành công.',
+        order: updated.rows[0],
+      };
+    } catch (error: unknown) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError: unknown) {
+        console.error(
+          'LỖI ROLLBACK HỦY ĐƠN:',
+          rollbackError,
+        );
+      }
+
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async updateStatus(
@@ -1049,7 +1402,11 @@ export class OrdersService {
           makh,
           trangthai,
           magiamgia,
-          giamgia
+          giamgia,
+          ma_freeship,
+          giamgia_freeship,
+          inventory_reserved,
+          inventory_released
         FROM donhang
         WHERE madonhang = $1
         FOR UPDATE
@@ -1075,6 +1432,11 @@ export class OrdersService {
             ? error.message
             : 'Chuyển trạng thái không hợp lệ.',
         );
+      }
+
+      // Nếu Admin hủy đơn thì phải hoàn kho và hoàn thanh toán.
+      if (nextStatus === OrderStatus.CANCELLED) {
+        await this.releaseInventoryAndRefund(client, order);
       }
 
       // 3. Nếu Admin xác nhận đơn đã thanh toán.
@@ -1124,11 +1486,42 @@ export class OrdersService {
         }
 
         // 4. Ghi nhận lịch sử sử dụng mã giảm giá nếu đơn có mã.
-        if (
-          order.magiamgia &&
-          Number(order.giamgia) > 0
-        ) {
+        // 4. Ghi nhận lịch sử sử dụng các voucher của đơn hàng.
+        const orderDiscounts = [
+          {
+            code: order.magiamgia,
+            amount: Number(order.giamgia),
+          },
+          {
+            code: order.ma_freeship,
+            amount: Number(order.giamgia_freeship),
+          },
+        ];
+
+        for (const item of orderDiscounts) {
+          if (!item.code || item.amount <= 0) {
+            continue;
+          }
+
           const discountResult = await client.query(
+            `
+            SELECT id
+            FROM magiamgia
+            WHERE UPPER(TRIM(ma)) = UPPER(TRIM($1))
+            FOR UPDATE
+            `,
+            [item.code],
+          );
+
+          if (discountResult.rowCount !== 1) {
+            throw new BadRequestException(
+              `Không tìm thấy voucher ${item.code} để ghi nhận lịch sử.`,
+            );
+          }
+
+          const discountId = discountResult.rows[0].id;
+
+          const historyResult = await client.query(
             `
             INSERT INTO lich_su_su_dung_ma_giam_gia (
               ma_giam_gia_id,
@@ -1136,24 +1529,20 @@ export class OrdersService {
               madonhang,
               so_tien_duoc_giam
             )
-            SELECT
-              m.id,
-              d.makh,
-              d.madonhang,
-              d.giamgia
-            FROM donhang d
-            JOIN magiamgia m
-              ON UPPER(TRIM(m.ma)) = UPPER(TRIM(d.magiamgia))
-            WHERE d.madonhang = $1
-              AND d.magiamgia IS NOT NULL
-              AND d.giamgia > 0
+            VALUES ($1, $2, $3, $4)
+            RETURNING id
             `,
-            [madonhang],
+            [
+              discountId,
+              order.makh,
+              order.madonhang,
+              item.amount,
+            ],
           );
 
-          if (discountResult.rowCount !== 1) {
+          if (historyResult.rowCount !== 1) {
             throw new BadRequestException(
-              'Không thể ghi nhận lịch sử sử dụng mã giảm giá.',
+              `Không thể ghi nhận lịch sử voucher ${item.code}.`,
             );
           }
         }
@@ -1163,7 +1552,13 @@ export class OrdersService {
       const updated = await client.query(
         `
         UPDATE donhang
-        SET trangthai = $1,
+        SET trangthai = $1::VARCHAR,
+            inventory_released = CASE
+              WHEN $1::VARCHAR = 'CANCELLED'::VARCHAR
+                AND inventory_reserved = TRUE
+                THEN TRUE
+              ELSE inventory_released
+            END,
             ngaycapnhat = CURRENT_TIMESTAMP
         WHERE madonhang = $2
         RETURNING *

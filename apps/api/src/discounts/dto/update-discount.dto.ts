@@ -2,6 +2,7 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -10,8 +11,7 @@ import {
   Min,
 } from 'class-validator';
 
-import { LoaiMaGiamGia } from './create-discount.dto';
-import { IsIn } from 'class-validator';
+import { LoaiMaGiamGia, HinhThucGiam, } from './create-discount.dto';
 
 export class UpdateDiscountDto {
   @IsOptional()
@@ -31,6 +31,10 @@ export class UpdateDiscountDto {
   @IsOptional()
   @IsEnum(LoaiMaGiamGia)
   loai_ma?: LoaiMaGiamGia;
+
+  @IsOptional()
+  @IsEnum(HinhThucGiam)
+  hinh_thuc_giam?: HinhThucGiam;
 
   @IsOptional()
   @IsNumber()

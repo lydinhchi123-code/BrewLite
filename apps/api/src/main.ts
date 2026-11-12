@@ -1,8 +1,11 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
-import { AppModule, ObserveInstrument } from './app.module';
+import { config } from 'dotenv';
+
+config({ path: '../../.env' });
 
 async function bootstrap() {
+  const { AppModule, ObserveInstrument } = await import('./app.module.js');
   const app = await NestFactory.create(AppModule, {
     instrument: ObserveInstrument,
   });

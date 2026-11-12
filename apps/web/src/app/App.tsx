@@ -32,7 +32,6 @@ export default function App() {
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  const [user, setUser] = useState("");
   const [toast, setToast] = useState("");
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [customer, setCustomer] = useState({ name: "", phone: "", address: "", note: "" });
@@ -40,7 +39,6 @@ export default function App() {
   const [authForm, setAuthForm] = useState({ name: "", email: "", password: "" });
 
   const filtered = useMemo(() => products.filter(p => (category === "Tất cả" || p.category === category) && p.name.toLowerCase().includes(search.toLowerCase())), [category, search]);
-  const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * (item.size === "L" ? 1.15 : item.size === "S" ? 0.9 : 1) * item.qty + item.toppings.length * 10000 * item.qty, 0);
   const total = subtotal + (subtotal > 0 ? 10000 : 0);
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2600); };
@@ -53,7 +51,7 @@ export default function App() {
   };
   const changeQty = (key: string, delta: number) => setCart(prev => prev.map(x => x.key === key ? { ...x, qty: x.qty + delta } : x).filter(x => x.qty > 0));
   const checkout = () => { if (!cart.length) return; if (!customer.name.trim() || !customer.phone.trim()) { notify("Vui lòng nhập họ tên và số điện thoại"); return; } const order: Order = { id: `BL${Date.now().toString().slice(-7)}`, date: new Date().toLocaleString("vi-VN"), items: cart, total, status: "Đã tiếp nhận", customer: customer.name }; setLastOrder(order); setOrders(prev => [order, ...prev]); setCart([]); go("confirmation"); };
-  const submitAuth = (e: React.FormEvent) => { e.preventDefault(); if (!authForm.email.trim() || !authForm.password.trim()) return; const name = authForm.name.trim() || authForm.email.split("@")[0]; setUser(name); setAuthOpen(false); notify(authMode === "login" ? "Đăng nhập demo thành công" : "Tạo tài khoản demo thành công"); };
+  const submitAuth = (e: React.FormEvent) => { e.preventDefault(); if (!authForm.email.trim() || !authForm.password.trim()) return; setAuthOpen(false); notify(authMode === "login" ? "Đăng nhập demo thành công" : "Tạo tài khoản demo thành công"); };
   const priceOf = (item: CartItem) => item.product.price * (item.size === "L" ? 1.15 : item.size === "S" ? .9 : 1) + item.toppings.length * 10000;
 
   return <div className="app-shell">

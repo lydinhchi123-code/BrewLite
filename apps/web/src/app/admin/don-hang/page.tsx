@@ -386,8 +386,10 @@ export default function AdminOrdersPage() {
                       <td>{formatDate(order.date)}</td>
                       <td>{formatMoney(order.total)}</td>
                       <td>
-                        <span className="admin-status"
-                          style={order.status === "PAYMENT_FAILED"
+                        <span
+                          className="admin-status"
+                          style={
+                            ["PAYMENT_FAILED", "CANCELLED"].includes(order.status)
                               ? {
                                   backgroundColor: "#fee2e2",
                                   color: "#dc2626",

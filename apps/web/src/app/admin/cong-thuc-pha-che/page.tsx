@@ -50,18 +50,6 @@ interface Recipe {
   steps: RecipeStep[];
 }
 
-function getSlug(product: Product) {
-  if (product.slug) return product.slug;
-
-  return product.name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "D")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
 
 function getCategory(product: Product) {
   if (typeof product.category === "string") {

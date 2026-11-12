@@ -18,6 +18,11 @@ export enum LoaiMaGiamGia {
   OTHER = 'OTHER',
 }
 
+export enum HinhThucGiam {
+  TIEN_HANG = 'TIEN_HANG',
+  FREESHIP = 'FREESHIP',
+}
+
 export class CreateDiscountDto {
   @IsString()
   @IsNotEmpty()
@@ -35,6 +40,9 @@ export class CreateDiscountDto {
 
   @IsEnum(LoaiMaGiamGia)
   loai_ma: LoaiMaGiamGia;
+
+  @IsEnum(HinhThucGiam)
+  hinh_thuc_giam: HinhThucGiam;
 
   @IsNumber()
   @Min(1)

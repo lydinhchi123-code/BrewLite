@@ -25,8 +25,11 @@ export class DiscountsController {
 
   // Khách hàng: xem danh sách mã đang hoạt động
   @Get()
-  findAll() {
-    return this.discountsService.findAll();
+  @UseGuards(JwtAuthGuard)
+  findAll(@Req() req: any) {
+    return this.discountsService.findAll(
+      Number(req.user.sub),
+    );
   }
 
   // Admin: xem tất cả mã
@@ -58,6 +61,7 @@ export class DiscountsController {
       dto.ma,
       Number(req.user.sub),
       dto.tamTinh,
+      dto.phiVanChuyenGoc,
     );
   }
 

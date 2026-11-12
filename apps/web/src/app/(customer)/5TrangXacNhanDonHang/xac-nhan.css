@@ -21,7 +21,14 @@
 .confirm-eyebrow span { height: 1px; width: 31px; background: var(--caramel); }
 .confirm-hero h1 { margin: 18px 0 9px; color: var(--coffee); font-family: "Segoe UI", Arial, sans-serif;font-weight: 700;font-size: 40px; letter-spacing: -.9px; }
 .confirm-subtitle { margin: 0 auto; max-width: 580px; color: var(--muted); font-size: 13px; line-height: 1.7; }
-.confirm-summary-card, .confirm-detail-card { background: white; border: 1px solid var(--line); border-radius: 17px; }
+.confirm-summary-card, .confirm-detail-card, .confirm-delivery-card { background: white; border: 1px solid var(--line); border-radius: 17px; }
+.confirm-delivery-card { margin-top: 16px; padding: 24px; }
+.confirm-delivery-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 16px; }
+.confirm-delivery-field { display: flex; flex-direction: column; gap: 4px; }
+.confirm-delivery-field.full-width { grid-column: 1 / -1; }
+.confirm-field-label { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.confirm-field-value { color: var(--coffee); font-size: 14px; font-weight: 700; }
+.confirm-field-note { color: #7f4714; font-size: 13px; font-style: italic; background: #fff8ef; padding: 8px 12px; border-radius: 8px; border-left: 3px solid var(--caramel); }
 .confirm-summary-card { margin-top: 30px; min-height: 91px; display: flex; justify-content: center; align-items: center; padding: 17px 25px; }
 .confirm-summary-field { flex: 1; min-width: 0; display: flex; align-items: center; flex-direction: column; gap: 6px; text-align: center; }
 .confirm-summary-field > span { color: var(--muted); font-size: 10px; }
@@ -88,5 +95,6 @@
   .confirm-actions { flex-direction: column; }
   .confirm-btn { width: 100%; }
   .confirm-empty { margin-top: 45px; padding: 32px 20px; }
+  .confirm-delivery-grid { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .confirm-spinner { animation: none; } .confirm-btn { transition: none; } }

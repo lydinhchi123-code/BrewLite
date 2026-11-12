@@ -41,6 +41,9 @@
 .payment-fields input, .payment-fields select, .discount-form input { width: 100%; height: 47px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; outline: 0; color: var(--ink); background: #fffdfa; font-size: 13px; }
 .payment-fields input:focus, .payment-fields select:focus, .discount-form input:focus { border-color: var(--caramel); box-shadow: 0 0 0 3px rgba(200,135,74,.11); }
 .payment-fields input::placeholder, .discount-form input::placeholder { color: #b0a79f; }
+.payment-fields .field-invalid { border-color: var(--red); background: var(--red-pale); }
+.payment-fields .field-invalid:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(168,79,71,.12); }
+.field-error { color: var(--red); font-size: 10px; font-weight: 600; line-height: 1.35; }
 .payment-methods { display: grid; gap: 11px; }
 .payment-method { position: relative; display: flex; align-items: center; gap: 13px; padding: 15px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; transition: border-color .2s, background .2s; }
 .payment-method:hover, .payment-method.selected { border-color: var(--caramel); background: #fffaf4; }
@@ -52,6 +55,57 @@
 .method-copy small { color: var(--muted); font-size: 11px; }
 .method-check { width: 21px; height: 21px; margin-left: auto; border: 1px solid var(--beige); border-radius: 50%; color: transparent; text-align: center; line-height: 19px; font-size: 12px; font-weight: 800; }
 .payment-method.selected .method-check { border-color: var(--caramel); color: white; background: var(--caramel); }
+
+/* Thông báo đồ án mock payment */
+.payment-project-notice {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  margin: 16px 0;
+  border: 1px solid #d4b896;
+  border-radius: 12px;
+  background: #fdf6ee;
+}
+
+.payment-project-notice-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.payment-project-notice-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.payment-project-notice-body strong {
+  color: #5a3415;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.payment-project-notice-body p {
+  margin: 0;
+  color: #7a5235;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.vnpay-method-badge {
+  display: grid;
+  place-items: center;
+  min-width: 58px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: #005baa;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
 .payment-summary { position: sticky; top: 96px; }
 .summary-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 24px; }
 .summary-heading a { color: var(--caramel-dark); font-size: 11px; font-weight: 700; text-decoration: none; }
@@ -391,11 +445,109 @@
   color: #fff;
   cursor: pointer;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .discount-apply-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.discount-remove-button {
+  padding: 12px 14px;
+  border: 1px solid #e2b9b3;
+  border-radius: 8px;
+  background: #fdf2f2;
+  color: #c53030;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.discount-remove-button:hover {
+  background: #fde8e8;
+  border-color: #c53030;
+}
+
+.discount-item.ineligible {
+  opacity: 0.65;
+  background: #fafafa;
+  border-color: #eee;
+}
+
+.discount-item-badge-ineligible {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #fee2e2;
+  color: #b91c1c;
+  width: fit-content;
+}
+
+.discount-item > button:disabled {
+  background: #bbb !important;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.discount-item-active-btn {
+  background: #c53030 !important;
+  color: #fff !important;
+}
+
+.discount-item-active-btn:hover {
+  background: #9b2c2c !important;
+}
+
+.discount-modal-manual-input {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed #e2d8ce;
+}
+
+.discount-modal-manual-input input {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #d5c8be;
+  border-radius: 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.discount-modal-manual-input button {
+  padding: 0 16px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: #6f4e37;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.discount-modal-clear {
+  margin-top: 14px;
+  width: 100%;
+  padding: 11px;
+  border: 1px dashed #e2b9b3;
+  border-radius: 8px;
+  background: #fff5f5;
+  color: #c53030;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+}
+
+.discount-modal-clear:hover {
+  background: #fee2e2;
 }
 
 /* Modal mã giảm giá */

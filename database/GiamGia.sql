@@ -1,10 +1,10 @@
-BEGIN;
-
 DROP TABLE IF EXISTS lich_su_su_dung_ma_giam_gia CASCADE;
 DROP TABLE IF EXISTS magiamgia CASCADE;
 
+BEGIN;
+
 -- =====================================================
--- 1. BẢNG MÃ GIẢM GIÁ
+-- 1. TAO BANG MA GIAM GIA NEU CHUA TON TAI
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS magiamgia (
@@ -14,25 +14,27 @@ CREATE TABLE IF NOT EXISTS magiamgia (
     ten VARCHAR(150) NOT NULL,
     mo_ta TEXT,
 
-    loai_ma VARCHAR(30) NOT NULL CHECK (loai_ma IN ('NEW_CUSTOMER', 'MONTHLY', 'HOLIDAY', 'OTHER')),
-    -- Chỉ giảm tiền cố định, đơn vị VNĐ
-    so_tien_giam NUMERIC(12, 0) NOT NULL CHECK (so_tien_giam > 0),
-    -- Giá trị đơn hàng tối thiểu
-    don_hang_toi_thieu NUMERIC(12, 0) NOT NULL DEFAULT 0 CHECK (don_hang_toi_thieu >= 0),
-    -- NULL = không giới hạn số lượt sử dụng
+    loai_ma VARCHAR(30) NOT NULL
+        CHECK (loai_ma IN ('NEW_CUSTOMER', 'MONTHLY', 'HOLIDAY', 'OTHER')),
+
+    -- Voucher TIEN_HANG: so tien giam san pham.
+    -- Voucher FREESHIP: muc giam phi ship toi da.
+    so_tien_giam NUMERIC(12, 0) NOT NULL
+        CHECK (so_tien_giam > 0),
+
+    don_hang_toi_thieu NUMERIC(12, 0) NOT NULL DEFAULT 0
+        CHECK (don_hang_toi_thieu >= 0),
+
     so_luong_toi_da INTEGER,
-    -- Số lượt đã sử dụng
+
     so_luong_da_dung INTEGER NOT NULL DEFAULT 0,
 
-    -- Thời gian áp dụng
     ngay_bat_dau TIMESTAMPTZ,
     ngay_ket_thuc TIMESTAMPTZ,
 
-    -- Trạng thái: DANG_SU_DUNG, AN, HET
     trang_thai VARCHAR(20) NOT NULL DEFAULT 'DANG_SU_DUNG'
         CHECK (trang_thai IN ('DANG_SU_DUNG', 'AN', 'HET')),
 
-    -- Mỗi khách hàng chỉ được sử dụng mã này một lần
     moi_khach_mot_lan BOOLEAN NOT NULL DEFAULT FALSE,
 
     ngay_tao TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -59,7 +61,32 @@ CREATE TABLE IF NOT EXISTS magiamgia (
 
 
 -- =====================================================
--- 2. BẢNG LỊCH SỬ SỬ DỤNG MÃ GIẢM GIÁ
+-- 2. BO SUNG LOAI HINH GIAM GIA
+-- CAC VOUCHER CU MAC DINH LA TIEN_HANG
+-- =====================================================
+
+ALTER TABLE magiamgia
+ADD COLUMN IF NOT EXISTS hinh_thuc_giam VARCHAR(20)
+NOT NULL DEFAULT 'TIEN_HANG';
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'chk_magiamgia_hinh_thuc_giam'
+          AND conrelid = 'magiamgia'::regclass
+    ) THEN
+        ALTER TABLE magiamgia
+        ADD CONSTRAINT chk_magiamgia_hinh_thuc_giam
+        CHECK (hinh_thuc_giam IN ('TIEN_HANG', 'FREESHIP'));
+    END IF;
+END;
+$$;
+
+
+-- =====================================================
+-- 3. TAO BANG LICH SU SU DUNG MA GIAM GIA
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS lich_su_su_dung_ma_giam_gia (
@@ -74,21 +101,31 @@ CREATE TABLE IF NOT EXISTS lich_su_su_dung_ma_giam_gia (
     madonhang BIGINT NOT NULL
         REFERENCES donhang(madonhang) ON DELETE RESTRICT,
 
+    -- So tien thuc te duoc giam.
+    -- Voi FREESHIP: day la phi ship duoc mien giam thuc te.
     so_tien_duoc_giam NUMERIC(12, 0) NOT NULL
         CHECK (so_tien_duoc_giam > 0),
 
     ngay_su_dung TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    -- Một khách hàng không được dùng cùng mã nhiều lần
-    UNIQUE (ma_giam_gia_id, makh),
-
-    -- Một đơn hàng chỉ sử dụng một mã giảm giá
-    UNIQUE (madonhang)
+    -- Mot voucher co the duoc ghi nhieu lan tren cac don khac nhau
+    -- neu moi_khach_mot_lan = FALSE.
+    -- Mot don hang co the su dung voucher tien hang va Freeship.
+    CONSTRAINT uq_lich_su_voucher_donhang
+        UNIQUE (ma_giam_gia_id, madonhang)
 );
 
 
 -- =====================================================
--- 3. TỰ ĐỘNG KIỂM TRA KHI SỬ DỤNG MÃ
+-- 4. INDEX HO TRO KIEM TRA FREESHIP HANG THANG
+-- =====================================================
+
+CREATE INDEX IF NOT EXISTS idx_lich_su_mgg_makh_ngay
+ON lich_su_su_dung_ma_giam_gia (makh, ngay_su_dung);
+
+
+-- =====================================================
+-- 5. FUNCTION KIEM TRA SU DUNG VOUCHER
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION fn_kiem_tra_su_dung_ma_giam_gia()
@@ -96,9 +133,12 @@ RETURNS TRIGGER AS $$
 DECLARE
     v_ma magiamgia%ROWTYPE;
     v_so_don_da_mua INTEGER;
+    v_da_dung_voucher BOOLEAN;
+    v_da_dung_freeship_thang BOOLEAN;
 BEGIN
-    -- Khóa dòng mã giảm giá để tránh hai giao dịch
-    -- cùng sử dụng vượt quá số lượng còn lại.
+
+    -- Khoa voucher de tranh hai giao dich
+    -- cung su dung vuot qua so luong con lai.
     SELECT *
     INTO v_ma
     FROM magiamgia
@@ -106,32 +146,38 @@ BEGIN
     FOR UPDATE;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Mã giảm giá không tồn tại';
+        RAISE EXCEPTION 'Ma giam gia khong ton tai';
     END IF;
 
-    -- Kiểm tra trạng thái
+
+    -- Kiem tra trang thai
     IF v_ma.trang_thai <> 'DANG_SU_DUNG' THEN
-        RAISE EXCEPTION 'Mã giảm giá hiện không khả dụng';
+        RAISE EXCEPTION 'Ma giam gia hien khong kha dung';
     END IF;
 
-    -- Kiểm tra thời gian
+
+    -- Kiem tra thoi gian bat dau
     IF v_ma.ngay_bat_dau IS NOT NULL
        AND CURRENT_TIMESTAMP < v_ma.ngay_bat_dau THEN
-        RAISE EXCEPTION 'Mã giảm giá chưa đến thời gian áp dụng';
+        RAISE EXCEPTION 'Ma giam gia chua den thoi gian ap dung';
     END IF;
 
+
+    -- Kiem tra thoi gian ket thuc
     IF v_ma.ngay_ket_thuc IS NOT NULL
        AND CURRENT_TIMESTAMP > v_ma.ngay_ket_thuc THEN
-        RAISE EXCEPTION 'Mã giảm giá đã hết hạn';
+        RAISE EXCEPTION 'Ma giam gia da het han';
     END IF;
 
-    -- Kiểm tra số lượng mã còn lại
+
+    -- Kiem tra so luong ma con lai
     IF v_ma.so_luong_toi_da IS NOT NULL
        AND v_ma.so_luong_da_dung >= v_ma.so_luong_toi_da THEN
-        RAISE EXCEPTION 'Mã giảm giá đã hết số lượng';
+        RAISE EXCEPTION 'Ma giam gia da het so luong';
     END IF;
 
-    -- Kiểm tra khách hàng mới
+
+    -- Kiem tra khach hang moi
     IF v_ma.loai_ma = 'NEW_CUSTOMER' THEN
 
         SELECT COUNT(*)
@@ -139,20 +185,80 @@ BEGIN
         FROM donhang
         WHERE makh = NEW.makh
           AND madonhang <> NEW.madonhang
-          AND trangthai IN ('PAID', 'PREPARING', 'READY', 'COMPLETED');
+          AND trangthai IN (
+              'PAID',
+              'PREPARING',
+              'READY',
+              'COMPLETED'
+          );
 
         IF v_so_don_da_mua > 0 THEN
-            RAISE EXCEPTION 'Mã này chỉ dành cho khách hàng mới';
+            RAISE EXCEPTION 'Ma nay chi danh cho khach hang moi';
         END IF;
 
     END IF;
 
-    -- Tăng số lượt sử dụng
+
+    -- Kiem tra moi khach chi duoc dung cung mot voucher mot lan
+    -- khi moi_khach_mot_lan = TRUE.
+    IF v_ma.moi_khach_mot_lan THEN
+
+        SELECT EXISTS (
+            SELECT 1
+            FROM lich_su_su_dung_ma_giam_gia ls
+            WHERE ls.ma_giam_gia_id = NEW.ma_giam_gia_id
+              AND ls.makh = NEW.makh
+        )
+        INTO v_da_dung_voucher;
+
+        IF v_da_dung_voucher THEN
+            RAISE EXCEPTION 'Ban da su dung ma giam gia nay';
+        END IF;
+
+    END IF;
+
+
+    -- Kiem tra Freeship don dau tien trong thang.
+    -- Moi khach chi duoc dung mot voucher Freeship
+    -- thuoc nhom MONTHLY trong mot thang.
+    IF v_ma.loai_ma = 'MONTHLY'
+       AND v_ma.hinh_thuc_giam = 'FREESHIP' THEN
+
+        -- Khoa theo khach hang de tranh hai giao dich
+        -- dung hai voucher thang khac nhau cung luc.
+        PERFORM pg_advisory_xact_lock(NEW.makh);
+
+        SELECT EXISTS (
+            SELECT 1
+            FROM lich_su_su_dung_ma_giam_gia ls
+            JOIN magiamgia mg
+                ON mg.id = ls.ma_giam_gia_id
+            WHERE ls.makh = NEW.makh
+              AND mg.loai_ma = 'MONTHLY'
+              AND mg.hinh_thuc_giam = 'FREESHIP'
+              AND ls.ngay_su_dung >= date_trunc('month', CURRENT_TIMESTAMP)
+              AND ls.ngay_su_dung < (
+                  date_trunc('month', CURRENT_TIMESTAMP)
+                  + INTERVAL '1 month'
+              )
+        )
+        INTO v_da_dung_freeship_thang;
+
+        IF v_da_dung_freeship_thang THEN
+            RAISE EXCEPTION
+                'Ban da su dung voucher Freeship thang nay';
+        END IF;
+
+    END IF;
+
+
+    -- Tang so luot su dung.
+    -- Chi tang khi lich su voucher duoc INSERT.
+    -- Khong tang them lan nua trong OrdersService.
     UPDATE magiamgia
     SET
         so_luong_da_dung = so_luong_da_dung + 1,
 
-        -- Tự chuyển sang HET khi dùng hết số lượng
         trang_thai = CASE
             WHEN so_luong_toi_da IS NOT NULL
                  AND so_luong_da_dung + 1 >= so_luong_toi_da
@@ -163,9 +269,14 @@ BEGIN
     WHERE id = NEW.ma_giam_gia_id;
 
     RETURN NEW;
+
 END;
 $$ LANGUAGE plpgsql;
 
+
+-- =====================================================
+-- 6. TAO TRIGGER KIEM TRA SU DUNG VOUCHER
+-- =====================================================
 
 DROP TRIGGER IF EXISTS trg_kiem_tra_su_dung_ma_giam_gia
 ON lich_su_su_dung_ma_giam_gia;
@@ -177,52 +288,213 @@ EXECUTE FUNCTION fn_kiem_tra_su_dung_ma_giam_gia();
 
 
 -- =====================================================
--- 4. DỮ LIỆU MÃ GIẢM GIÁ MẪU
+-- 7. CAC VOUCHER CU
+-- GIU NGUYEN CAC GIA TRI DA CO
 -- =====================================================
 
-INSERT INTO magiamgia (ma,ten, mo_ta, loai_ma, so_tien_giam, 
-    don_hang_toi_thieu, so_luong_toi_da, moi_khach_mot_lan, trang_thai)
-VALUES ('KHACHMOI10K', 'Ưu đãi khách hàng mới',
+INSERT INTO magiamgia (
+    ma, ten, mo_ta, loai_ma, so_tien_giam,
+    don_hang_toi_thieu, so_luong_toi_da,
+    moi_khach_mot_lan, trang_thai
+)
+VALUES (
+    'KHACHMOI10K',
+    'Ưu đãi khách hàng mới',
     'Giảm 10.000đ cho đơn hàng đầu tiên của khách hàng.',
-    'NEW_CUSTOMER', 10000, 0, NULL, TRUE, 'DANG_SU_DUNG'
+    'NEW_CUSTOMER',
+    10000, 0, NULL, TRUE, 'DANG_SU_DUNG'
 )
 ON CONFLICT (ma) DO NOTHING;
 
 
 INSERT INTO magiamgia (
-    ma, ten, mo_ta, loai_ma, so_tien_giam, don_hang_toi_thieu, so_luong_toi_da,
-    moi_khach_mot_lan, ngay_bat_dau, ngay_ket_thuc, trang_thai)
-VALUES 
-('THANG1-10K','Ưu đãi tháng 1','Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY',10000, 99000, 100, TRUE,'2026-1-01 00:00:00+07','2026-1-31 23:59:59+07','DANG_SU_DUNG'),
-('THANG2-10K','Ưu đãi tháng 2','Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY',10000, 99000, 100, TRUE,'2026-2-01 00:00:00+07','2026-2-28 23:59:59+07','DANG_SU_DUNG'),
-('THANG3-10K','Ưu đãi tháng 3','Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY',10000, 99000, 100, TRUE,'2026-3-01 00:00:00+07','2026-3-31 23:59:59+07','DANG_SU_DUNG'),
-('THANG4-10K','Ưu đãi tháng 4','Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY',10000, 99000, 100, TRUE,'2026-4-01 00:00:00+07','2026-4-30 23:59:59+07','DANG_SU_DUNG'),
-('THANG5-10K','Ưu đãi tháng 5','Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY',10000, 99000, 100, TRUE,'2026-5-01 00:00:00+07','2026-5-31 23:59:59+07','DANG_SU_DUNG'),
-('THANG6-10K','Ưu đãi tháng 6','Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY',10000, 99000, 100, TRUE,'2026-6-01 00:00:00+07','2026-6-30 23:59:59+07','DANG_SU_DUNG'),
-('THANG7-10K','Ưu đãi tháng 7','Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY',10000, 99000, 100, TRUE,'2026-7-01 00:00:00+07','2026-7-31 23:59:59+07','DANG_SU_DUNG'),
-('THANG8-10K','Ưu đãi tháng 8','Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY',10000, 99000, 100, TRUE,'2026-8-01 00:00:00+07','2026-8-31 23:59:59+07','DANG_SU_DUNG'),
-('THANG9-10K','Ưu đãi tháng 9','Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY',10000, 99000, 100, TRUE,'2026-9-01 00:00:00+07','2026-9-30 23:59:59+07','DANG_SU_DUNG'),
-('THANG10-10K','Ưu đãi tháng 10','Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY',10000, 99000, 100, TRUE,'2026-10-01 00:00:00+07','2026-10-31 23:59:59+07','DANG_SU_DUNG'),
-('THANG11-10K','Ưu đãi tháng 11','Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY',10000, 99000, 100, TRUE,'2026-11-01 00:00:00+07','2026-11-30 23:59:59+07','DANG_SU_DUNG'),
-('THANG12-10K','Ưu đãi tháng 12','Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY',10000, 99000, 100, TRUE,'2026-12-01 00:00:00+07','2026-12-31 23:59:59+07','DANG_SU_DUNG')
+    ma, ten, mo_ta, loai_ma, so_tien_giam,
+    don_hang_toi_thieu, so_luong_toi_da,
+    moi_khach_mot_lan, ngay_bat_dau,
+    ngay_ket_thuc, trang_thai
+)
+VALUES
+('THANG1-10K', 'Ưu đãi tháng 1', 'Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY', 10000, 99000, 100, TRUE, '2026-01-01 00:00:00+07', '2026-01-31 23:59:59+07', 'DANG_SU_DUNG'),
+('THANG2-10K', 'Ưu đãi tháng 2', 'Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY', 10000, 99000, 100, TRUE, '2026-02-01 00:00:00+07', '2026-02-28 23:59:59+07', 'DANG_SU_DUNG'),
+('THANG3-10K', 'Ưu đãi tháng 3', 'Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY', 10000, 99000, 100, TRUE, '2026-03-01 00:00:00+07', '2026-03-31 23:59:59+07', 'DANG_SU_DUNG'),
+('THANG4-10K', 'Ưu đãi tháng 4', 'Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY', 10000, 99000, 100, TRUE, '2026-04-01 00:00:00+07', '2026-04-30 23:59:59+07', 'DANG_SU_DUNG'),
+('THANG5-10K', 'Ưu đãi tháng 5', 'Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY', 10000, 99000, 100, TRUE, '2026-05-01 00:00:00+07', '2026-05-31 23:59:59+07', 'DANG_SU_DUNG'),
+('THANG6-10K', 'Ưu đãi tháng 6', 'Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY', 10000, 99000, 100, TRUE, '2026-06-01 00:00:00+07', '2026-06-30 23:59:59+07', 'DANG_SU_DUNG'),
+('THANG7-10K', 'Ưu đãi tháng 7', 'Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY', 10000, 99000, 100, TRUE, '2026-07-01 00:00:00+07', '2026-07-31 23:59:59+07', 'DANG_SU_DUNG'),
+('THANG8-10K', 'Ưu đãi tháng 8', 'Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY', 10000, 99000, 100, TRUE, '2026-08-01 00:00:00+07', '2026-08-31 23:59:59+07', 'DANG_SU_DUNG'),
+('THANG9-10K', 'Ưu đãi tháng 9', 'Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY', 10000, 99000, 100, TRUE, '2026-09-01 00:00:00+07', '2026-09-30 23:59:59+07', 'DANG_SU_DUNG'),
+('THANG10-10K', 'Ưu đãi tháng 10', 'Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY', 10000, 99000, 100, TRUE, '2026-10-01 00:00:00+07', '2026-10-31 23:59:59+07', 'DANG_SU_DUNG'),
+('THANG11-10K', 'Ưu đãi tháng 11', 'Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY', 10000, 99000, 100, TRUE, '2026-11-01 00:00:00+07', '2026-11-30 23:59:59+07', 'DANG_SU_DUNG'),
+('THANG12-10K', 'Ưu đãi tháng 12', 'Giảm 10.000đ cho đơn hàng từ 99.000đ.', 'MONTHLY', 10000, 99000, 100, TRUE, '2026-12-01 00:00:00+07', '2026-12-31 23:59:59+07', 'DANG_SU_DUNG')
 ON CONFLICT (ma) DO NOTHING;
 
+
+-- =====================================================
+-- 8. VOUCHER FREESHIP DON DAU TIEN TRONG THANG
+-- Moi khach chi dung duoc mot voucher MONTHLY FREESHIP/thang
+-- =====================================================
+
 INSERT INTO magiamgia (
-    ma, ten, mo_ta, loai_ma,
+    ma, ten, mo_ta, loai_ma, hinh_thuc_giam,
     so_tien_giam, don_hang_toi_thieu,
     so_luong_toi_da, moi_khach_mot_lan,
     ngay_bat_dau, ngay_ket_thuc, trang_thai
 )
+VALUES
+('FS-THANG01-2026', 'Freeship tháng 1', 'Miễn phí vận chuyển cho đơn hàng đầu tiên trong tháng 1/2026.', 'MONTHLY', 'FREESHIP', 20000, 0, 200, TRUE, '2026-01-01 00:00:00+07', '2026-01-31 23:59:59+07', 'DANG_SU_DUNG'),
+('FS-THANG02-2026', 'Freeship tháng 2', 'Miễn phí vận chuyển cho đơn hàng đầu tiên trong tháng 2/2026.', 'MONTHLY', 'FREESHIP', 20000, 0, 200, TRUE, '2026-02-01 00:00:00+07', '2026-02-28 23:59:59+07', 'DANG_SU_DUNG'),
+('FS-THANG03-2026', 'Freeship tháng 3', 'Miễn phí vận chuyển cho đơn hàng đầu tiên trong tháng 3/2026.', 'MONTHLY', 'FREESHIP', 20000, 0, 200, TRUE, '2026-03-01 00:00:00+07', '2026-03-31 23:59:59+07', 'DANG_SU_DUNG'),
+('FS-THANG04-2026', 'Freeship tháng 4', 'Miễn phí vận chuyển cho đơn hàng đầu tiên trong tháng 4/2026.', 'MONTHLY', 'FREESHIP', 20000, 0, 200, TRUE, '2026-04-01 00:00:00+07', '2026-04-30 23:59:59+07', 'DANG_SU_DUNG'),
+('FS-THANG05-2026', 'Freeship tháng 5', 'Miễn phí vận chuyển cho đơn hàng đầu tiên trong tháng 5/2026.', 'MONTHLY', 'FREESHIP', 20000, 0, 200, TRUE, '2026-05-01 00:00:00+07', '2026-05-31 23:59:59+07', 'DANG_SU_DUNG'),
+('FS-THANG06-2026', 'Freeship tháng 6', 'Miễn phí vận chuyển cho đơn hàng đầu tiên trong tháng 6/2026.', 'MONTHLY', 'FREESHIP', 20000, 0, 200, TRUE, '2026-06-01 00:00:00+07', '2026-06-30 23:59:59+07', 'DANG_SU_DUNG'),
+('FS-THANG07-2026', 'Freeship tháng 7', 'Miễn phí vận chuyển cho đơn hàng đầu tiên trong tháng 7/2026.', 'MONTHLY', 'FREESHIP', 20000, 0, 200, TRUE, '2026-07-01 00:00:00+07', '2026-07-31 23:59:59+07', 'DANG_SU_DUNG'),
+('FS-THANG08-2026', 'Freeship tháng 8', 'Miễn phí vận chuyển cho đơn hàng đầu tiên trong tháng 8/2026.', 'MONTHLY', 'FREESHIP', 20000, 0, 200, TRUE, '2026-08-01 00:00:00+07', '2026-08-31 23:59:59+07', 'DANG_SU_DUNG'),
+('FS-THANG09-2026', 'Freeship tháng 9', 'Miễn phí vận chuyển cho đơn hàng đầu tiên trong tháng 9/2026.', 'MONTHLY', 'FREESHIP', 20000, 0, 200, TRUE, '2026-09-01 00:00:00+07', '2026-09-30 23:59:59+07', 'DANG_SU_DUNG'),
+('FS-THANG10-2026', 'Freeship tháng 10', 'Miễn phí vận chuyển cho đơn hàng đầu tiên trong tháng 10/2026.', 'MONTHLY', 'FREESHIP', 20000, 0, 200, TRUE, '2026-10-01 00:00:00+07', '2026-10-31 23:59:59+07', 'DANG_SU_DUNG'),
+('FS-THANG11-2026', 'Freeship tháng 11', 'Miễn phí vận chuyển cho đơn hàng đầu tiên trong tháng 11/2026.', 'MONTHLY', 'FREESHIP', 20000, 0, 200, TRUE, '2026-11-01 00:00:00+07', '2026-11-30 23:59:59+07', 'DANG_SU_DUNG'),
+('FS-THANG12-2026', 'Freeship tháng 12', 'Miễn phí vận chuyển cho đơn hàng đầu tiên trong tháng 12/2026.', 'MONTHLY', 'FREESHIP', 20000, 0, 200, TRUE, '2026-12-01 00:00:00+07', '2026-12-31 23:59:59+07', 'DANG_SU_DUNG')
+ON CONFLICT (ma) DO NOTHING;
+
+
+-- =====================================================
+-- 9. VOUCHER FREESHIP KHACH HANG MOI
+-- =====================================================
+
+INSERT INTO magiamgia (
+    ma, ten, mo_ta, loai_ma, hinh_thuc_giam,
+    so_tien_giam, don_hang_toi_thieu,
+    so_luong_toi_da, moi_khach_mot_lan,
+    trang_thai
+)
 VALUES (
-    'TEST-10K','Mã kiểm tra tồn kho',
+    'FS-KHACHMOI',
+    'Freeship khách hàng mới',
+    'Miễn phí vận chuyển cho đơn hàng đầu tiên của khách hàng mới.',
+    'NEW_CUSTOMER',
+    'FREESHIP',
+    20000,
+    0,
+    NULL,
+    TRUE,
+    'DANG_SU_DUNG'
+)
+ON CONFLICT (ma) DO NOTHING;
+
+
+-- =====================================================
+-- 10. VOUCHER FREESHIP CAC NGAY LE LON NAM 2026
+-- =====================================================
+
+INSERT INTO magiamgia (
+    ma, ten, mo_ta, loai_ma, hinh_thuc_giam,
+    so_tien_giam, don_hang_toi_thieu,
+    so_luong_toi_da, moi_khach_mot_lan,
+    ngay_bat_dau, ngay_ket_thuc, trang_thai
+)
+VALUES
+(
+    'FS-TETDUONG-2026',
+    'Freeship Tết Dương lịch',
+    'Miễn phí vận chuyển nhân dịp Tết Dương lịch 2026.',
+    'HOLIDAY', 'FREESHIP', 20000, 0, 300, TRUE,
+    '2026-01-01 00:00:00+07',
+    '2026-01-02 23:59:59+07',
+    'DANG_SU_DUNG'
+),
+(
+    'FS-TETNGUYENDAN-2026',
+    'Freeship Tết Nguyên Đán',
+    'Miễn phí vận chuyển nhân dịp Tết Nguyên Đán 2026.',
+    'HOLIDAY', 'FREESHIP', 20000, 0, 500, TRUE,
+    '2026-02-16 00:00:00+07',
+    '2026-02-20 23:59:59+07',
+    'DANG_SU_DUNG'
+),
+(
+    'FS-GIOTO-2026',
+    'Freeship Giỗ Tổ Hùng Vương',
+    'Miễn phí vận chuyển nhân dịp Giỗ Tổ Hùng Vương 2026.',
+    'HOLIDAY', 'FREESHIP', 20000, 0, 300, TRUE,
+    '2026-04-25 00:00:00+07',
+    '2026-04-27 23:59:59+07',
+    'DANG_SU_DUNG'
+),
+(
+    'FS-304-2026',
+    'Freeship ngày Giải phóng miền Nam',
+    'Miễn phí vận chuyển nhân dịp 30/4 và 1/5.',
+    'HOLIDAY', 'FREESHIP', 20000, 0, 300, TRUE,
+    '2026-04-29 00:00:00+07',
+    '2026-05-02 23:59:59+07',
+    'DANG_SU_DUNG'
+),
+(
+    'FS-QUOCKHANH-2026',
+    'Freeship Quốc khánh',
+    'Miễn phí vận chuyển nhân dịp Quốc khánh 2/9.',
+    'HOLIDAY', 'FREESHIP', 20000, 0, 300, TRUE,
+    '2026-09-01 00:00:00+07',
+    '2026-09-03 23:59:59+07',
+    'DANG_SU_DUNG'
+),
+(
+    'FS-TRUNGTHU-2026',
+    'Freeship Tết Trung Thu',
+    'Miễn phí vận chuyển nhân dịp Tết Trung Thu 2026.',
+    'HOLIDAY', 'FREESHIP', 20000, 0, 300, TRUE,
+    '2026-09-24 00:00:00+07',
+    '2026-09-26 23:59:59+07',
+    'DANG_SU_DUNG'
+),
+(
+    'FS-NOEL-2026',
+    'Freeship Giáng sinh',
+    'Miễn phí vận chuyển nhân dịp Giáng sinh 2026.',
+    'HOLIDAY', 'FREESHIP', 20000, 0, 300, TRUE,
+    '2026-12-24 00:00:00+07',
+    '2026-12-26 23:59:59+07',
+    'DANG_SU_DUNG'
+)
+ON CONFLICT (ma) DO NOTHING;
+
+
+-- =====================================================
+-- 11. VOUCHER KIEM TRA TON KHO CU
+-- =====================================================
+
+INSERT INTO magiamgia (
+    ma, ten, mo_ta, loai_ma, so_tien_giam,
+    don_hang_toi_thieu, so_luong_toi_da,
+    moi_khach_mot_lan, ngay_bat_dau,
+    ngay_ket_thuc, trang_thai
+)
+VALUES (
+    'TEST-10K',
+    'Mã kiểm tra tồn kho',
     'Mã dùng để kiểm tra số lượng phát hành.',
-    'MONTHLY', 10000, 0, 2, FALSE,
+    'MONTHLY',
+    10000,
+    0,
+    2,
+    FALSE,
     CURRENT_TIMESTAMP - INTERVAL '1 day',
     CURRENT_TIMESTAMP + INTERVAL '7 days',
     'DANG_SU_DUNG'
-);
+)
+ON CONFLICT (ma) DO NOTHING;
+
 
 COMMIT;
 
-SELECT * FROM magiamgia;
-SELECT * FROM lich_su_su_dung_ma_giam_gia
+
+-- =====================================================
+-- 12. KIEM TRA DU LIEU
+-- =====================================================
+
+SELECT *
+FROM magiamgia
+ORDER BY id;
+
+SELECT *
+FROM lich_su_su_dung_ma_giam_gia
+ORDER BY ngay_su_dung DESC;
