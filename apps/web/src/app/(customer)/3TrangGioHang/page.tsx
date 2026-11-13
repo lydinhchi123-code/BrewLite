@@ -3,43 +3,13 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import {
+  EMPTY_BREWLITE_CART,
+  getCartStorageKey,
+  useCartStore,
+  type BrewLiteCartItem as CartItem,
+} from "@/store/useCartStore";
 import "./TrangGioHang.css";
-
-type SizeOption = {
-  code: string;
-  name: string;
-  price: number;
-};
-
-type ToppingOption = {
-  id?: number;
-  name: string;
-  price: number;
-};
-
-type Product = {
-  id: number;
-  name: string;
-  image?: string;
-  price: number;
-  category?: string;
-  categorySlug?: string;
-  description?: string;
-  sizes?: SizeOption[];
-  toppings?: ToppingOption[];
-};
-
-type CartItem = {
-  key: string;
-  product: Product;
-  size?: string;
-  sizeName?: string;
-  sugar?: string | null;
-  ice?: string | null;
-  toppings?: ToppingOption[];
-  qty: number;
-  unitPrice: number;
-};
 
 type PendingCheckout = {
   orderId: string;
@@ -135,7 +105,10 @@ function isCake(product: Product) {
 export default function CartPage() {
   const router = useRouter();
 
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [cartStorageKey, setCartStorageKey] = useState("brewlite_cart_guest");
+  const items = useCartStore(
+    (state) => state.carts[cartStorageKey] ?? EMPTY_BREWLITE_CART,
+  );
   const [loaded, setLoaded] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -172,21 +145,18 @@ export default function CartPage() {
 
         // Xác định giỏ hàng của tài khoản hiện tại
         const cartKey = getCartStorageKey();
+        setCartStorageKey(cartKey);
         const isLoggedIn = Boolean(savedUser);
 
-        // Lấy giỏ hàng hiện tại
-        const currentCartRaw = localStorage.getItem(cartKey);
-        const currentCart: CartItem[] = currentCartRaw
-          ? JSON.parse(currentCartRaw)
-          : [];
+        // Zustand quản lý state; localStorage giữ dữ liệu qua lần tải trang.
+        const currentCart = useCartStore.getState().loadCart(cartKey);
 
         // Nếu vừa đăng nhập từ tài khoản khách:
         // gộp giỏ khách vào giỏ của tài khoản vừa đăng nhập
         if (isLoggedIn) {
-          const guestCartRaw = localStorage.getItem("brewlite_cart_guest");
-          const guestCart: CartItem[] = guestCartRaw
-            ? JSON.parse(guestCartRaw)
-            : [];
+          const guestCart = useCartStore
+            .getState()
+            .loadCart("brewlite_cart_guest");
 
           if (Array.isArray(guestCart) && guestCart.length > 0) {
             const mergedCart = [...currentCart];
@@ -207,21 +177,11 @@ export default function CartPage() {
               }
             });
 
-            localStorage.setItem(
-              cartKey,
-              JSON.stringify(mergedCart)
-            );
+            useCartStore.getState().setCart(cartKey, mergedCart);
 
             // Đã chuyển giỏ khách sang tài khoản
-            localStorage.removeItem("brewlite_cart_guest");
-
-            setItems(mergedCart);
-          } else {
-            setItems(currentCart);
+            useCartStore.getState().clearCart("brewlite_cart_guest");
           }
-        } else {
-          // Đang ở chế độ khách
-          setItems(currentCart);
         }
 
         // Không sử dụng key giỏ hàng dùng chung cũ nữa
@@ -265,7 +225,7 @@ export default function CartPage() {
         }
       } catch (error) {
         console.error("Không thể đọc giỏ hàng:", error);
-        setItems([]);
+        useCartStore.getState().clearCart(getCartStorageKey());
       } finally {
         setLoaded(true);
         setSubmitting(false);
@@ -288,12 +248,8 @@ export default function CartPage() {
   }, []);
 
   function saveCart(newItems: CartItem[]) {
-    setItems(newItems);
-
     try {
-      const cartKey = getCartStorageKey();
-
-      localStorage.setItem(cartKey, JSON.stringify(newItems));
+      useCartStore.getState().setCart(cartStorageKey, newItems);
 
       window.dispatchEvent(new Event("brewlite-cart-updated"));
     } catch (error) {
@@ -305,15 +261,13 @@ export default function CartPage() {
   function updateQuantity(key: string, qty: number) {
     if (qty < 1) return;
 
-    saveCart(
-      items.map((item) =>
-        item.key === key ? { ...item, qty } : item
-      )
-    );
+    useCartStore.getState().updateCartQuantity(cartStorageKey, key, qty);
+    window.dispatchEvent(new Event("brewlite-cart-updated"));
   }
 
   function removeItem(key: string) {
-    saveCart(items.filter((item) => item.key !== key));
+    useCartStore.getState().removeCartItem(cartStorageKey, key);
+    window.dispatchEvent(new Event("brewlite-cart-updated"));
 
     if (editingKey === key) {
       setEditingKey(null);
@@ -1042,23 +996,4 @@ export default function CartPage() {
       )}
     </main>
   );
-}
-
-function getCartStorageKey() {
-  const savedUser = localStorage.getItem("brewlite_user");
-
-  if (savedUser) {
-    try {
-      const user = JSON.parse(savedUser);
-      const makh = Number(user?.makh);
-
-      if (Number.isInteger(makh) && makh > 0) {
-        return `brewlite_cart_${makh}`;
-      }
-    } catch {
-      // Sử dụng giỏ hàng khách nếu tài khoản không hợp lệ.
-    }
-  }
-
-  return "brewlite_cart_guest";
 }

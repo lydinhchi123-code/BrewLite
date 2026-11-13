@@ -159,11 +159,13 @@ jobs:
               -p 3000:3001 \
               -e PORT=3001 \
               -e DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}" \
+              -e JWT_SECRET="${{ secrets.PROD_JWT_SECRET }}" \
+              -e FRONTEND_URL="https://brew-lite-murex.vercel.app" \
               "$API_IMAGE:$IMAGE_TAG"
 
       - name: Smoke Test (Health Check)
         run: |
-          URL="https://${{ secrets.PROD_HOST }}/api/health"
+          URL="https://${{ secrets.PROD_HOST }}/health"
           STATUS_CODE="000"
 
           for i in $(seq 1 12); do
@@ -202,6 +204,8 @@ jobs:
                   -p 3000:3001 \
                   -e PORT=3001 \
                   -e DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}" \
+                  -e JWT_SECRET="${{ secrets.PROD_JWT_SECRET }}" \
+                  -e FRONTEND_URL="https://brew-lite-murex.vercel.app" \
                   "$PREV_IMAGE"
                 echo "Rollback execution completed."
               else
