@@ -325,7 +325,7 @@ export default function CartPage() {
 
     if (submitting || items.length === 0) return;
 
-    const token = sessionStorage.getItem("brewlite_admin_accessToken");
+    const token = localStorage.getItem("brewlite_accessToken");
     const savedUser = localStorage.getItem("brewlite_user");
 
     if (!token) {
