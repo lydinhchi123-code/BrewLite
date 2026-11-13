@@ -1,0 +1,45 @@
+databases:
+  - name: brewlite-db
+    databaseName: brewlite
+    user: brewlite
+    plan: free
+    region: singapore
+    ipAllowList: []
+
+services:
+  - type: web
+    name: brewlite-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: apps/api
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: brewlite-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: http://localhost:3000 # Replace with the Render frontend URL after creation.
+
+  - type: web
+    name: brewlite-web
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: apps/web
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: http://localhost:3001 # Replace with the Render API URL after creation.

@@ -4,9 +4,7 @@ BrewLite is a drink ordering web application. The frontend is built with Next.js
 
 ## Production
 
-- Frontend: <https://brew-lite-khaki.vercel.app>
-- API: not configured yet. The production frontend currently needs a public API URL; see [deployment guide](docs/deployment.md).
-- API health check: `GET /health` after the API is deployed.
+The production target is Render. Production URLs will be recorded in [the deployment guide](docs/deployment.md) after the Render services are created and verified. The API health check is `GET /health`.
 
 ## Requirements
 
@@ -100,12 +98,10 @@ The GitHub Actions workflow runs lint, unit tests, and builds for both apps on p
 
 ## Deploy and rollback
 
-The frontend is deployed from Vercel. The API workflow builds a Docker image, pushes it to Docker Hub, deploys it to a server over SSH, checks `/health`, and attempts to restore the previous image if the health check fails. Deployment configuration and required GitHub settings are documented in [docs/deployment.md](docs/deployment.md).
-
-The production API host, database, and their URLs must be configured before the frontend can use the production API. The current Vercel deployment must not use `localhost` as its API URL.
+The frontend, API, and private PostgreSQL database are configured as Render resources in `render.yaml`. GitHub Actions validates changes; Render deploys after the linked branch's CI checks pass. Follow [docs/deployment.md](docs/deployment.md) to create the Blueprint, set the production URLs, initialize the database, and roll back a deployment.
 
 ## Security
 
 - Keep production database access limited to the API host; do not expose PostgreSQL directly to the public internet.
-- Store `DATABASE_URL`, SSH credentials, and registry credentials in the hosting provider or GitHub Actions secrets.
+- Store `DATABASE_URL` and application secrets in Render Environment; do not copy them to GitHub Actions or the repository.
 - Do not place production secrets in this repository, `.env.example`, or CI output.

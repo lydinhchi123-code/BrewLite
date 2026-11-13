@@ -20,27 +20,21 @@ jobs:
     defaults:
       run:
         working-directory: apps/api
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: apps/api/package-lock.json
-
       - name: Install dependencies
         run: npm ci
-
       - name: Lint
         run: npm run lint
-
-      - name: Unit Test
+      - name: Unit tests
         run: npm test -- --runInBand
-
       - name: Build
         run: npm run build
 
@@ -50,167 +44,20 @@ jobs:
     defaults:
       run:
         working-directory: apps/web
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
-
       - name: Install dependencies
         run: npm ci
-
       - name: Lint
         run: npm run lint
-
-      - name: Unit Test
+      - name: Unit tests
         run: npm run test
-
       - name: Build
         run: npm run build
-
-  build-and-push:
-    name: Build & Push Docker Images
-    needs: [backend, frontend]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Extract Metadata (Backend)
-        id: meta-api
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKER_USERNAME }}/brewlite-api
-          tags: |
-            type=sha,format=long,prefix=
-            type=raw,value=latest
-
-      - name: Build and Push Backend image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: apps/api/Dockerfile
-          push: true
-          tags: ${{ steps.meta-api.outputs.tags }}
-          labels: ${{ steps.meta-api.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  deploy-and-verify:
-    name: Deploy & Verify Production
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.PROD_HOST }}
-          username: ${{ secrets.PROD_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
-          script: |
-            set -e
-
-            IMAGE_TAG="${{ github.sha }}"
-            API_IMAGE="${{ secrets.DOCKER_USERNAME }}/brewlite-api"
-
-            # Xoa file cu de rollback khong dung nham tag cua lan deploy truoc
-            rm -f /tmp/brewlite_prev_tag.txt
-
-            echo "1. Pulling image..."
-            docker pull "$API_IMAGE:$IMAGE_TAG"
-
-            echo "2. Saving current image tag for potential Rollback..."
-            OLD_TAG=$(docker inspect --format='{{.Config.Image}}' brewlite-api-container 2>/dev/null || echo "")
-            echo "$OLD_TAG" > /tmp/brewlite_prev_tag.txt
-
-            # Yêu cầu 5: Migration (CHUA TRIEN KHAI)
-            # Du an hien chua co co che migration tu dong, schema duoc cap nhat thu cong.
-            # Khi du an bo sung migration, them buoc sau TRUOC khi thay container chinh:
-            #   a. Backup DB production (vi du pg_dump)
-            #   b. Chay migration bang container tam, neu loi thi set -e dung pipeline:
-            #        docker run --rm -e DATABASE_URL="..." "$API_IMAGE:$IMAGE_TAG" <lenh migration>
-            #   c. Viet migration tuong thich nguoc de rollback code van chay duoc voi schema moi
-
-            echo "3. Deploying new container into Production..."
-            docker stop brewlite-api-container || true
-            docker rm brewlite-api-container || true
-            docker run -d \
-              --name brewlite-api-container \
-              --restart always \
-              -p 3000:3001 \
-              -e PORT=3001 \
-              -e DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}" \
-              -e JWT_SECRET="${{ secrets.PROD_JWT_SECRET }}" \
-              -e FRONTEND_URL="https://brew-lite-khaki.vercel.app" \
-              "$API_IMAGE:$IMAGE_TAG"
-
-      - name: Smoke Test (Health Check)
-        run: |
-          URL="https://${{ secrets.PROD_HOST }}/health"
-          STATUS_CODE="000"
-
-          for i in $(seq 1 12); do
-            echo "Attempt $i/12: checking $URL"
-            STATUS_CODE=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 "$URL" || true)
-            if [ "$STATUS_CODE" = "200" ]; then
-              echo "Smoke test PASSED with status code 200!"
-              exit 0
-            fi
-            echo "Got status $STATUS_CODE, retrying in 5s..."
-            sleep 5
-          done
-
-          echo "Smoke test FAILED with last status code $STATUS_CODE!"
-          exit 1
-
-      - name: Automatic Rollback on Failure
-        if: failure()
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.PROD_HOST }}
-          username: ${{ secrets.PROD_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
-          script: |
-            echo "!!! DEPLOYMENT/SMOKE TEST FAILED - INITIATING AUTOMATIC ROLLBACK !!!"
-
-            if [ -f /tmp/brewlite_prev_tag.txt ]; then
-              PREV_IMAGE=$(cat /tmp/brewlite_prev_tag.txt)
-              if [ -n "$PREV_IMAGE" ]; then
-                echo "Rolling back to stable image: $PREV_IMAGE"
-                docker stop brewlite-api-container || true
-                docker rm brewlite-api-container || true
-                docker run -d \
-                  --name brewlite-api-container \
-                  --restart always \
-                  -p 3000:3001 \
-                  -e PORT=3001 \
-                  -e DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}" \
-                  -e JWT_SECRET="${{ secrets.PROD_JWT_SECRET }}" \
-                  -e FRONTEND_URL="https://brew-lite-khaki.vercel.app" \
-                  "$PREV_IMAGE"
-                echo "Rollback execution completed."
-              else
-                echo "No previous image recorded (first deploy?) - nothing to roll back to."
-              fi
-            else
-              echo "No rollback file found - old container was not replaced."
-            fi

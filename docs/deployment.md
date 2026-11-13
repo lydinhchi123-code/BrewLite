@@ -1,81 +1,54 @@
 # BrewLite deployment and handover
 
-This guide describes the deployment currently represented by the repository: Vercel serves the frontend; GitHub Actions builds the NestJS API image, pushes it to Docker Hub, then deploys it to a Docker host over SSH.
+This project is intended to run entirely on Render: the Next.js frontend and NestJS API are separate web services, with PostgreSQL as a private Render database. `render.yaml` describes these resources. Do not use the old Vercel or SSH/Docker-host deployment instructions.
 
-## Current status
+## Production status
 
-| Part | Status |
+Deployment is not complete until the team creates the Render Blueprint, initializes its database, sets the two service URLs below, and verifies the end-to-end order flow.
+
+| Part | Value after setup |
 | --- | --- |
-| Frontend | Vercel URL: <https://brew-lite-khaki.vercel.app> |
-| Production API host | Not configured in this repository. `PROD_HOST` must be supplied by the deployment owner. |
-| Production database | No provider or URL is documented. The database must be reachable privately by the API host. |
-| Health check | `GET /health`; the workflow checks `https://$PROD_HOST/health`. |
-| Vercel API URL | Must be changed from `http://localhost:3001` to the production API HTTPS URL after the API is deployed. |
+| Frontend | Copy the `brewlite-web` `onrender.com` HTTPS URL from Render |
+| API | Copy the `brewlite-api` `onrender.com` HTTPS URL from Render |
+| Health check | `<API URL>/health` (expected HTTP 200 and `{"status":"ok",...}`) |
+| PostgreSQL | Render Postgres internal connection only; external IP allowlist is empty in `render.yaml` |
 
-The Vercel frontend currently requests `http://localhost:3001/menu/products`; that address refers to the computer opening the page. The production flow is incomplete until a public HTTPS API URL and private production database are configured.
+## First deployment
 
-## Required production layout
+1. Push the reviewed branch containing `render.yaml` to the GitHub repository that Render can access. The repository must include this file at its root.
+2. In Render, choose **New → Blueprint**, connect the BrewLite GitHub repository, and select the branch containing `render.yaml`.
+3. Review the resources before applying: `brewlite-api`, `brewlite-web`, and `brewlite-db`. The Blueprint uses Singapore for all three so the API can reach PostgreSQL through Render's private network. The database's external IP allowlist is empty.
+4. Apply the Blueprint. Render generates `JWT_SECRET` and sets `DATABASE_URL` from the database's private connection string. Do not copy that connection string into GitHub or the repository.
+5. Open the `brewlite-api` service and copy its HTTPS `onrender.com` URL. In **Environment**, set `FRONTEND_URL` to the exact frontend HTTPS origin (no trailing slash). Open `brewlite-web` and set `NEXT_PUBLIC_API_URL` to the API HTTPS origin (no trailing slash). Save and redeploy both services. `NEXT_PUBLIC_API_URL` is included in the Next.js build, so the frontend must rebuild after changing it.
+6. Initialize the new database with the SQL schema and seed files from the local setup section of the README. These scripts are for an empty database; do not rerun them on a database with existing data. Keep external database access disabled; use an approved, restricted admin path if the team must import SQL from a developer machine.
+7. Open `<API URL>/health` and confirm HTTP 200. Then visit the frontend URL and verify the menu loads, add an item to cart, sign in, place a test order, and confirm it appears in order history.
 
-1. Vercel serves the Next.js frontend at `https://brew-lite-khaki.vercel.app`.
-2. A server with Docker and an HTTPS reverse proxy serves the NestJS API at `https://<PROD_HOST>` and forwards requests to container port `3001`.
-3. PostgreSQL accepts connections only from the API host/private network. Do not publish its database port to the internet.
-4. GitHub Actions and the hosting platform hold production credentials. Do not commit them or print them in CI logs.
+The Blueprint's free plans are for a class demo, not durable production. Render's free web services can sleep after 15 minutes without traffic, and a free PostgreSQL database expires 30 days after creation. Upgrade to paid services/database before relying on the deployment for long-term production data. See [Render free instance limitations](https://render.com/docs/free).
 
-The exact API host, DNS/TLS setup, and PostgreSQL provider are deployment-owner configuration and are not present in this repository yet.
+## CI and deployments
 
-## Configure GitHub Actions
+GitHub Actions runs lint, tests, and builds for the API and frontend. Render services use `autoDeployTrigger: checksPass`, so Render deploys commits from the linked branch only after CI checks pass. Deployments and logs are visible in each service's **Events** and **Logs** pages in Render.
 
-In the repository's **Settings → Secrets and variables → Actions → Secrets**, add:
-
-| Secret | Purpose |
-| --- | --- |
-| `DOCKER_USERNAME` | Docker Hub account that owns `brewlite-api` |
-| `DOCKER_PASSWORD` | Docker Hub access token |
-| `PROD_HOST` | SSH host name; use the host name only, without `https://` |
-| `PROD_USER` | SSH user with permission to run Docker |
-| `PROD_SSH_KEY` | Private SSH key for the production host |
-| `PROD_DATABASE_URL` | PostgreSQL connection string available to the API host |
-| `PROD_JWT_SECRET` | Long random signing key for production JWTs |
-
-The production frontend origin is currently set in the workflow to `https://brew-lite-khaki.vercel.app` for CORS. If the Vercel production domain changes, update the `FRONTEND_URL` entries in `.github/workflows/ci.yml` and redeploy.
-
-Never paste secret values into issues, pull requests, chat, README, or terminal commands that may be recorded in shell history. Verify that each required secret is configured without exposing its value.
-
-## Deploy
-
-1. Confirm the API host has Docker installed, HTTPS enabled, and a reverse proxy forwarding to host port `3000` (the workflow maps this to container port `3001`).
-2. Confirm PostgreSQL is provisioned, has the BrewLite schema and seed data, and is not publicly accessible. Allow the API host to connect privately.
-3. Configure all required GitHub Actions secrets above.
-4. Set Vercel **Project → Settings → Environment Variables → Production**:
-
-   ```env
-   NEXT_PUBLIC_API_URL=https://<PROD_HOST>
-   ```
-
-   Use the API origin, not the frontend URL and not `localhost`. Redeploy the Vercel production project after changing the variable.
-
-5. Merge the reviewed deployment change into `master`. The workflow runs lint, tests, and builds for pull requests; after a push to `master`, it builds and pushes the API image, deploys it over SSH, and checks `https://<PROD_HOST>/health`.
-6. Confirm the workflow's **Deploy & Verify Production** job succeeds. Open the health URL and the Vercel site from a browser outside the development setup. Verify menu loading and the end-to-end order flow.
-
-The workflow does not currently apply database migrations automatically. For a schema change, back up production first, apply the reviewed SQL migration using the production database owner’s process, verify it, then deploy the API. Do not use a destructive reset or re-run seed scripts on production.
+The repository does not currently define automated PostgreSQL migrations. For schema changes, back up the database first, apply a reviewed migration using the database owner's process, verify it, and then deploy. Never run the fresh-database schema/seed sequence against an existing production database.
 
 ## Health check
 
-The API responds to `GET /health` with HTTP 200 and a small JSON status response when NestJS has started. This endpoint is a process health check; it does not expose database credentials or application data.
+The API provides `GET /health`. Render uses `/health` as the API service health check. It confirms that NestJS started; it does not currently verify database connectivity.
 
 ## Rollback
 
-- If deployment or the health check fails, GitHub Actions attempts to restart the previous Docker image.
-- If a successful deployment needs to be reverted, create and merge a revert pull request for the deployment commit on `master`. The normal CI/CD workflow then builds and deploys the reverted code.
-- If a database migration was applied, check compatibility before reverting API code. The current workflow does not roll back database schema changes; restore from the pre-migration backup or apply a reviewed corrective migration.
-- After rollback, verify `https://<PROD_HOST>/health` and the production frontend again.
+1. In Render, open the service's **Events** page and select the last known-good deploy.
+2. Choose **Rollback** and confirm. Roll back the API and frontend separately if both services changed.
+3. Check `<API URL>/health`, reload the frontend, and verify the affected flow.
+4. If a database migration ran, confirm it is compatible with the previous application version. Render code rollback does not reverse database changes; restore a backup or apply a reviewed corrective migration if needed.
 
 ## Release and handover checklist
 
-- [ ] Replace `<PROD_HOST>` with the actual production API URL in the handover materials.
-- [ ] Verify HTTPS frontend and API URLs, including `/health`.
-- [ ] Confirm database access is private and CI/hosting secrets are configured.
-- [ ] Create a version tag and GitHub Release with notes after production verification.
+- [ ] Record the production frontend HTTPS URL, API HTTPS URL, and API `/health` URL.
+- [ ] Confirm the PostgreSQL external IP allowlist is empty and `DATABASE_URL` uses the private Render connection.
+- [ ] Confirm production secrets are stored in Render Environment and absent from the repository and CI logs.
+- [ ] Verify the frontend, menu, authentication, checkout, and order history against production.
+- [ ] Create a version tag and GitHub Release with release notes after production verification.
 - [ ] Record a live end-to-end demo video using non-sensitive demo data.
 - [ ] Record Sprint Review feedback and Retrospective action items in the team's sprint notes.
-- [ ] Ensure a new contributor can clone the repository and follow the README.
+- [ ] Ask someone outside the group to clone the repository, follow the README, and open the production URLs.
