@@ -6,7 +6,7 @@ This guide describes the deployment currently represented by the repository: Ver
 
 | Part | Status |
 | --- | --- |
-| Frontend | Vercel URL: <https://brew-lite-murex.vercel.app> |
+| Frontend | Vercel URL: <https://brew-lite-khaki.vercel.app> |
 | Production API host | Not configured in this repository. `PROD_HOST` must be supplied by the deployment owner. |
 | Production database | No provider or URL is documented. The database must be reachable privately by the API host. |
 | Health check | `GET /health`; the workflow checks `https://$PROD_HOST/health`. |
@@ -16,7 +16,7 @@ The Vercel frontend currently requests `http://localhost:3001/menu/products`; th
 
 ## Required production layout
 
-1. Vercel serves the Next.js frontend at `https://brew-lite-murex.vercel.app`.
+1. Vercel serves the Next.js frontend at `https://brew-lite-khaki.vercel.app`.
 2. A server with Docker and an HTTPS reverse proxy serves the NestJS API at `https://<PROD_HOST>` and forwards requests to container port `3001`.
 3. PostgreSQL accepts connections only from the API host/private network. Do not publish its database port to the internet.
 4. GitHub Actions and the hosting platform hold production credentials. Do not commit them or print them in CI logs.
@@ -37,7 +37,7 @@ In the repository's **Settings → Secrets and variables → Actions → Secrets
 | `PROD_DATABASE_URL` | PostgreSQL connection string available to the API host |
 | `PROD_JWT_SECRET` | Long random signing key for production JWTs |
 
-The production frontend origin is currently set in the workflow to `https://brew-lite-murex.vercel.app` for CORS. If the Vercel production domain changes, update the `FRONTEND_URL` entries in `.github/workflows/ci.yml` and redeploy.
+The production frontend origin is currently set in the workflow to `https://brew-lite-khaki.vercel.app` for CORS. If the Vercel production domain changes, update the `FRONTEND_URL` entries in `.github/workflows/ci.yml` and redeploy.
 
 Never paste secret values into issues, pull requests, chat, README, or terminal commands that may be recorded in shell history. Verify that each required secret is configured without exposing its value.
 

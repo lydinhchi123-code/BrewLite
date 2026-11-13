@@ -160,7 +160,7 @@ jobs:
               -e PORT=3001 \
               -e DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}" \
               -e JWT_SECRET="${{ secrets.PROD_JWT_SECRET }}" \
-              -e FRONTEND_URL="https://brew-lite-murex.vercel.app" \
+              -e FRONTEND_URL="https://brew-lite-khaki.vercel.app" \
               "$API_IMAGE:$IMAGE_TAG"
 
       - name: Smoke Test (Health Check)
@@ -205,7 +205,7 @@ jobs:
                   -e PORT=3001 \
                   -e DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}" \
                   -e JWT_SECRET="${{ secrets.PROD_JWT_SECRET }}" \
-                  -e FRONTEND_URL="https://brew-lite-murex.vercel.app" \
+                  -e FRONTEND_URL="https://brew-lite-khaki.vercel.app" \
                   "$PREV_IMAGE"
                 echo "Rollback execution completed."
               else

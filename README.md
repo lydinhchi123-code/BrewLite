@@ -4,7 +4,7 @@ BrewLite is a drink ordering web application. The frontend is built with Next.js
 
 ## Production
 
-- Frontend: <https://brew-lite-murex.vercel.app>
+- Frontend: <https://brew-lite-khaki.vercel.app>
 - API: not configured yet. The production frontend currently needs a public API URL; see [deployment guide](docs/deployment.md).
 - API health check: `GET /health` after the API is deployed.
 

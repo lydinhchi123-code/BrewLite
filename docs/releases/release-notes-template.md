@@ -1,7 +1,7 @@
 # BrewLite vX.Y.Z
 
 - Release date: YYYY-MM-DD
-- Frontend URL: https://brew-lite-murex.vercel.app
+- Frontend URL: https://brew-lite-khaki.vercel.app
 - API URL: <production API URL>
 - Health check: <production API URL>/health
 
