@@ -271,6 +271,82 @@ export default function AdminOrdersPage() {
     }
   };
 
+  const cancelOrder = async (order: Order) => {
+    const allowedCancelStatuses = ["PENDING", "PAID", "PREPARING"];
+
+    if (!allowedCancelStatuses.includes(order.status)) {
+      setError("Không thể hủy đơn hàng ở trạng thái hiện tại.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Bạn có chắc chắn muốn hủy đơn ${order.displayId}?`
+    );
+
+    if (!confirmed) return;
+
+    const token = localStorage.getItem("brewlite_accessToken");
+
+    if (!token) {
+      setError("Không tìm thấy token đăng nhập. Vui lòng đăng nhập lại.");
+      return;
+    }
+
+    const id = String(order.madonhang);
+
+    setUpdatingId(id);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/orders/${order.madonhang}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status: "CANCELLED" }),
+        }
+      );
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(
+          message || `Hủy đơn thất bại (HTTP ${response.status})`
+        );
+      }
+
+      setOrders((previous) =>
+        previous.map((item) =>
+          String(item.madonhang) === id
+            ? { ...item, status: "CANCELLED" }
+            : item
+        )
+      );
+
+      setNextStatus((previous) => ({
+        ...previous,
+        [id]: "",
+      }));
+
+      setSuccess(`Đã hủy đơn ${order.displayId}.`);
+
+      setSelectedOrder((previous) =>
+        previous && String(previous.madonhang) === id
+          ? { ...previous, status: "CANCELLED" }
+          : previous
+      );
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Không thể hủy đơn hàng."
+      );
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   return (
     <>
       <section className="admin-page-heading">
@@ -437,12 +513,29 @@ export default function AdminOrdersPage() {
                         )}
                       </td>
                       <td>
-                        <button
-                          className="admin-action-button"
-                          onClick={() => setSelectedOrder(order)}
-                        >
-                          Chi tiết
-                        </button>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button
+                            className="admin-action-button"
+                            onClick={() => setSelectedOrder(order)}
+                          >
+                            Chi tiết
+                          </button>
+
+                          {["PENDING", "PAID", "PREPARING"].includes(order.status) && (
+                            <button
+                              className="admin-action-button"
+                              disabled={updatingId === id}
+                              onClick={() => void cancelOrder(order)}
+                              style={{
+                                backgroundColor: "#fee2e2",
+                                color: "#dc2626",
+                                border: "1px solid #fecaca",
+                              }}
+                            >
+                              {updatingId === id ? "Đang xử lý..." : "Hủy đơn"}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

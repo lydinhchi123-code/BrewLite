@@ -1329,6 +1329,13 @@ export class OrdersService {
       const order = result.rows[0];
       const currentStatus = order.trangthai as OrderStatus;
 
+      // Khách hàng không được hủy đơn khi đang pha chế.
+      if (currentStatus === OrderStatus.PREPARING) {
+        throw new BadRequestException(
+          'Đơn hàng đang được chuẩn bị, khách hàng không thể hủy đơn.',
+        );
+      }
+
       // Kiểm tra chuyển trạng thái.
       try {
         assertTransition(
