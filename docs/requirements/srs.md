@@ -13,9 +13,9 @@ Tài liệu mô tả hành vi mà MVP BrewLite phải cung cấp. Đây là đ�
 - **Won't:** không triển khai trong bản phát hành MVP hiện tại.
 
 ## 2. Actor hệ thống
-- **Khách hàng:** Xem menu, tùy chỉnh món, quản lý giỏ hàng, đăng ký/đăng nhập, đặt hàng, thanh toán và xem lịch sử đơn hàng.
+- **Khách hàng:** Sử dụng hệ thống để xem menu, tìm kiếm sản phẩm, tùy chỉnh đồ uống, quản lý giỏ hàng, đăng ký, đăng nhập, đặt hàng, thanh toán trực tuyến thông qua VNPay Sandbox, theo dõi lịch sử và trạng thái đơn hàng.
 - **Admin:** Truy cập khu vực quản trị để xem thông tin tổng quan, quản lý đơn hàng, theo dõi tồn kho, quản lý công thức pha chế và mã giảm giá.
-- **Dịch vụ thanh toán giả lập:** Nhận yêu cầu thanh toán và trả về kết quả thành công/thất bại.
+- **VNPay Sandbox:** Là môi trường thử nghiệm của cổng thanh toán VNPay, tiếp nhận yêu cầu thanh toán từ hệ thống và trả về kết quả giao dịch thành công hoặc thất bại để hệ thống xử lý.
 
 ## 3. Yêu cầu chức năng (FR)
 
@@ -25,15 +25,15 @@ Tài liệu mô tả hành vi mà MVP BrewLite phải cung cấp. Đây là đ�
 | FR-02 | Khách hàng tìm kiếm theo tên và lọc theo danh mục. | Should | Từ khóa không phân biệt hoa/thường; kết quả chỉ gồm sản phẩm khớp từ khóa và danh mục đã chọn; có thể xóa bộ lọc để xem lại toàn bộ. |
 | FR-03 | Khách hàng xem chi tiết sản phẩm và tùy chọn kích cỡ, lượng đường, lượng đá, topping theo cấu hình sản phẩm. | Must | Trang chi tiết hiển thị đúng tên, mô tả, giá cơ bản và tùy chọn hợp lệ; tùy chọn không được hỗ trợ không thể gửi lên đơn. |
 | FR-04 | Khách hàng thêm sản phẩm đã chọn vào giỏ hàng. | Must | Sau khi thêm, số lượng trong biểu tượng giỏ tăng đúng; các lựa chọn khác nhau được phân biệt thành dòng hàng phù hợp. |
-| FR-05 | Khách hàng cập nhật số lượng hoặc xóa dòng hàng khỏi giỏ. | Must | Số lượng được phép là số nguyên dương; khi giảm về 0, dòng hàng bị xóa; tổng tiền cập nhật đúng sau mỗi thay đổi. |
+| FR-05 | Khách hàng cập nhật số lượng hoặc xóa dòng hàng khỏi giỏ. | Must | Số lượng sản phẩm phải là số nguyên dương và không được nhỏ hơn 1. Khách hàng có thể sử dụng chức năng xóa riêng để loại bỏ dòng hàng khỏi giỏ. Tổng tiền được cập nhật sau mỗi thay đổi. |
 | FR-06 | Hệ thống tính tạm tính, phụ phí và tổng tiền theo quy tắc đã công bố. | Must | Với bộ dữ liệu kiểm thử xác định trước, tổng tiền hiển thị bằng tổng giá từng dòng và các phụ phí hợp lệ; frontend không phải nguồn dữ liệu cuối cùng để xác định giá khi tạo đơn. |
 | FR-07 | Khách hàng đăng ký tài khoản bằng các thông tin bắt buộc và đăng nhập bằng email/mật khẩu. | Must | Dữ liệu hợp lệ tạo được tài khoản; email trùng bị từ chối; thông tin sai không đăng nhập được; mật khẩu không lưu dạng rõ. |
 | FR-08 | Backend xác thực phiên đăng nhập và kiểm tra quyền truy cập tài nguyên cá nhân. | Must | Request không có token hợp lệ tới endpoint cần đăng nhập nhận 401; người dùng không thể đọc đơn của tài khoản khác và nhận 403 hoặc 404 theo chính sách API. |
 | FR-09 | Khách hàng tạo đơn từ giỏ hàng với thông tin liên hệ/giao nhận và ghi chú nếu có. | Must | Dữ liệu hợp lệ tạo một mã đơn; đơn và các dòng hàng được lưu trong DB; dữ liệu thiếu/sai bị từ chối với thông báo có thể hiểu được. |
 | FR-10 | Hệ thống kiểm tra giá và tính hợp lệ của sản phẩm ở backend trước khi lưu đơn. | Must | Nếu sản phẩm không tồn tại, ngừng bán hoặc tùy chọn không hợp lệ, API từ chối tạo đơn và không lưu đơn dở dang. |
-| FR-11 | Khách hàng chọn phương thức thanh toán được MVP hỗ trợ, tối thiểu COD và/hoặc thanh toán giả lập. | Must | Phương thức đã chọn được lưu đúng; hệ thống không báo đã thanh toán thành công nếu dịch vụ giả lập trả thất bại. |
-| FR-12 | Hệ thống ghi nhận kết quả thanh toán thành công/thất bại và liên kết kết quả với đúng đơn. | Must | Khi mô phỏng thành công, trạng thái thanh toán cập nhật đúng; khi thất bại, hệ thống hiển thị lỗi và không đánh dấu đơn là đã thanh toán; request lặp không tạo giao dịch ghi nhận trùng. |
-| FR-13 | Sau khi đặt đơn thành công, khách hàng nhận màn hình xác nhận có mã đơn và thông tin tóm tắt. | Must | Màn hình xác nhận hiển thị mã đơn, dòng hàng và tổng tiền tương ứng với dữ liệu đã lưu. |
+| FR-11 | Khách hàng có thể thực hiện thanh toán trực tuyến thông qua VNPay Sandbox. | Must | Hệ thống tạo yêu cầu thanh toán phù hợp và chuyển khách hàng đến môi trường VNPay Sandbox để thực hiện thanh toán. |
+| FR-12 | Hệ thống ghi nhận kết quả thanh toán thành công/thất bại và liên kết kết quả với đúng đơn. | Must | Khi VNPay Sandbox trả về kết quả thanh toán thành công, trạng thái thanh toán cập nhật đúng; khi thất bại, hệ thống hiển thị lỗi và không đánh dấu đơn là đã thanh toán; request lặp không tạo giao dịch ghi nhận trùng. |
+| FR-13 | Sau khi thanh toán qua VNPay Sandbox thành công, khách hàng nhận được màn hình xác nhận đơn hàng, bao gồm mã đơn, thông tin sản phẩm và tổng tiền. | Must | Màn hình xác nhận hiển thị mã đơn, dòng hàng và tổng tiền tương ứng với dữ liệu đã lưu. |
 | FR-14 | Khách hàng xem danh sách lịch sử đơn thuộc tài khoản của mình. | Must | Danh sách chỉ trả về đơn của người dùng đang đăng nhập; đơn mới nhất được hiển thị trước hoặc có thứ tự được công bố. |
 | FR-15 | Khách hàng xem trạng thái hiện tại và chi tiết một đơn. | Must | Mã đơn hợp lệ của chính khách hàng hiển thị trạng thái hiện tại; mã không tồn tại hoặc không thuộc quyền truy cập không làm lộ dữ liệu. |
 | FR-16 | Admin xem danh sách, chi tiết đơn hàng và cập nhật trạng thái đơn theo quy trình cho phép. | Must | Admin có thể xem thông tin đơn hàng và cập nhật trạng thái theo quyền được cấp; chuyển trạng thái không hợp lệ bị từ chối; trạng thái mới được lưu và phản ánh khi tải lại. |
@@ -45,8 +45,8 @@ Tài liệu mô tả hành vi mà MVP BrewLite phải cung cấp. Đây là đ�
 | FR-22 | Hệ thống gửi email/SMS thông báo trạng thái đơn. | Won't (this release) | Không bắt buộc trong MVP; khi chưa cấu hình nhà cung cấp, hệ thống vẫn đặt đơn và xem trạng thái được. |
 | FR-23 | Admin xem thông tin và số liệu tổng quan về hoạt động kinh doanh của hệ thống. | Must | Khi truy cập trang Tổng quan, hệ thống hiển thị các số liệu được tổng hợp từ dữ liệu hiện có; khi không có dữ liệu, giao diện hiển thị giá trị hoặc trạng thái rỗng phù hợp. |
 | FR-24 | Admin xem và quản lý thông tin tồn kho nguyên liệu. | Must | Admin có thể xem thông tin nguyên liệu và số lượng tồn kho; các thao tác cập nhật hợp lệ được lưu vào DB và phản ánh khi tải lại. |
-| FR-25 | Admin xem và quản lý công thức pha chế của sản phẩm. | Must | Admin có thể xem thông tin công thức pha chế; các thao tác thêm, sửa hoặc xóa công thức được lưu chính xác nếu các chức năng này được hỗ trợ. |
-| FR-26 | Admin xem và quản lý mã giảm giá. | Must | Admin có thể xem thông tin mã giảm giá; các thao tác thêm, sửa hoặc xóa mã được lưu chính xác nếu các chức năng này được hỗ trợ. |
+| FR-25 | Admin xem và quản lý công thức pha chế của sản phẩm. | Must | Admin có thể xem thông tin công thức pha chế; các thao tác thêm, sửa hoặc xóa công thức được lưu chính xác. |
+| FR-26 | Admin xem và quản lý mã giảm giá. | Must | Admin có thể xem thông tin mã giảm giá; các thao tác thêm, sửa hoặc xóa mã được lưu chính xác. |
 
 
 ## 4. Yêu cầu phi chức năng (NFR)
@@ -54,7 +54,7 @@ Tài liệu mô tả hành vi mà MVP BrewLite phải cung cấp. Đây là đ�
 | ID | Yêu cầu | Ưu tiên | Tiêu chí chấp nhận kiểm chứng được |
 |---|---|---|---|
 | NFR-01 | Hiệu năng: các trang menu thông thường phải phản hồi nhanh với bộ dữ liệu demo. | Should | Trong môi trường nghiệm thu đã thống nhất, 95% request `GET /products` hoàn thành dưới 1 giây với 100 sản phẩm mẫu, không tính thời gian mạng bên ngoài. |
-| NFR-02 | Hiệu năng: thao tác tạo đơn phải có phản hồi trong thời gian hợp lý. | Should | Với DB cục bộ và dịch vụ thanh toán giả lập, 95% request tạo đơn hoàn thành dưới 2 giây khi không có lỗi phụ thuộc ngoài. |
+| NFR-02 | Hiệu năng: thao tác tạo đơn phải có phản hồi trong thời gian hợp lý. | Should | Với cơ sở dữ liệu cục bộ, 95% yêu cầu tạo đơn hàng phải được hệ thống xử lý và phản hồi trong vòng 2 giây, không tính thời gian chuyển hướng và thời gian chờ phản hồi từ hệ thống VNPay Sandbox. |
 | NFR-03 | Bảo mật mật khẩu. | Must | Mật khẩu được băm bằng thuật toán phù hợp như bcrypt/Argon2; kiểm tra DB không thấy mật khẩu dạng rõ. |
 | NFR-04 | Bảo mật API và quyền riêng tư dữ liệu. | Must | Endpoint riêng tư yêu cầu xác thực; người dùng A không thể đọc/sửa đơn của người dùng B; lỗi API không trả stack trace cho client ở môi trường production. |
 | NFR-05 | Bảo vệ secrets. | Must | `.env` bị loại khỏi Git; repository chỉ chứa `.env.example` không có giá trị bí mật thật. |
@@ -72,9 +72,16 @@ Tài liệu mô tả hành vi mà MVP BrewLite phải cung cấp. Đây là đ�
 2. Tổng tiền đơn hàng được tính từ giá sản phẩm hiện hành, tùy chọn hợp lệ, số lượng và các khoản phụ phí theo quy tắc nghiệp vụ đã thống nhất.
 3. Mỗi đơn hàng có mã đơn duy nhất và thời điểm tạo.
 4. Đơn hàng thuộc về một khách hàng; khách hàng chỉ được xem đơn hàng thuộc tài khoản của mình. Admin được xem và quản lý đơn hàng theo quyền được cấp.
-5. Các trạng thái đơn hàng phải được định nghĩa thống nhất, gồm: `PENDING`, `CONFIRMED`, `PREPARING`, `READY`, `COMPLETED`, `CANCELLED`. Không cho phép chuyển trạng thái tùy ý.
-6. Trạng thái thanh toán được quản lý riêng với trạng thái xử lý đơn hàng, ví dụ: `UNPAID`, `PAID`, `FAILED`, `REFUNDED`.
-7. Với thanh toán giả lập, kết quả chỉ phục vụ mục đích học tập và kiểm thử, không đại diện cho giao dịch tiền thật.
+5. Đơn hàng được quản lý theo các trạng thái:  `PENDING`, `PAID`, `PAYMENT_FAILED`, `PREPARING`, `READY`, `COMPLETED` và `CANCELLED`. Việc chuyển đổi trạng thái phải tuân theo các quy tắc nghiệp vụ được định nghĩa trong hệ thống.
+6. Hệ thống chỉ cho phép chuyển trạng thái đơn hàng theo các quy tắc sau:
+- PENDING → PAID, PAYMENT_FAILED, CANCELLED.
+- PAYMENT_FAILED → PENDING, PAID, PAYMENT_FAILED, CANCELLED.
+- PAID → PREPARING, CANCELLED.
+- PREPARING → READY, CANCELLED.
+- READY → COMPLETED.
+- COMPLETED và CANCELLED là các trạng thái kết thúc, không cho phép chuyển sang trạng thái khác.
+Mọi yêu cầu chuyển trạng thái không hợp lệ đều bị hệ thống từ chối.
+7. Các giao dịch thông qua VNPay Sandbox chỉ phục vụ mục đích học tập, thử nghiệm và kiểm thử. Những giao dịch này không đại diện cho giao dịch tiền thật.
 8. Các chức năng quản trị tồn kho, công thức pha chế và mã giảm giá chỉ được thực hiện thông qua tài khoản có quyền Admin.
 9. Thông tin tồn kho phải được lưu trữ và cập nhật nhất quán theo các thao tác quản lý được hệ thống hỗ trợ.
 10. Công thức pha chế phải được liên kết với sản phẩm tương ứng để phục vụ việc quản lý thông tin pha chế.
@@ -82,7 +89,7 @@ Tài liệu mô tả hành vi mà MVP BrewLite phải cung cấp. Đây là đ�
 
 ## 6. Use-case tổng quát của toàn hệ thống
 
-Sơ đồ Use Case tổng quát mô tả các chức năng chính mà hai nhóm người dùng Khách hàng và Admin có thể thực hiện trong hệ thống BrewLite, cùng với sự tương tác của dịch vụ thanh toán giả lập.
+Sơ đồ Use Case tổng quát mô tả các chức năng chính mà hai nhóm người dùng là Khách hàng và Admin có thể thực hiện trong hệ thống BrewLite, đồng thời thể hiện sự tương tác giữa hệ thống với môi trường thanh toán VNPay Sandbox.
 
 **Các nhóm chức năng của Khách hàng:**
 - Xem menu, tìm kiếm và lọc sản phẩm.
@@ -99,7 +106,7 @@ Sơ đồ Use Case tổng quát mô tả các chức năng chính mà hai nhóm 
 - Quản lý công thức pha chế.
 - Quản lý mã giảm giá.
 
-**Dịch vụ thanh toán giả lập:** Tham gia xử lý yêu cầu thanh toán khi khách hàng lựa chọn phương thức thanh toán giả lập.
+**Tác nhân VNPay Sandbox:** VNPay Sandbox tham gia vào quy trình thanh toán trực tuyến bằng cách tiếp nhận yêu cầu thanh toán từ hệ thống BrewLite và trả về kết quả giao dịch. Hệ thống căn cứ vào kết quả nhận được để cập nhật trạng thái thanh toán tương ứng với đơn hàng.
 
 Sơ đồ PlantUML được lưu tại `docs/diagrams/use-case-overview.png`.
 
