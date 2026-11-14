@@ -13,7 +13,7 @@ services:
     plan: free
     region: singapore
     rootDir: apps/api
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run start:prod
     healthCheckPath: /health
     autoDeployTrigger: checksPass
@@ -27,7 +27,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
-        value: http://localhost:3000 # Replace with the Render frontend URL after creation.
+        value: https://brewlite-web-ksd1.onrender.com
 
   - type: web
     name: brewlite-web
@@ -42,4 +42,4 @@ services:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_API_URL
-        value: http://localhost:3001 # Replace with the Render API URL after creation.
+        value: https://brewlite-api-tutb.onrender.com
