@@ -94,7 +94,7 @@ const HO_CHI_MINH_WARDS = [
   "Phường Thông Tây Hội",
 ];
 
-function isCake(product: Product) {
+function isCake(product: CartItem["product"]) {
   return (
     product.categorySlug === "banh" ||
     product.categorySlug === "banh-ngot" ||
