@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { getCartStorageKey, useCartStore } from "@/store/useCartStore";
 import "./menu.css";
 
 type ApiRecord = Record<string, unknown>;
@@ -434,53 +435,9 @@ export default function MenuPage() {
     };
 
     try {
-      // Xác định giỏ hàng theo tài khoản đang đăng nhập
-      const savedUser = localStorage.getItem("brewlite_user");
-
-      let cartKey = "brewlite_cart_guest";
-
-      if (savedUser) {
-        const user = JSON.parse(savedUser);
-        const makh = Number(user?.makh);
-
-        if (Number.isInteger(makh) && makh > 0) {
-          cartKey = `brewlite_cart_${makh}`;
-        }
-      }
-
-      if (savedUser) {
-        try {
-          const user = JSON.parse(savedUser);
-          const makh = Number(user?.makh);
-
-          if (Number.isInteger(makh) && makh > 0) {
-            cartKey = `brewlite_cart_${makh}`;
-          }
-        } catch {
-          cartKey = "brewlite_cart_guest";
-        }
-      }
-
-      // Đọc giỏ hàng riêng của tài khoản
-      const savedCart = localStorage.getItem(cartKey);
-      const oldCart = savedCart ? JSON.parse(savedCart) : [];
-
-      if (!Array.isArray(oldCart)) {
-        throw new Error("Dữ liệu giỏ hàng không hợp lệ.");
-      }
-
-      const exists = oldCart.findIndex(
-        (item: ApiRecord) => item.key === cartItem.key,
-      );
-
-      if (exists >= 0) {
-        oldCart[exists].qty += 1;
-      } else {
-        oldCart.push(cartItem);
-      }
-
-      // Lưu vào giỏ hàng riêng
-      localStorage.setItem(cartKey, JSON.stringify(oldCart));
+      useCartStore
+        .getState()
+        .addCartItem(getCartStorageKey(), cartItem);
 
       // Báo cho Header và CartPage cập nhật
       window.dispatchEvent(new Event("brewlite-cart-updated"));

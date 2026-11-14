@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import {
+  EMPTY_BREWLITE_CART,
+  getCartStorageKey,
+  useCartStore,
+} from "@/store/useCartStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -24,7 +29,14 @@ export default function Header() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [cheDo, setCheDo] = useState<CheDo>("dang-nhap");
   const [taiKhoan, setTaiKhoan] = useState<TaiKhoan | null>(null);
-  const [soLuongGioHang, setSoLuongGioHang] = useState(0);
+  const [cartStorageKey, setCartStorageKey] = useState("brewlite_cart_guest");
+  const cartItems = useCartStore(
+    (state) => state.carts[cartStorageKey] ?? EMPTY_BREWLITE_CART,
+  );
+  const soLuongGioHang = cartItems.reduce(
+    (total, item) => total + Math.max(0, Number(item.qty) || 0),
+    0,
+  );
   const [dangXuLy, setDangXuLy] = useState(false);
   const [thongBao, setThongBao] = useState("");
   const [loi, setLoi] = useState(false);
@@ -63,53 +75,6 @@ export default function Header() {
     setMoMenuTaiKhoan(false);
     setMoForm(true);
   }
-
-function capNhatSoLuongGioHang() {
-  try {
-    const cartKey = getCartStorageKey();
-
-    const duLieu = localStorage.getItem(cartKey);
-    const gioHang = duLieu ? JSON.parse(duLieu) : [];
-
-    if (!Array.isArray(gioHang)) {
-      setSoLuongGioHang(0);
-      return;
-    }
-
-    const tongSoLuong = gioHang.reduce(
-      (tong: number, mon: { qty?: number }) => {
-        const qty = Number(mon.qty ?? 0);
-
-        return tong + (Number.isFinite(qty) && qty > 0 ? qty : 0);
-      },
-      0,
-    );
-
-    setSoLuongGioHang(tongSoLuong);
-  } catch {
-    setSoLuongGioHang(0);
-  }
-}
-
-function docSoLuongGioHang(): number {
-  try {
-    const cartKey = getCartStorageKey();
-    const duLieu = localStorage.getItem(cartKey);
-    const gioHang = duLieu ? JSON.parse(duLieu) : [];
-
-    if (!Array.isArray(gioHang)) return 0;
-
-    return gioHang.reduce(
-      (tong: number, mon: { qty?: number }) => {
-        const qty = Number(mon.qty ?? 0);
-        return tong + (Number.isFinite(qty) && qty > 0 ? qty : 0);
-      },
-      0,
-    );
-  } catch {
-    return 0;
-  }
-}
 
   useEffect(() => {
     function xuLyClickBenNgoai(e: MouseEvent) {
@@ -151,55 +116,24 @@ function docSoLuongGioHang(): number {
     let active = true;
 
     const capNhatGioHang = () => {
-      if (active) {
-        capNhatSoLuongGioHang();
-      }
+      const cartKey = getCartStorageKey();
+      useCartStore.getState().loadCart(cartKey);
+      if (active) setCartStorageKey(cartKey);
     };
 
-    Promise.resolve().then(capNhatGioHang);
-
-    // Cập nhật khi chuyển tab hoặc quay lại trang
-    window.addEventListener("focus", capNhatGioHang);
-
-    // Nhận thông báo khi trang khác cập nhật giỏ hàng
-    window.addEventListener("storage", capNhatGioHang);
-
-    // Sự kiện tùy chỉnh dùng trong cùng một tab
-    window.addEventListener("brewlite-cart-updated", capNhatGioHang);
-
-    return () => {
-      active = false;
-
-      window.removeEventListener("focus", capNhatGioHang);
-      window.removeEventListener("storage", capNhatGioHang);
-      window.removeEventListener(
-        "brewlite-cart-updated",
-        capNhatGioHang
-      );
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    const capNhatGioHang = () => {
-      if (active) {
-        setSoLuongGioHang(docSoLuongGioHang());
-      }
-    };
-
-    // Đọc giỏ hàng sau khi effect được thực thi
     Promise.resolve().then(capNhatGioHang);
 
     window.addEventListener("focus", capNhatGioHang);
     window.addEventListener("storage", capNhatGioHang);
     window.addEventListener("brewlite-cart-updated", capNhatGioHang);
+    window.addEventListener("brewlite-auth-updated", capNhatGioHang);
 
     return () => {
       active = false;
       window.removeEventListener("focus", capNhatGioHang);
       window.removeEventListener("storage", capNhatGioHang);
       window.removeEventListener("brewlite-cart-updated", capNhatGioHang);
+      window.removeEventListener("brewlite-auth-updated", capNhatGioHang);
     };
   }, [taiKhoan]);
 
@@ -295,12 +229,9 @@ function docSoLuongGioHang(): number {
         // Gộp giỏ khách vào giỏ của tài khoản vừa đăng nhập
         const makh = Number(data.user.makh);
         const accountCartKey = `brewlite_cart_${makh}`;
-
-        const guestCartRaw = localStorage.getItem("brewlite_cart_guest");
-        const accountCartRaw = localStorage.getItem(accountCartKey);
-
-        const guestCart = guestCartRaw ? JSON.parse(guestCartRaw) : [];
-        const accountCart = accountCartRaw ? JSON.parse(accountCartRaw) : [];
+        const cartStore = useCartStore.getState();
+        const guestCart = cartStore.loadCart("brewlite_cart_guest");
+        const accountCart = cartStore.loadCart(accountCartKey);
 
         if (
           Number.isInteger(makh) &&
@@ -327,11 +258,11 @@ function docSoLuongGioHang(): number {
             }
           });
 
-          localStorage.setItem(accountCartKey, JSON.stringify(mergedCart));
+          cartStore.setCart(accountCartKey, mergedCart);
         }
 
         // Xóa giỏ khách sau khi đã gộp
-        localStorage.removeItem("brewlite_cart_guest");
+        cartStore.clearCart("brewlite_cart_guest");
 
         setTaiKhoan(data.user);
 
@@ -355,7 +286,7 @@ function docSoLuongGioHang(): number {
   function dangXuat() {
     localStorage.removeItem("brewlite_user");
     localStorage.removeItem("brewlite_accessToken");
-    localStorage.removeItem("brewlite_cart_guest");
+    useCartStore.getState().clearCart("brewlite_cart_guest");
 
     setTaiKhoan(null);
     setMoMenuTaiKhoan(false);
@@ -1044,24 +975,4 @@ function docSoLuongGioHang(): number {
       `}</style>
     </>
   );
-}
-
-function getCartStorageKey() {
-  const savedUser = localStorage.getItem("brewlite_user");
-
-  if (savedUser) {
-    try {
-      const user = JSON.parse(savedUser);
-      const makh = Number(user?.makh);
-
-      if (Number.isInteger(makh) && makh > 0) {
-        return `brewlite_cart_${makh}`;
-      }
-    } catch {
-      // Nếu thông tin tài khoản không hợp lệ,
-      // sử dụng giỏ hàng khách.
-    }
-  }
-
-  return "brewlite_cart_guest";
 }

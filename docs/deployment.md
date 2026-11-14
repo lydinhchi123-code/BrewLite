@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 # BrewLite deployment and handover
 
 This project is intended to run entirely on Render: the Next.js frontend and NestJS API are separate web services, with PostgreSQL as a private Render database. `render.yaml` describes these resources. Do not use the old Vercel or SSH/Docker-host deployment instructions.
@@ -57,4 +55,3 @@ The API provides `GET /health`. Render uses `/health` as the API service health 
 - [ ] Record Sprint Review feedback and Retrospective action items in the team's sprint notes.
 - [ ] Ask someone outside the group to clone the repository, follow the README, and open the production URLs.
 
->>>>>>> Stashed changes

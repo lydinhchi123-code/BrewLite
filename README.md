@@ -1,41 +1,4 @@
 # BrewLite
-Ứng dụng web đặt đồ uống trực tuyến, cho phép người dùng tìm kiếm và lựa chọn đồ uống thông qua giao diện website.
-
-<<<<<<< Updated upstream
-## 1. Công nghệ sử dụng
-
-- **Frontend:** Next.js, React, TypeScript, Tailwind CSS
-- **Backend:** NestJS, TypeScript
-- **Database:** PostgreSQL
-- **ORM:** Prisma (dự kiến tích hợp)
-- **Version control:** Git, GitHub
-
-## 2. Cấu trúc dự án
-
-```text
-BrewLite/
-├── apps/
-│   ├── api/              # Backend - NestJS
-│   └── web/              # Frontend - Next.js
-├── database/             # Tài liệu và dữ liệu cơ sở dữ liệu
-├── docs/                 # Tài liệu phân tích và thiết kế
-├── .env.example          # File mẫu cấu hình môi trường
-├── .gitignore            # Các file không đưa lên Git
-└── README.md             # Tài liệu giới thiệu dự án
-```
-
-## 3. Yêu cầu môi trường
-
-- Node.js và npm
-- Git
-- PostgreSQL (phục vụ tích hợp cơ sở dữ liệu)
-
-## 4. Cài đặt và chạy dự án
-
-### 4.1. Frontend
-
-Mở terminal tại thư mục gốc dự án:
-=======
 BrewLite là ứng dụng web đặt đồ uống trực tuyến, cho phép khách hàng xem menu, tìm kiếm và lựa chọn sản phẩm, quản lý giỏ hàng và thực hiện đặt hàng thông qua giao diện website.
 
 Dự án được xây dựng theo mô hình Frontend – Backend – Database, sử dụng Next.js, NestJS và PostgreSQL. Hệ thống được tổ chức trong một monorepo nhằm thuận tiện cho việc phát triển, kiểm thử và triển khai.
@@ -135,7 +98,6 @@ Có hai cách để chạy dự án ở môi trường local.
 **Bước 1.** Cài đặt và khởi động Docker Desktop.
 
 **Bước 2.** Mở terminal tại thư mục gốc của repository và chạy:
->>>>>>> Stashed changes
 
 ```bash
 cd apps/web
@@ -143,27 +105,6 @@ npm install
 npm run dev
 ```
 
-<<<<<<< Updated upstream
-Truy cập: http://localhost:3000
-
-### 4.2. Backend
-
-Mở một terminal khác tại thư mục gốc dự án:
-
-```bash
-cd apps/api
-npm install
-npm run start:dev
-```
-
-Backend chạy tại: http://localhost:3001
-
-## 5. Cấu hình môi trường
-
-Tham khảo file `.env.example` tại thư mục gốc để biết biến môi trường mẫu.
-
-Đối với frontend, tạo file `apps/web/.env.local` và cấu hình:
-=======
 Lệnh này thực hiện build các Docker Image cần thiết và khởi chạy ba dịch vụ PostgreSQL, Backend và Frontend. Database được khởi tạo theo cấu hình và thứ tự các script SQL đã thiết lập trong dự án.
 
 **Bước 3.** Truy cập hệ thống:
@@ -266,32 +207,11 @@ npm ci
 ```
 
 Tạo file `apps/web/.env.local`:
->>>>>>> Stashed changes
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:3001
 ```
 
-<<<<<<< Updated upstream
-Các thông tin môi trường khác cần được cấu hình theo yêu cầu thực tế của từng ứng dụng.
-
-Không đưa file `.env`, `.env.local` hoặc thông tin bí mật lên GitHub.
-
-## 6. Trạng thái dự án
-
-- [x] Khởi tạo Frontend Next.js
-- [x] Khởi tạo Backend NestJS
-- [x] Chạy thử hai ứng dụng
-- [x] Thiết lập Git và tài liệu cơ bản
-- [x] Sắp xếp cấu trúc dự án theo `apps/api` và `apps/web`
-- [ ] Tích hợp PostgreSQL và Prisma
-- [ ] Xây dựng API và giao diện
-- [ ] Kiểm thử và tích hợp các chức năng
-
-## 7. Đóng góp và phát triển
-
-Các thành viên sử dụng Git để quản lý mã nguồn, cập nhật chức năng và phối hợp phát triển dự án thông qua GitHub.
-=======
 Khởi chạy Frontend:
 
 ```powershell
@@ -471,4 +391,3 @@ Quy trình làm việc cơ bản:
 5. Tạo Pull Request để xem xét và tích hợp vào nhánh `master`.
 
 Các thay đổi cần được kiểm tra trước khi tích hợp nhằm đảm bảo tính ổn định của hệ thống.
->>>>>>> Stashed changes
