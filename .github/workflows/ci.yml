@@ -37,6 +37,16 @@ jobs:
         run: npm test -- --runInBand
       - name: Build
         run: npm run build
+      - name: Start seeded PostgreSQL for integration tests
+        run: docker compose -f ../../docker-compose.yml up -d --wait db
+      - name: API end-to-end test (menu to paid order confirmation)
+        run: npm run test:e2e -- --runInBand
+        env:
+          DATABASE_URL: postgresql://postgres:brewlite_dev@localhost:5433/brewlite_db
+          JWT_SECRET: local-e2e-only-secret
+      - name: Stop test database
+        if: always()
+        run: docker compose -f ../../docker-compose.yml down -v --remove-orphans
 
   frontend:
     name: Frontend - Next.js

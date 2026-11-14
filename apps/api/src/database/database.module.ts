@@ -1,7 +1,16 @@
-import { Module } from '@nestjs/common';
+import { Inject, Injectable, Module, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 
 export const DATABASE_POOL = 'DATABASE_POOL';
+
+@Injectable()
+class DatabasePoolLifecycle implements OnModuleDestroy {
+  constructor(@Inject(DATABASE_POOL) private readonly pool: Pool) {}
+
+  async onModuleDestroy(): Promise<void> {
+    await this.pool.end();
+  }
+}
 
 @Module({
   providers: [
@@ -28,6 +37,7 @@ export const DATABASE_POOL = 'DATABASE_POOL';
         }
       },
     },
+    DatabasePoolLifecycle,
   ],
   exports: [DATABASE_POOL],
 })

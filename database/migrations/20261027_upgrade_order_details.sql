@@ -13,25 +13,38 @@ ALTER TABLE chitietdonhang
 CREATE UNIQUE INDEX IF NOT EXISTS uq_chitietdonhang_mactdh
     ON chitietdonhang (mactdh);
 
--- Preserve the options from the previous schema in the new structured fields.
-UPDATE chitietdonhang
-SET kichco = COALESCE(
-        kichco,
-        NULLIF(btrim(substring(tuychon FROM 'Size:[[:space:]]*([^;]+)')), '')
-    ),
-    duong = COALESCE(
-        duong,
-        NULLIF(btrim(substring(tuychon FROM 'Đường:[[:space:]]*([^;]+)')), ''),
-        NULLIF(btrim(substring(tuychon FROM 'Sugar:[[:space:]]*([^;]+)')), '')
-    ),
-    da = COALESCE(
-        da,
-        NULLIF(btrim(substring(tuychon FROM 'Đá:[[:space:]]*([^;]+)')), ''),
-        NULLIF(btrim(substring(tuychon FROM 'Ice:[[:space:]]*([^;]+)')), '')
-    ),
-    topping = COALESCE(
-        topping,
-        NULLIF(btrim(substring(tuychon FROM 'Topping:[[:space:]]*([^;]+)')), '')
-    );
+-- Older copies of the order schema stored options in `tuychon`; newer schema
+-- already has structured fields and no legacy column to backfill.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'chitietdonhang'
+          AND column_name = 'tuychon'
+    ) THEN
+        UPDATE chitietdonhang
+        SET kichco = COALESCE(
+                kichco,
+                NULLIF(btrim(substring(tuychon FROM 'Size:[[:space:]]*([^;]+)')), '')
+            ),
+            duong = COALESCE(
+                duong,
+                NULLIF(btrim(substring(tuychon FROM 'Đường:[[:space:]]*([^;]+)')), ''),
+                NULLIF(btrim(substring(tuychon FROM 'Sugar:[[:space:]]*([^;]+)')), '')
+            ),
+            da = COALESCE(
+                da,
+                NULLIF(btrim(substring(tuychon FROM 'Đá:[[:space:]]*([^;]+)')), ''),
+                NULLIF(btrim(substring(tuychon FROM 'Ice:[[:space:]]*([^;]+)')), '')
+            ),
+            topping = COALESCE(
+                topping,
+                NULLIF(btrim(substring(tuychon FROM 'Topping:[[:space:]]*([^;]+)')), '')
+            );
+    END IF;
+END;
+$$;
 
 COMMIT;

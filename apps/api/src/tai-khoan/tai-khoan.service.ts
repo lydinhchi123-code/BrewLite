@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  OnModuleDestroy,
   UnauthorizedException,
   BadRequestException,
   ForbiddenException,
@@ -10,7 +11,7 @@ import * as bcrypt from "bcrypt";
 import { JwtService } from "@nestjs/jwt";
 
 @Injectable()
-export class TaiKhoanService {
+export class TaiKhoanService implements OnModuleDestroy {
   private readonly pool: Pool;
 
   constructor(private readonly jwtService: JwtService) {
@@ -24,6 +25,10 @@ export class TaiKhoanService {
       connectionString,
       ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : false,
     });
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    await this.pool.end();
   }
 
   async dangKy(data: {
