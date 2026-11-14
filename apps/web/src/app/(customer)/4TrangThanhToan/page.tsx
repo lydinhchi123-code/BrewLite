@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { useCartStore } from "@/store/useCartStore";
 import "./thanh-toan.css";
 
 type FormField = "name" | "phone" | "address" | "phuong" | "note";
@@ -860,7 +861,9 @@ export default function ThanhToanPage() {
       );
 
       // Xóa giỏ hàng của đúng tài khoản vừa đặt hàng thành công.
-      localStorage.removeItem(`brewlite_cart_${checkout.makh}`);
+      useCartStore
+        .getState()
+        .clearCart(`brewlite_cart_${checkout.makh}`);
 
       // Thông báo để Header và các trang khác cập nhật số lượng giỏ hàng.
       window.dispatchEvent(new Event("brewlite-cart-updated"));

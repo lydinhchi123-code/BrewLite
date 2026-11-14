@@ -1,85 +1,107 @@
 # BrewLite
-Ứng dụng web đặt đồ uống trực tuyến, cho phép người dùng tìm kiếm và lựa chọn đồ uống thông qua giao diện website.
 
-## 1. Công nghệ sử dụng
+BrewLite is a drink ordering web application. The frontend is built with Next.js, the API with NestJS, and data is stored in PostgreSQL.
 
-- **Frontend:** Next.js, React, TypeScript, Tailwind CSS
-- **Backend:** NestJS, TypeScript
-- **Database:** PostgreSQL
-- **ORM:** Prisma (dự kiến tích hợp)
-- **Version control:** Git, GitHub
+## Production
 
-## 2. Cấu trúc dự án
+The production target is Render. Production URLs will be recorded in [the deployment guide](docs/deployment.md) after the Render services are created and verified. The API health check is `GET /health`.
 
-```text
-BrewLite/
-├── apps/
-│   ├── api/              # Backend - NestJS
-│   └── web/              # Frontend - Next.js
-├── database/             # Tài liệu và dữ liệu cơ sở dữ liệu
-├── docs/                 # Tài liệu phân tích và thiết kế
-├── .env.example          # File mẫu cấu hình môi trường
-├── .gitignore            # Các file không đưa lên Git
-└── README.md             # Tài liệu giới thiệu dự án
-```
+## Requirements
 
-## 3. Yêu cầu môi trường
-
-- Node.js và npm
+- Node.js 24 and npm
+- PostgreSQL 18
 - Git
-- PostgreSQL (phục vụ tích hợp cơ sở dữ liệu)
 
-## 4. Cài đặt và chạy dự án
+## Run locally
 
-### 4.1. Frontend
+### 1. Create and initialize the database
 
-Mở terminal tại thư mục gốc dự án:
+Start the PostgreSQL service, then create a fresh database:
 
-```bash
-cd apps/web
-npm install
-npm run dev
+```powershell
+psql -U postgres -h localhost -c "CREATE DATABASE brewlite_db;"
 ```
 
-Truy cập: http://localhost:3000
+From the repository root, load the SQL files in this order:
 
-### 4.2. Backend
+```powershell
+psql -U postgres -h localhost -d brewlite_db -f database/Menu.sql
+psql -U postgres -h localhost -d brewlite_db -f database/TaiKhoanKhachHang.sql
+psql -U postgres -h localhost -d brewlite_db -f database/NguyenLieu.sql
+psql -U postgres -h localhost -d brewlite_db -f database/DonHang-ThanhToan.sql
+psql -U postgres -h localhost -d brewlite_db -f database/GiamGia.sql
+psql -U postgres -h localhost -d brewlite_db -f database/migrations/20261027_upgrade_order_details.sql
+```
 
-Mở một terminal khác tại thư mục gốc dự án:
+The scripts initialize a new local database. Do not rerun them against a database that already contains the schema unless you intend to reset it.
 
-```bash
+### 2. Configure the API
+
+Create `apps/api/.env`:
+
+```env
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/brewlite_db
+PORT=3001
+FRONTEND_URL=http://localhost:3000
+JWT_SECRET=replace_with_a_local_random_secret
+```
+
+Replace the sample database password and JWT secret locally. Never commit `.env` files or production credentials.
+
+Install dependencies and start the API in one terminal:
+
+```powershell
 cd apps/api
-npm install
+npm ci
 npm run start:dev
 ```
 
-Backend chạy tại: http://localhost:3001
+The API is available at <http://localhost:3001>. Check <http://localhost:3001/health> for `{"status":"ok"}`.
 
-## 5. Cấu hình môi trường
+### 3. Configure and start the frontend
 
-Tham khảo file `.env.example` tại thư mục gốc để biết biến môi trường mẫu.
-
-Đối với frontend, tạo file `apps/web/.env.local` và cấu hình:
+Create `apps/web/.env.local`:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:3001
 ```
 
-Các thông tin môi trường khác cần được cấu hình theo yêu cầu thực tế của từng ứng dụng.
+In a second terminal:
 
-Không đưa file `.env`, `.env.local` hoặc thông tin bí mật lên GitHub.
+```powershell
+cd apps/web
+npm ci
+npm run dev
+```
 
-## 6. Trạng thái dự án
+Open <http://localhost:3000>.
 
-- [x] Khởi tạo Frontend Next.js
-- [x] Khởi tạo Backend NestJS
-- [x] Chạy thử hai ứng dụng
-- [x] Thiết lập Git và tài liệu cơ bản
-- [x] Sắp xếp cấu trúc dự án theo `apps/api` và `apps/web`
-- [ ] Tích hợp PostgreSQL và Prisma
-- [ ] Xây dựng API và giao diện
-- [ ] Kiểm thử và tích hợp các chức năng
+## Check, test, and build
 
-## 7. Đóng góp và phát triển
+Run commands from the relevant app directory:
 
-Các thành viên sử dụng Git để quản lý mã nguồn, cập nhật chức năng và phối hợp phát triển dự án thông qua GitHub.
+```powershell
+# API
+cd apps/api
+npm run lint
+npm test -- --runInBand
+npm run build
+
+# Frontend
+cd ..\web
+npm run lint
+npm run test
+npm run build
+```
+
+The GitHub Actions workflow runs lint, unit tests, and builds for both apps on pull requests to `master`.
+
+## Deploy and rollback
+
+The frontend, API, and private PostgreSQL database are configured as Render resources in `render.yaml`. GitHub Actions validates changes; Render deploys after the linked branch's CI checks pass. Follow [docs/deployment.md](docs/deployment.md) to create the Blueprint, set the production URLs, initialize the database, and roll back a deployment.
+
+## Security
+
+- Keep production database access limited to the API host; do not expose PostgreSQL directly to the public internet.
+- Store `DATABASE_URL` and application secrets in Render Environment; do not copy them to GitHub Actions or the repository.
+- Do not place production secrets in this repository, `.env.example`, or CI output.
