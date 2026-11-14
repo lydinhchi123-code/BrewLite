@@ -18,6 +18,13 @@ export class MenuController {
     return this.menuService.getProducts();
   }
 
+  @Get('products/:id')
+  async getProductById(
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.menuService.getProductById(id);
+  }
+
   @Get('menu/categories')
   async getCategories() {
     return this.menuService.getCategories();

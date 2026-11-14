@@ -3,7 +3,7 @@
 - **Dự án:** BrewLite – Hệ thống đặt đồ uống trực tuyến cho cửa hàng cà phê.
 - **Phiên bản tài liệu:** 1.0
 - **Phạm vi:** Task 1.1 – Bối cảnh, stakeholder và phạm vi.
-- **Công nghệ dự kiến:** Next.js (frontend), NestJS (backend), PostgreSQL (database), dịch vụ thanh toán giả lập trong môi trường đồ án.
+- **Công nghệ dự kiến:** Next.js (frontend), NestJS (backend), PostgreSQL (database), tích hợp VNPay Sandbox để mô phỏng quy trình thanh toán trực tuyến trong môi trường thử nghiệm.
 
 ## 1. Bối cảnh và vấn đề nghiệp vụ
 
@@ -22,7 +22,7 @@ Phạm vi đồ án tập trung vào việc xây dựng MVP có thể kiểm th�
 1. Cho phép khách hàng xem menu và thông tin sản phẩm rõ ràng.
 2. Hỗ trợ khách hàng lựa chọn kích cỡ, lượng đường, lượng đá và topping nếu sản phẩm có hỗ trợ.
 3. Tính chính xác tạm tính, phí giao hàng (nếu áp dụng) và tổng thanh toán.
-4. Cho phép khách hàng tạo đơn, lựa chọn phương thức thanh toán được hỗ trợ, sửa dụng mã giảm giá có điều kiện hợp lệ và nhận xác nhận đơn hàng.
+4. Cho phép khách hàng tạo đơn, thanh toán trực tuyến thông qua VNPay Sandbox, sử dụng mã giảm giá có điều kiện hợp lệ và nhận xác nhận đơn hàng.
 5. Cho phép khách hàng tra cứu trạng thái và lịch sử đơn hàng.
 6. Cung cấp khu vực Admin để quản lý thông tin sản phẩm,  đơn hàng, công thức pha chế và quản lý mã giảm giá.
 7. Đảm bảo ứng dụng có thể được cài đặt và chạy lại theo hướng dẫn cấu hình môi trường, migration và dữ liệu mẫu.
@@ -36,7 +36,7 @@ Phạm vi đồ án tập trung vào việc xây dựng MVP có thể kiểm th�
 | Quản lý cửa hàng | Người theo dõi hoạt động kinh doanh và quản lý cửa hàng | Nắm được tình trạng đơn hàng, thông tin sản phẩm và hoạt động vận hành | Cao |
 | Giảng viên / khách hàng nghiệm thu | Người đánh giá sản phẩm theo yêu cầu đồ án | Có tài liệu đầy đủ, tiêu chí nghiệm thu kiểm chứng được, sản phẩm có thể demo và kiểm thử lại | Cao |
 | Nhóm phát triển | Nhóm phân tích, thiết kế, lập trình, kiểm thử và triển khai hệ thống | Yêu cầu rõ ràng; mã nguồn có cấu trúc; dễ tích hợp, kiểm thử và bảo trì | Cao |
-| Đơn vị / dịch vụ thanh toán | Đơn vị xử lý kết quả thanh toán khi được tích hợp | Nhận đúng dữ liệu giao dịch; trả kết quả thành công/thất bại; hạn chế ghi nhận giao dịch trùng | Trung bình; MVP sử dụng dịch vụ mô phỏng |
+| VNPay Sandbox | Hệ thống thanh toán bên ngoài được tích hợp với BrewLite | Tiếp nhận yêu cầu thanh toán và trả kết quả giao dịch thành công hoặc thất bại trong môi trường thử nghiệm | Trung bình |
 
 **Lưu ý:** Nhân viên quầy và quản lý cửa hàng là các stakeholder có nhu cầu nghiệp vụ liên quan đến hoạt động của cửa hàng. Hệ thống không xây dựng giao diện riêng cho từng vai trò này; các chức năng quản trị được thực hiện thông qua khu vực Admin theo phạm vi phân quyền được triển khai.
 
@@ -51,8 +51,8 @@ Phạm vi đồ án tập trung vào việc xây dựng MVP có thể kiểm th�
 - Tính tạm tính và tổng đơn theo quy tắc được công bố trong giao diện.
 - Đăng ký và đăng nhập bằng tài khoản, mật khẩu.
 - Tạo đơn hàng và lưu đơn cùng các dòng sản phẩm vào PostgreSQL.
-- Hỗ trợ phương thức thanh toán COD và/hoặc luồng thanh toán giả lập.
-- Hiển thị trang xác nhận sau khi tạo đơn thành công.
+- Hỗ trợ phương thức thanh toán trực tuyến thông qua VNPay Sandbox.
+- Hiển thị trang xác nhận đơn hàng sau khi thanh toán qua VNPay Sandbox thành công.
 - Tra cứu trạng thái đơn hàng hiện tại và lịch sử đơn của khách hàng đã đăng nhập.
 
 ### 4.2. Khu vực Admin
@@ -78,7 +78,7 @@ Phạm vi đồ án tập trung vào việc xây dựng MVP có thể kiểm th�
 - Thông báo qua email/SMS hoặc thông báo đẩy.
 - Đánh giá sản phẩm và gợi ý món.
 - Dashboard thống kê doanh thu, sản phẩm bán chạy và hiệu suất xử lý đơn.
-- Tích hợp cổng thanh toán thật sau khi có tài khoản sandbox/production và được phê duyệt.
+- Nâng cấp tích hợp VNPay từ môi trường Sandbox sang môi trường Production khi đáp ứng các điều kiện đăng ký và được đơn vị cung cấp dịch vụ thanh toán phê duyệt.
 - Hỗ trợ nhiều chi nhánh, giờ hoạt động và menu theo chi nhánh.
 
 ## 6. Ngoài phạm vi (Out-of-scope)
@@ -99,7 +99,7 @@ Phạm vi đồ án tập trung vào việc xây dựng MVP có thể kiểm th�
 1. Người dùng có trình duyệt hiện đại và kết nối Internet.
 2. Giá, danh mục, hình ảnh và thông tin sản phẩm được nhóm cung cấp bằng dữ liệu quản lý qua database.
 3. Cửa hàng có một điểm xử lý đơn trong phạm vi MVP.
-4. Dịch vụ thanh toán có thể được mô phỏng; không cần giao dịch tiền thật để nghiệm thu.
+4. Dịch vụ thanh toán được tích hợp thông qua môi trường VNPay Sandbox; các giao dịch chỉ mang tính chất thử nghiệm, không phát sinh giao dịch tiền thật.
 5. Khi sử dụng tài khoản, mỗi khách hàng có email duy nhất và mật khẩu được xử lý an toàn ở backend.
 6. Nhóm có môi trường Node.js và PostgreSQL để phát triển, kiểm thử.
 7. Phí giao hàng và các quy tắc giá được xác định thống nhất trước khi viết test.
@@ -115,7 +115,7 @@ Phạm vi đồ án tập trung vào việc xây dựng MVP có thể kiểm th�
 - Các luồng nghiệp vụ phải có tiêu chí chấp nhận và có thể kiểm thử.
 - Cấu trúc hiện tại của repository sử dụng `apps/web` và `apps/api`
 - Thời gian và nhân lực có giới hạn; ưu tiên chức năng Must trước Should/Could.
-- Dịch vụ bên ngoài có thể không khả dụng; cần có xử lý lỗi và phương án thanh toán giả lập.
+- Các dịch vụ bên ngoài, bao gồm VNPay Sandbox, có thể không khả dụng trong một số thời điểm; hệ thống cần có cơ chế xử lý lỗi phù hợp và thông báo kết quả thanh toán cho khách hàng.
 
 ## 9. Rủi ro ban đầu
 
@@ -124,7 +124,7 @@ Phạm vi đồ án tập trung vào việc xây dựng MVP có thể kiểm th�
 | Frontend và backend không thống nhất API/data contract | Tích hợp chậm, sai dữ liệu | Chốt schema request/response và mã lỗi trước khi chia việc |
 | Quy tắc giá, topping và phí giao hàng thay đổi muộn | Sai tổng tiền, test phải sửa | Viết rõ công thức tính tiền và tạo test nghiệp vụ |
 | Trạng thái đơn không nhất quán | Khách hàng và Admin thấy thông tin khác nhau | Định nghĩa enum và các chuyển trạng thái hợp lệ |
-| Thanh toán giả lập không xử lý callback hoặc request lặp | Tạo đơn hoặc ghi nhận thanh toán trùng | Dùng mã tham chiếu/idempotency key và kiểm thử request lặp |
+| Quá trình tích hợp VNPay Sandbox không xử lý đúng kết quả trả về hoặc phát sinh request lặp | Trạng thái thanh toán và đơn hàng có thể không chính xác; có nguy cơ ghi nhận kết quả trùng | Kiểm tra tính hợp lệ của dữ liệu phản hồi, chữ ký giao dịch; sử dụng mã tham chiếu giao dịch và cơ chế chống xử lý trùng; kiểm thử các trường hợp thanh toán thành công, thất bại và gửi lại yêu cầu |
 | Môi trường phát triển giữa các thành viên khác nhau | Không chạy được khi nghiệm thu | Cung cấp README, `.env.example`, migration/seed và Docker Compose nếu cần |
 | Phạm vi quá lớn so với thời gian | Không hoàn thành MVP | Sử dụng MoSCoW, ưu tiên chức năng Must và ghi chức năng mở rộng riêng |
 | Phân quyền khu vực Admin chưa rõ ràng | Người không có quyền có thể truy cập chức năng quản trị | Xác định quyền truy cập và kiểm thử các API quản trị |

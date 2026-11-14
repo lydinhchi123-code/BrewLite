@@ -210,6 +210,126 @@ export class MenuService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+    /**
+   * Lấy chi tiết một sản phẩm theo ID, bao gồm danh mục, size và topping.
+   */
+  async getProductById(id: number) {
+    try {
+      const result = await this.pool.query<MenuProductRow>(
+        `
+        SELECT
+          p.id,
+          p.name,
+          p.slug,
+          p.description,
+          p.image_url,
+          p.base_price,
+          p.is_featured,
+          p.is_available,
+          p.display_order,
+
+          c.id AS category_id,
+          c.name AS category_name,
+          c.slug AS category_slug,
+
+          COALESCE(
+            (
+              SELECT json_agg(
+                json_build_object(
+                  'id', s.id,
+                  'size_code', s.size_code,
+                  'size_name', s.size_name,
+                  'price', s.price
+                )
+                ORDER BY s.display_order ASC, s.id ASC
+              )
+              FROM menu_product_sizes s
+              WHERE s.product_id = p.id
+                AND s.is_available = TRUE
+            ),
+            '[]'::json
+          ) AS sizes,
+
+          COALESCE(
+            (
+              SELECT json_agg(
+                json_build_object(
+                  'id', t.id,
+                  'name', t.name,
+                  'price', t.price
+                )
+                ORDER BY t.display_order ASC, t.id ASC
+              )
+              FROM menu_toppings t
+              WHERE t.is_available = TRUE
+                AND c.slug <> 'banh'
+            ),
+            '[]'::json
+          ) AS toppings
+
+        FROM menu_products p
+        LEFT JOIN menu_categories c
+          ON c.id = p.category_id
+
+        WHERE p.id = $1
+          AND p.is_available = TRUE
+          AND (c.id IS NULL OR c.is_active = TRUE)
+        `,
+        [id],
+      );
+
+      if (result.rows.length === 0) {
+        throw new NotFoundException(
+          'Không tìm thấy sản phẩm.',
+        );
+      }
+
+      const row = result.rows[0];
+
+      return {
+        ...row,
+        id: Number(row.id),
+        basePrice: Number(row.base_price),
+        imageUrl: row.image_url,
+        isFeatured: row.is_featured,
+
+        categoryId:
+          row.category_id === null
+            ? null
+            : Number(row.category_id),
+
+        categoryName: row.category_name,
+        categorySlug: row.category_slug,
+
+        category: row.category_id
+          ? {
+              id: Number(row.category_id),
+              name: row.category_name,
+              slug: row.category_slug,
+            }
+          : null,
+
+        sizes: (row.sizes ?? []).map((size) => ({
+          ...size,
+          id: Number(size.id),
+          price: Number(size.price),
+        })),
+
+        toppings: (row.toppings ?? []).map((topping) => ({
+          ...topping,
+          id: Number(topping.id),
+          price: Number(topping.price),
+        })),
+      };
+    } catch (error: unknown) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      this.handleDatabaseError(error);
+    }
+  }
+
   /**
    * Lấy danh sách nguyên liệu và tồn kho dành cho Admin.
    */

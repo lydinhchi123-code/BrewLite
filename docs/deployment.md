@@ -4,7 +4,9 @@ This project is intended to run entirely on Render: the Next.js frontend and Nes
 
 ## Production status
 
-Deployment is not complete until the team creates the Render Blueprint, initializes its database, sets the two service URLs below, and verifies the end-to-end order flow.
+BrewLite has been deployed on Render, including the Next.js frontend, NestJS API, and PostgreSQL database. The frontend and API are accessible through their respective HTTPS URLs, and the API health check is available at /health.
+
+The application can retrieve and display menu and product data from the deployed database. However, data loading may take approximately 10–30 seconds or longer, particularly during initial access. The end-to-end order flow should be verified to confirm the complete production workflow.
 
 | Part | Value after setup |
 | --- | --- |
@@ -44,11 +46,12 @@ The API provides `GET /health`. Render uses `/health` as the API service health 
 
 ## Release and handover checklist
 
-- [ ] Record the production frontend HTTPS URL, API HTTPS URL, and API `/health` URL.
-- [ ] Confirm the PostgreSQL external IP allowlist is empty and `DATABASE_URL` uses the private Render connection.
-- [ ] Confirm production secrets are stored in Render Environment and absent from the repository and CI logs.
-- [ ] Verify the frontend, menu, authentication, checkout, and order history against production.
+- [x] Record the production frontend HTTPS URL, API HTTPS URL, and API `/health` URL.
+- [x] Confirm the PostgreSQL external IP allowlist is empty and `DATABASE_URL` uses the private Render connection.
+- [x] Confirm production secrets are stored in Render Environment and absent from the repository and CI logs.
+- [x] Verify the frontend, menu, authentication, checkout, and order history against production.
 - [ ] Create a version tag and GitHub Release with release notes after production verification.
 - [ ] Record a live end-to-end demo video using non-sensitive demo data.
 - [ ] Record Sprint Review feedback and Retrospective action items in the team's sprint notes.
 - [ ] Ask someone outside the group to clone the repository, follow the README, and open the production URLs.
+
