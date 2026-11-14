@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [master]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   backend:
     name: Backend - NestJS
@@ -13,29 +20,33 @@ jobs:
     defaults:
       run:
         working-directory: apps/api
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: apps/api/package-lock.json
-
       - name: Install dependencies
         run: npm ci
-
       - name: Lint
         run: npm run lint
-
-      - name: Unit Test
+      - name: Unit tests
         run: npm test -- --runInBand
-
       - name: Build
         run: npm run build
+      - name: Start seeded PostgreSQL for integration tests
+        run: docker compose -f ../../docker-compose.yml up -d --wait db
+      - name: API end-to-end test (menu to paid order confirmation)
+        run: npm run test:e2e -- --runInBand
+        env:
+          DATABASE_URL: postgresql://postgres:brewlite_dev@localhost:5433/brewlite_db
+          JWT_SECRET: local-e2e-only-secret
+      - name: Stop test database
+        if: always()
+        run: docker compose -f ../../docker-compose.yml down -v --remove-orphans
 
   frontend:
     name: Frontend - Next.js
@@ -43,26 +54,20 @@ jobs:
     defaults:
       run:
         working-directory: apps/web
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
-
       - name: Install dependencies
         run: npm ci
-
       - name: Lint
         run: npm run lint
-
-      - name: Unit Test
+      - name: Unit tests
         run: npm run test
-
       - name: Build
         run: npm run build
