@@ -66,8 +66,6 @@
 
 ## Verification
 
-## Verification
-
 - **CI:** [GitHub Actions – BrewLite CI](https://github.com/lydinhchi123-code/BrewLite/actions/runs/43566841591) – **Success**. Hai jobs Backend (NestJS) và Frontend (Next.js) hoàn thành thành công.
 
 - **End-to-end demo flow:** Đã thực hiện kiểm tra các luồng nghiệp vụ chính của hệ thống, bao gồm:
@@ -81,22 +79,18 @@
 ## Known issues
 
 - Các dịch vụ sử dụng gói miễn phí trên Render có thể chuyển sang trạng thái ngủ khi không có truy cập trong một khoảng thời gian. Vì vậy, lần truy cập đầu tiên sau thời gian không hoạt động có thể mất thêm thời gian để khởi động.
-- Dữ liệu menu và sản phẩm có thể tải chậm trong lần truy cập đầu tiên do thời gian khởi động của dịch vụ Backend.
+- Dữ liệu menu và sản phẩm có thể tải chậm trong lần truy cập đầu tiên, có thể liên quan đến thời gian khởi động của dịch vụ Backend.
 - Thanh toán VNPay hiện sử dụng môi trường Sandbox phục vụ kiểm thử, chưa triển khai thanh toán bằng tiền thật trên môi trường Production.
 
 ## Rollback
 
-- <Rollback commit/tag and instructions>
-
-
-
-
-
-
-
-
-
-
-
-
-
+- **Rollback target:** Commit `7470721` – `Merge pull request #18 from lydinhchi123-code/task-5.4/production-handover fix: configure production deployment urls`.
+- **Rollback platform:** Render.
+- **Instructions:**
+  1. Truy cập Render Dashboard.
+  2. Mở dịch vụ `brewlite-web`, chọn tab Deploys và rollback về lần deploy thành công tương ứng với commit `7470721`.
+  3. Thực hiện tương tự với dịch vụ `brewlite-api`.
+  4. Kiểm tra trạng thái triển khai của cả Frontend và Backend.
+  5. Truy cập website Production, kiểm tra API health check và các chức năng chính.
+  6. Kiểm tra lại cấu hình Auto-Deploy sau khi hoàn tất rollback.
+- **Database:** Rollback ứng dụng không tự động khôi phục PostgreSQL. Nếu có thay đổi cấu trúc hoặc dữ liệu database không tương thích, cần thực hiện phương án khôi phục database riêng.
