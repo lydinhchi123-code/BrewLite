@@ -338,6 +338,7 @@ export default function CartPage() {
       items: items.map((item) => ({
       id: String(item.product.id),
       name: item.product.name,
+      image: item.product.image,
       price: item.unitPrice,
       quantity: item.qty,
 
