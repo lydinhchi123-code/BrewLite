@@ -53,6 +53,13 @@ export class OrdersController {
   @Get(':orderId')
   @UseGuards(JwtAuthGuard)
   findOne(@Param('orderId') orderId: string, @Req() req: any) {
+    const makh = req.user?.sub;
+
+    if (makh == null || !/^\d+$/.test(String(makh))) {
+      throw new UnauthorizedException(
+        'Không xác định được khách hàng đăng nhập.',
+      );
+    }
     return this.ordersService.findOne(orderId, req.user?.sub);
   }
 
