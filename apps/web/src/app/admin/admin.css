@@ -1,4 +1,3 @@
-
 .admin-shell {
   --coffee: #70452d;
   --coffee-dark: #422b20;
@@ -30,39 +29,47 @@
 }
 
 .admin-brand {
+  width: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 0 10px 32px;
-  color: var(--coffee-dark);
-  text-decoration: none;
+  justify-content: center;
+  text-align: center;
+  gap: 2px;
+}
+
+.admin-brand > span:last-child {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.admin-brand img {
+  display: block;
+  width: 175px;
+  height: auto;
+  object-fit: contain;
+  margin: 0 auto;
 }
 
 .admin-brand-icon {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  background: #f1e4d5;
-  font-size: 24px;
-}
-
-.admin-brand strong,
-.admin-brand small {
-  display: block;
+  display: none;
 }
 
 .admin-brand strong {
   font-family: Georgia, serif;
-  font-size: 23px;
+  font-size: 20px;
 }
 
 .admin-brand small {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 9px;
-  letter-spacing: 1.8px;
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  margin-top: 2px;
+  text-align: center;
+  color: var(--coffee);
 }
 
 .admin-menu-label {
@@ -90,7 +97,9 @@
   color: #776a60;
   font-size: 14px;
   text-decoration: none;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
 
 .admin-nav-item:hover {
@@ -447,7 +456,9 @@
   background: #fff;
   color: inherit;
   text-decoration: none;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .admin-shortcut:hover {

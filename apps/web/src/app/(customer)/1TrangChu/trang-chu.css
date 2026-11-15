@@ -1,4 +1,3 @@
-
 /* ========================================
    BREWLITE - TRANG CHỦ
    ======================================== */
@@ -177,8 +176,21 @@
 }
 
 .tc-image-note > span {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   font-size: 25px;
+}
+
+.tc-image-note > span img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .tc-image-note strong,
