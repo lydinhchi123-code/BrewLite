@@ -75,7 +75,7 @@ jobs:
   publish-images:
     name: Build and push Docker images
     needs: [backend, frontend]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
