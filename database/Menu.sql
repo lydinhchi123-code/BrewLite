@@ -280,67 +280,10 @@ VALUES
 
 INSERT INTO menu_product_toppings (product_id, topping_id)
 SELECT p.id, t.id
-FROM (
-    VALUES
-    ('ca-phe-sua-da', 'Shot Espresso'),
-    ('ca-phe-sua-da', 'Trân châu đen'),
-    ('ca-phe-sua-da', 'Trân châu trắng'),
-
-    ('caramel-macchiato', 'Shot Espresso'),
-    ('caramel-macchiato', 'Kem cheese'),
-
-    ('americano', 'Shot Espresso'),
-    ('cappuccino', 'Shot Espresso'),
-
-    ('tra-dao', 'Trân châu đen'),
-    ('tra-dao', 'Trân châu trắng'),
-    ('tra-dao', 'Trân châu hoàng kim'),
-    ('tra-dao', 'Pudding trứng'),
-
-    ('tra-vai-lai', 'Trân châu trắng'),
-    ('tra-vai-lai', 'Trân châu hoàng kim'),
-    ('tra-vai-lai', 'Pudding trứng'),
-
-    ('tra-chanh', 'Trân châu trắng'),
-    ('tra-chanh', 'Trân châu đen'),
-
-    ('tra-luu-do', 'Trân châu trắng'),
-    ('tra-luu-do', 'Trân châu hoàng kim'),
-
-    ('tra-sua-dau', 'Trân châu đen'),
-    ('tra-sua-dau', 'Trân châu trắng'),
-    ('tra-sua-dau', 'Trân châu hoàng kim'),
-    ('tra-sua-dau', 'Phô mai viên'),
-    ('tra-sua-dau', 'Pudding trứng'),
-
-    ('tra-sua-thai-xanh', 'Trân châu đen'),
-    ('tra-sua-thai-xanh', 'Trân châu trắng'),
-    ('tra-sua-thai-xanh', 'Trân châu hoàng kim'),
-    ('tra-sua-thai-xanh', 'Phô mai viên'),
-    ('tra-sua-thai-xanh', 'Pudding trứng'),
-
-    ('tra-sua-tran-chau', 'Trân châu đen'),
-    ('tra-sua-tran-chau', 'Trân châu trắng'),
-    ('tra-sua-tran-chau', 'Trân châu hoàng kim'),
-    ('tra-sua-tran-chau', 'Phô mai viên'),
-    ('tra-sua-tran-chau', 'Pudding trứng'),
-
-    ('matcha-da-xay', 'Trân châu đen'),
-    ('matcha-da-xay', 'Trân châu trắng'),
-    ('matcha-da-xay', 'Kem cheese'),
-    ('matcha-da-xay', 'Kem trứng nướng'),
-    ('matcha-da-xay', 'Pudding trứng'),
-
-    ('chocolate-da-xay', 'Kem cheese'),
-    ('chocolate-da-xay', 'Kem trứng nướng'),
-    ('chocolate-da-xay', 'Pudding trứng'),
-
-    ('oreo-da-xay', 'Kem cheese'),
-    ('oreo-da-xay', 'Kem trứng nướng'),
-    ('oreo-da-xay', 'Pudding trứng')
-) AS x(product_slug, topping_name)
-JOIN menu_products p ON p.slug = x.product_slug
-JOIN menu_toppings t ON t.name = x.topping_name;
+FROM menu_products p
+JOIN menu_categories c ON c.id = p.category_id
+CROSS JOIN menu_toppings t
+WHERE c.slug IN ('ca-phe', 'tra', 'tra-sua', 'da-xay');
 
 COMMIT;
 
@@ -453,4 +396,4 @@ ORDER BY c.display_order, p.display_order;
 SELECT * FROM menu_categories;
 SELECT * FROM menu_products;
 SELECT * FROM menu_product_sizes;
-SELECT * FROM menu_toppings;
+SELECT * FROM menu_product_toppings;

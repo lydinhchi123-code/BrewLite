@@ -1,0 +1,790 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import "./lichsudon.css";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+type TaiKhoan = {
+  makh: number;
+  hoten: string;
+  email: string | null;
+  sodienthoai: string;
+  trangthai: number;
+};
+
+type OrderStatus = "Đang xử lý" | "Hoàn thành" | "Đã hủy";
+
+type OrderItem = {
+  id: number;
+  name: string;
+  image: string;
+  size: string;
+  sugar: string;
+  ice: string;
+  toppings: string[];
+  quantity: number;
+  price: number;
+};
+
+type Order = {
+  id: string;
+  date: string;
+  status: OrderStatus;
+  items: OrderItem[];
+  subtotal: number;
+  shippingFee: number;
+  freeShipDiscount: number;
+  discount: number;
+  totalAmount: number;
+  deliveryMethod?: "DELIVERY" | "PICKUP";
+  recipientName?: string;
+  recipientPhone?: string;
+  deliveryAddress?: string;
+  province?: string;
+  note?: string;
+  apiStatus: string;
+};
+
+type ApiOrder = {
+  madonhang: string | number;
+  madonhanghienthi?: string;
+  makh: string | number | null;
+  ngaydat: string;
+  trangthai: string;
+  tongtien: number;
+  tamtinh: number;
+  phigiaohang: number;
+  originalDeliveryFee?: number;
+  giamgia_freeship?: number;
+  giamgia: number;
+  hinhthucnhanhang?: "DELIVERY" | "PICKUP";
+  deliveryMethod?: "DELIVERY" | "PICKUP";
+  items: ApiOrderItem[];
+  hotennguoinhan?: string;
+  sodienthoainguoinhan?: string;
+  diachigiaohang?: string;
+  phuong?: string;
+  ghichu?: string;
+};
+
+type ApiOrderItem = {
+  mactdh: number;
+  tenmon: string;
+  image_url: string | null;
+  kichco: string | null;
+  duong: string | null;
+  da: string | null;
+  topping: string | null;
+  soluong: number;
+  dongia: number;
+  thanhtien: number;
+};
+
+function mapOrderStatus(status: string): OrderStatus {
+  const value = status
+    .trim()
+    .toLowerCase()
+    .normalize("NFC")
+    .replace(/[\s-]+/g, "_");
+
+  if (
+    [
+      "da_giao",
+      "hoàn_thành",
+      "hoan_thanh",
+      "completed",
+      "complete",
+      "delivered",
+    ].includes(value)
+  ) {
+    return "Hoàn thành";
+  }
+
+  if (["da_huy", "đã_hủy", "đã_huỷ", "canceled", "cancelled"].includes(value)) {
+    return "Đã hủy";
+  }
+
+  return "Đang xử lý";
+}
+
+function mapApiOrder(order: ApiOrder): Order {
+  const items = (order.items ?? []).map((item) => ({
+    id: Number(item.mactdh),
+    name: item.tenmon,
+    image: item.image_url || "☕",
+    size: item.kichco || "Mặc định",
+    sugar: item.duong || "Chưa chọn",
+    ice: item.da || "Chưa chọn",
+    toppings: item.topping
+      ? item.topping
+          .split(",")
+          .map((name) => name.trim())
+          .filter(Boolean)
+      : [],
+    quantity: Number(item.soluong),
+    price: Number(item.dongia),
+  }));
+
+  const subtotal = Number(
+    order.tamtinh ??
+      items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+  );
+
+  // Phí giao hàng gốc trước khi trừ Freeship
+  const freeShipDiscount = Number(order.giamgia_freeship ?? 0);
+
+  // Phí giao hàng gốc = phí thực tế phải trả + tiền được giảm Freeship
+  const shippingFee = Number(
+    order.originalDeliveryFee ??
+      Number(order.phigiaohang ?? 0) + freeShipDiscount,
+  );
+
+  const discount = Number(order.giamgia ?? 0);
+
+  return {
+    id: order.madonhanghienthi || String(order.madonhang),
+    date: new Date(order.ngaydat).toLocaleString("vi-VN"),
+    status: mapOrderStatus(order.trangthai),
+    items,
+    subtotal,
+    shippingFee,
+    freeShipDiscount,
+    discount,
+    totalAmount: Number(order.tongtien),
+    deliveryMethod:
+      order.deliveryMethod === "PICKUP" || order.hinhthucnhanhang === "PICKUP"
+        ? "PICKUP"
+        : "DELIVERY",
+    recipientName: order.hotennguoinhan,
+    recipientPhone: order.sodienthoainguoinhan,
+    deliveryAddress: order.diachigiaohang,
+    province: order.phuong,
+    note: order.ghichu,
+    apiStatus: order.trangthai,
+  };
+}
+
+const filters = ["Tất cả", "Đang xử lý", "Hoàn thành", "Đã hủy"] as const;
+
+type Filter = (typeof filters)[number];
+
+function formatPrice(price: number) {
+  return price.toLocaleString("vi-VN") + "đ";
+}
+
+function getOrderTotal(order: Order) {
+  return order.totalAmount;
+}
+
+function getStatusClass(status: OrderStatus) {
+  if (status === "Hoàn thành") return "status-success";
+  if (status === "Đang xử lý") return "status-pending";
+  return "status-cancelled";
+}
+
+function isImageSource(image: string) {
+  return (
+    image.startsWith("/") ||
+    image.startsWith("https://") ||
+    image.startsWith("http://")
+  );
+}
+
+function getCurrentTaiKhoan(): TaiKhoan | null {
+  const token = localStorage.getItem("brewlite_accessToken");
+  const duLieu = localStorage.getItem("brewlite_user");
+
+  if (!token || !duLieu) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(duLieu);
+
+    if (!parsed || typeof parsed !== "object") return null;
+
+    const user = parsed as Record<string, unknown>;
+    const makh = Number(user.makh);
+
+    if (
+      !Number.isSafeInteger(makh) ||
+      makh <= 0 ||
+      typeof user.hoten !== "string" ||
+      typeof user.sodienthoai !== "string"
+    ) {
+      return null;
+    }
+
+    return {
+      makh,
+      hoten: user.hoten,
+      email: typeof user.email === "string" ? user.email : null,
+      sodienthoai: user.sodienthoai,
+      trangthai: Number(user.trangthai ?? 0),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export default function OrderHistoryPage() {
+  const [activeFilter, setActiveFilter] = useState<Filter>("Tất cả");
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  const [taiKhoan, setTaiKhoan] = useState<TaiKhoan | null>(null);
+  const [daKiemTra, setDaKiemTra] = useState(false);
+
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [dangTaiDonHang, setDangTaiDonHang] = useState(false);
+  const [loiDonHang, setLoiDonHang] = useState("");
+
+  const [dangHuyDon, setDangHuyDon] = useState(false);
+  const [loiHuyDon, setLoiHuyDon] = useState("");
+
+  useEffect(() => {
+    function capNhatTaiKhoan() {
+      // Xóa dữ liệu của tài khoản trước
+      setOrders([]);
+      setSelectedOrder(null);
+      setLoiDonHang("");
+      setDangTaiDonHang(false);
+      setActiveFilter("Tất cả");
+
+      // Đọc lại tài khoản sau khi đăng nhập hoặc đăng xuất
+      setTaiKhoan(getCurrentTaiKhoan());
+      setDaKiemTra(true);
+    }
+
+    capNhatTaiKhoan();
+
+    window.addEventListener("brewlite-auth-updated", capNhatTaiKhoan);
+
+    return () => {
+      window.removeEventListener("brewlite-auth-updated", capNhatTaiKhoan);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!taiKhoan) return;
+
+    const currentMakh = taiKhoan.makh;
+    const controller = new AbortController();
+
+    async function taiLichSuDonHang() {
+      setDangTaiDonHang(true);
+      setLoiDonHang("");
+
+      try {
+        const token = localStorage.getItem("brewlite_accessToken");
+        if (!token) {
+          throw new Error("Vui lòng đăng nhập để xem lịch sử đơn hàng.");
+        }
+
+        const response = await fetch(`${API_URL}/orders/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Không thể tải đơn hàng (HTTP ${response.status})`);
+        }
+
+        const data: ApiOrder[] = await response.json();
+
+        console.log("Dữ liệu lịch sử đơn hàng từ API:", data);
+
+        console.table(
+          data.map((order) => ({
+            maDonHang: order.madonhanghienthi || order.madonhang,
+            phiGiaoHang: order.phigiaohang,
+            originalDeliveryFee: order.originalDeliveryFee,
+            freeShipDiscount: order.giamgia_freeship,
+            giamgia: order.giamgia,
+          })),
+        );
+
+        if (controller.signal.aborted) return;
+
+        // Kiểm tra tài khoản hiện tại vẫn là tài khoản đã gửi request
+        const latestToken = localStorage.getItem("brewlite_accessToken");
+        const latestUser = getCurrentTaiKhoan();
+
+        if (
+          latestToken !== token ||
+          !latestUser ||
+          latestUser.makh !== currentMakh
+        ) {
+          return;
+        }
+
+        // API đã lọc đơn hàng theo tài khoản từ JWT
+        setOrders(data.map(mapApiOrder));
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
+
+        if (controller.signal.aborted) return;
+
+        setLoiDonHang(
+          error instanceof Error
+            ? error.message
+            : "Đã xảy ra lỗi khi tải đơn hàng.",
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setDangTaiDonHang(false);
+        }
+      }
+    }
+
+    Promise.resolve().then(() => {
+      if (!controller.signal.aborted) {
+        void taiLichSuDonHang();
+      }
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, [taiKhoan]);
+
+  const visibleOrders =
+    activeFilter === "Tất cả"
+      ? orders
+      : orders.filter((order) => order.status === activeFilter);
+
+  function getCount(filter: Filter) {
+    if (filter === "Tất cả") return orders.length;
+
+    return orders.filter((order) => order.status === filter).length;
+  }
+
+  async function handleCancelOrder() {
+    if (!selectedOrder || dangHuyDon) return;
+
+    const confirmed = window.confirm(
+      `Bạn có chắc chắn muốn hủy đơn hàng ${selectedOrder.id} không?`,
+    );
+
+    if (!confirmed) return;
+
+    setDangHuyDon(true);
+    setLoiHuyDon("");
+
+    try {
+      const token = localStorage.getItem("brewlite_accessToken");
+
+      if (!token) {
+        throw new Error("Vui lòng đăng nhập lại.");
+      }
+
+      const response = await fetch(
+        `${API_URL}/orders/${encodeURIComponent(selectedOrder.id)}/cancel`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message || "Không thể hủy đơn hàng. Vui lòng thử lại.",
+        );
+      }
+
+      const cancelledOrder: Order = {
+        ...selectedOrder,
+        status: "Đã hủy",
+        apiStatus: "CANCELLED",
+      };
+
+      setOrders((previousOrders) =>
+        previousOrders.map((order) =>
+          order.id === selectedOrder.id ? cancelledOrder : order,
+        ),
+      );
+
+      setSelectedOrder(cancelledOrder);
+    } catch (error) {
+      setLoiHuyDon(
+        error instanceof Error
+          ? error.message
+          : "Đã xảy ra lỗi khi hủy đơn hàng.",
+      );
+    } finally {
+      setDangHuyDon(false);
+    }
+  }
+
+  if (!daKiemTra) {
+    return (
+      <main className="history-page">
+        <section className="history-container">
+          <p>Đang kiểm tra thông tin tài khoản...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!taiKhoan) {
+    return (
+      <main className="history-page">
+        <section className="history-container">
+          <header className="history-header">
+            <div>
+              <p className="history-eyebrow">TÀI KHOẢN CỦA TÔI</p>
+              <h1>Lịch sử đơn hàng</h1>
+              <p className="history-subtitle">
+                Bạn chưa đăng nhập. Vui lòng đăng nhập để xem lịch sử đơn hàng.
+              </p>
+            </div>
+          </header>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="history-page">
+      <section className="history-container">
+        <header className="history-header">
+          <div>
+            <p className="history-eyebrow">TÀI KHOẢN CỦA TÔI</p>
+            <h1>Lịch sử đơn hàng</h1>
+            <p className="history-subtitle">
+              Theo dõi và xem lại những món ngon bạn đã đặt tại BrewLite.
+            </p>
+            {/* <div className="customer-info">
+              <p>Họ và tên: {taiKhoan.hoten}</p>
+              <p>Email: {taiKhoan.email || "Chưa cập nhật"}</p>
+              <p>Số điện thoại: {taiKhoan.sodienthoai}</p>
+            </div> */}
+          </div>
+
+          <div className="history-summary">
+            <strong>{orders.length}</strong>
+            <span>đơn hàng</span>
+          </div>
+        </header>
+
+        <nav className="history-filters" aria-label="Lọc đơn hàng">
+          {filters.map((filter) => (
+            <button
+              key={filter}
+              type="button"
+              className={`history-filter ${
+                activeFilter === filter ? "is-active" : ""
+              }`}
+              onClick={() => setActiveFilter(filter)}
+              aria-pressed={activeFilter === filter}
+            >
+              {filter}
+              <span>{getCount(filter)}</span>
+            </button>
+          ))}
+        </nav>
+
+        <section className="history-list" aria-label="Danh sách đơn hàng">
+          {dangTaiDonHang ? (
+            <div className="history-empty">
+              <p>Đang tải lịch sử đơn hàng...</p>
+            </div>
+          ) : loiDonHang ? (
+            <div className="history-empty">
+              <h2>Không thể tải đơn hàng</h2>
+              <p>{loiDonHang}</p>
+              <button
+                type="button"
+                className="history-detail-button"
+                onClick={() => setTaiKhoan({ ...taiKhoan! })}
+              >
+                Thử tải lại
+              </button>
+            </div>
+          ) : visibleOrders.length === 0 ? (
+            <div className="history-empty">
+              <span className="empty-icon">☕</span>
+              <h2>Chưa có đơn hàng</h2>
+              <p>Không tìm thấy đơn hàng nào thuộc trạng thái này.</p>
+            </div>
+          ) : (
+            visibleOrders.map((order) => {
+              if (order.items.length === 0) {
+                return (
+                  <article className="history-card" key={order.id}>
+                    <h2>#{order.id}</h2>
+                    <p>Đơn hàng chưa có thông tin chi tiết món.</p>
+                    <p>Trạng thái: {order.status}</p>
+                    <p>Tổng thanh toán: {formatPrice(order.totalAmount)}</p>
+                  </article>
+                );
+              }
+
+              const itemCount = order.items.reduce(
+                (sum, item) => sum + item.quantity,
+                0,
+              );
+
+              return (
+                <article className="history-card" key={order.id}>
+                  <div className="history-card-header">
+                    <div>
+                      <p className="history-label">Mã đơn hàng</p>
+                      <h2 className="history-order-id">#{order.id}</h2>
+                    </div>
+
+                    <span
+                      className={`history-status ${getStatusClass(order.status)}`}
+                    >
+                      <span className="status-dot" />
+                      {order.status}
+                    </span>
+                  </div>
+
+                  <p className="history-date">{order.date}</p>
+
+                  <div className="history-product">
+                    <div className="history-product-icon">
+                      {isImageSource(order.items[0].image) ? (
+                        <img
+                          src={order.items[0].image}
+                          alt={order.items[0].name}
+                          className="history-product-image"
+                        />
+                      ) : (
+                        order.items[0].image
+                      )}
+                    </div>
+
+                    <div className="history-product-info">
+                      <p className="history-product-name">
+                        {order.items[0].name}
+                        {order.items.length > 1 &&
+                          ` và ${order.items.length - 1} món khác`}
+                      </p>
+                      <p className="history-product-meta">
+                        Số lượng: {itemCount}
+                      </p>
+                    </div>
+
+                    <p className="history-product-price">
+                      {formatPrice(
+                        order.items.reduce(
+                          (sum, item) => sum + item.price * item.quantity,
+                          0,
+                        ),
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="history-card-footer">
+                    <div>
+                      <p className="history-total-label">Tổng thanh toán</p>
+                      <p className="history-total-price">
+                        {formatPrice(getOrderTotal(order))}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="history-detail-button"
+                      onClick={() => setSelectedOrder(order)}
+                      aria-label={`Xem chi tiết đơn hàng ${order.id}`}
+                    >
+                      Xem chi tiết <span aria-hidden="true">→</span>
+                    </button>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </section>
+      </section>
+
+      {selectedOrder && (
+        <div
+          className="history-modal-overlay"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedOrder(null);
+            }
+          }}
+        >
+          <section
+            className="history-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="history-modal-title"
+          >
+            <header className="history-modal-header">
+              <div>
+                <p className="history-eyebrow">CHI TIẾT ĐƠN HÀNG</p>
+                <h2 id="history-modal-title">#{selectedOrder.id}</h2>
+                <p className="history-date">{selectedOrder.date}</p>
+              </div>
+
+              <button
+                type="button"
+                className="history-modal-close"
+                onClick={() => setSelectedOrder(null)}
+                aria-label="Đóng chi tiết"
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="history-modal-status">
+              <span
+                className={`history-status ${getStatusClass(selectedOrder.status)}`}
+              >
+                <span className="status-dot" />
+                {selectedOrder.status}
+              </span>
+            </div>
+
+            {["PENDING", "PAYMENT_FAILED", "PAID"].includes(
+              selectedOrder.apiStatus,
+            ) && (
+              <div className="history-cancel-section">
+                {loiHuyDon && (
+                  <p className="history-cancel-error">{loiHuyDon}</p>
+                )}
+
+                <button
+                  type="button"
+                  className="history-cancel-button"
+                  onClick={handleCancelOrder}
+                  disabled={dangHuyDon}
+                >
+                  {dangHuyDon ? "Đang hủy đơn..." : "Hủy đơn hàng"}
+                </button>
+              </div>
+            )}
+
+            {/* Thông tin giao nhận */}
+            <div className="history-modal-delivery">
+              <h4>Thông tin giao nhận</h4>
+              <div className="history-delivery-grid">
+                <div>
+                  <span>Người nhận:</span>
+                  <strong>{selectedOrder.recipientName || "Khách hàng"}</strong>
+                </div>
+                <div>
+                  <span>Số điện thoại:</span>
+                  <strong>
+                    {selectedOrder.recipientPhone || "Chưa cập nhật"}
+                  </strong>
+                </div>
+                <div className="history-delivery-full">
+                  <span>Hình thức nhận hàng:</span>
+
+                  <strong>
+                    {selectedOrder.deliveryMethod === "PICKUP"
+                      ? "☕ Nhận tại quán BrewLite"
+                      : "📍 Giao tận nơi"}
+                  </strong>
+                </div>
+
+                {selectedOrder.deliveryMethod !== "PICKUP" && (
+                  <div className="history-delivery-full">
+                    <span>Địa chỉ giao hàng:</span>
+                    <strong>
+                      {selectedOrder.deliveryAddress || "Chưa cập nhật"}
+                      {selectedOrder.province &&
+                      !selectedOrder.deliveryAddress?.includes(
+                        selectedOrder.province,
+                      )
+                        ? `, ${selectedOrder.province}`
+                        : ""}
+                    </strong>
+                  </div>
+                )}
+                {selectedOrder.note && (
+                  <div className="history-delivery-full">
+                    <span>Ghi chú đơn hàng:</span>
+                    <em>&quot;{selectedOrder.note}&quot;</em>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="history-modal-items">
+              {selectedOrder.items.map((item) => (
+                <article className="history-detail-item" key={item.id}>
+                  <div className="history-product-icon">
+                    {isImageSource(item.image) ? (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="history-product-image"
+                      />
+                    ) : (
+                      item.image
+                    )}
+                  </div>
+
+                  <div className="history-detail-copy">
+                    <h3>{item.name}</h3>
+                    <p>Size {item.size}</p>
+                    <p>
+                      Đường: {item.sugar} · Đá: {item.ice}
+                    </p>
+                    <p>
+                      Topping:{" "}
+                      {item.toppings.length > 0
+                        ? item.toppings.join(", ")
+                        : "Không có"}
+                    </p>
+                    <p>Số lượng: {item.quantity}</p>
+                    <strong>{formatPrice(item.price * item.quantity)}</strong>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="history-payment">
+              <div>
+                <span>Tiền sản phẩm</span>
+                <span>{formatPrice(selectedOrder.subtotal)}</span>
+              </div>
+
+              <div>
+                <span>Phí giao hàng</span>
+                <span>{formatPrice(selectedOrder.shippingFee)}</span>
+              </div>
+
+              {selectedOrder.freeShipDiscount > 0 && (
+                <div>
+                  <span>Giảm phí giao hàng </span>
+                  <span>-{formatPrice(selectedOrder.freeShipDiscount)}</span>
+                </div>
+              )}
+
+              <div>
+                <span>Giảm giá</span>
+                <span>-{formatPrice(selectedOrder.discount)}</span>
+              </div>
+
+              <div className="history-payment-total">
+                <strong>Tổng thanh toán</strong>
+                <strong>{formatPrice(getOrderTotal(selectedOrder))}</strong>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="history-modal-done"
+              onClick={() => setSelectedOrder(null)}
+            >
+              Đóng
+            </button>
+          </section>
+        </div>
+      )}
+    </main>
+  );
+}
