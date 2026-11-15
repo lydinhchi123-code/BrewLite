@@ -24,6 +24,9 @@ export class OrderItemDto {
   name: string;
 
   @IsOptional()
+  @IsString()
+  image_url?: string;
+
   @IsNumber()
   @Min(0)
   price?: number;

@@ -82,22 +82,26 @@ type ApiOrderItem = {
 };
 
 function mapOrderStatus(status: string): OrderStatus {
-  const value = status.trim().toLowerCase().normalize("NFC").replace(/[\s-]+/g, "_");
+  const value = status
+    .trim()
+    .toLowerCase()
+    .normalize("NFC")
+    .replace(/[\s-]+/g, "_");
 
   if (
-    ["da_giao", "hoàn_thành", "hoan_thanh", 
-      "completed", "complete", "delivered",
+    [
+      "da_giao",
+      "hoàn_thành",
+      "hoan_thanh",
+      "completed",
+      "complete",
+      "delivered",
     ].includes(value)
   ) {
     return "Hoàn thành";
   }
 
-  if (
-    [
-      "da_huy", "đã_hủy", "đã_huỷ",
-      "canceled", "cancelled",
-    ].includes(value)
-  ) {
+  if (["da_huy", "đã_hủy", "đã_huỷ", "canceled", "cancelled"].includes(value)) {
     return "Đã hủy";
   }
 
@@ -124,20 +128,17 @@ function mapApiOrder(order: ApiOrder): Order {
 
   const subtotal = Number(
     order.tamtinh ??
-      items.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0,
-      ),
+      items.reduce((sum, item) => sum + item.price * item.quantity, 0),
   );
 
   // Phí giao hàng gốc trước khi trừ Freeship
   const freeShipDiscount = Number(order.giamgia_freeship ?? 0);
 
   // Phí giao hàng gốc = phí thực tế phải trả + tiền được giảm Freeship
-  const shippingFee =
-    Number(order.originalDeliveryFee ?? (
-      Number(order.phigiaohang ?? 0) + freeShipDiscount
-    ));
+  const shippingFee = Number(
+    order.originalDeliveryFee ??
+      Number(order.phigiaohang ?? 0) + freeShipDiscount,
+  );
 
   const discount = Number(order.giamgia ?? 0);
 
@@ -152,8 +153,7 @@ function mapApiOrder(order: ApiOrder): Order {
     discount,
     totalAmount: Number(order.tongtien),
     deliveryMethod:
-      order.deliveryMethod === "PICKUP" ||
-      order.hinhthucnhanhang === "PICKUP"
+      order.deliveryMethod === "PICKUP" || order.hinhthucnhanhang === "PICKUP"
         ? "PICKUP"
         : "DELIVERY",
     recipientName: order.hotennguoinhan,
@@ -275,20 +275,17 @@ export default function OrderHistoryPage() {
 
       try {
         const token = localStorage.getItem("brewlite_accessToken");
-
         if (!token) {
           throw new Error("Vui lòng đăng nhập để xem lịch sử đơn hàng.");
         }
 
-        const response = await fetch(`${API_URL}/orders/khach-hang`, {
+        const response = await fetch(`${API_URL}/orders/me`, {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });
 
         if (!response.ok) {
-          throw new Error(
-            `Không thể tải đơn hàng (HTTP ${response.status})`,
-          );
+          throw new Error(`Không thể tải đơn hàng (HTTP ${response.status})`);
         }
 
         const data: ApiOrder[] = await response.json();
@@ -302,7 +299,7 @@ export default function OrderHistoryPage() {
             originalDeliveryFee: order.originalDeliveryFee,
             freeShipDiscount: order.giamgia_freeship,
             giamgia: order.giamgia,
-          }))
+          })),
         );
 
         if (controller.signal.aborted) return;
@@ -322,10 +319,7 @@ export default function OrderHistoryPage() {
         // API đã lọc đơn hàng theo tài khoản từ JWT
         setOrders(data.map(mapApiOrder));
       } catch (error) {
-        if (
-          error instanceof Error &&
-          error.name === "AbortError"
-        ) {
+        if (error instanceof Error && error.name === "AbortError") {
           return;
         }
 
@@ -354,8 +348,10 @@ export default function OrderHistoryPage() {
     };
   }, [taiKhoan]);
 
-  const visibleOrders = activeFilter === "Tất cả"
-      ? orders : orders.filter((order) => order.status === activeFilter);
+  const visibleOrders =
+    activeFilter === "Tất cả"
+      ? orders
+      : orders.filter((order) => order.status === activeFilter);
 
   function getCount(filter: Filter) {
     if (filter === "Tất cả") return orders.length;
@@ -408,9 +404,7 @@ export default function OrderHistoryPage() {
 
       setOrders((previousOrders) =>
         previousOrders.map((order) =>
-          order.id === selectedOrder.id
-            ? cancelledOrder
-            : order,
+          order.id === selectedOrder.id ? cancelledOrder : order,
         ),
       );
 
@@ -657,9 +651,7 @@ export default function OrderHistoryPage() {
             ) && (
               <div className="history-cancel-section">
                 {loiHuyDon && (
-                  <p className="history-cancel-error">
-                    {loiHuyDon}
-                  </p>
+                  <p className="history-cancel-error">{loiHuyDon}</p>
                 )}
 
                 <button
@@ -683,7 +675,9 @@ export default function OrderHistoryPage() {
                 </div>
                 <div>
                   <span>Số điện thoại:</span>
-                  <strong>{selectedOrder.recipientPhone || "Chưa cập nhật"}</strong>
+                  <strong>
+                    {selectedOrder.recipientPhone || "Chưa cập nhật"}
+                  </strong>
                 </div>
                 <div className="history-delivery-full">
                   <span>Hình thức nhận hàng:</span>
@@ -701,7 +695,9 @@ export default function OrderHistoryPage() {
                     <strong>
                       {selectedOrder.deliveryAddress || "Chưa cập nhật"}
                       {selectedOrder.province &&
-                      !selectedOrder.deliveryAddress?.includes(selectedOrder.province)
+                      !selectedOrder.deliveryAddress?.includes(
+                        selectedOrder.province,
+                      )
                         ? `, ${selectedOrder.province}`
                         : ""}
                     </strong>
@@ -772,7 +768,7 @@ export default function OrderHistoryPage() {
                 <span>Giảm giá</span>
                 <span>-{formatPrice(selectedOrder.discount)}</span>
               </div>
-              
+
               <div className="history-payment-total">
                 <strong>Tổng thanh toán</strong>
                 <strong>{formatPrice(getOrderTotal(selectedOrder))}</strong>

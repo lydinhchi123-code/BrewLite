@@ -9,14 +9,12 @@ databases:
 services:
   - type: web
     name: brewlite-api
-    runtime: node
+    runtime: image
+    image:
+      url: ghcr.io/lydinhchi123-code/brewlite-api:a692489942b88efaed3a46503e9764db365a99e2
     plan: free
     region: singapore
-    rootDir: apps/api
-    buildCommand: npm ci --include=dev && npm run build
-    startCommand: npm run start:prod
     healthCheckPath: /health
-    autoDeployTrigger: checksPass
     envVars:
       - key: NODE_ENV
         value: production
@@ -31,13 +29,12 @@ services:
 
   - type: web
     name: brewlite-web
-    runtime: node
+    runtime: image
+    image:
+      url: ghcr.io/lydinhchi123-code/brewlite-web:a692489942b88efaed3a46503e9764db365a99e2
     plan: free
     region: singapore
-    rootDir: apps/web
-    buildCommand: npm ci --include=dev && npm run build
-    startCommand: npm run start
-    autoDeployTrigger: checksPass
+    healthCheckPath: /
     envVars:
       - key: NODE_ENV
         value: production
