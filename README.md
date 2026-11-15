@@ -224,11 +224,43 @@ Truy cập website tại:
 
 http://localhost:3000
 
-## 5. Cấu hình môi trường
+## 5. Hướng dẫn truy cập trang Admin
+
+BrewLite cung cấp trang quản trị dành cho Admin để quản lý và theo dõi các hoạt động của hệ thống.
+
+**Địa chỉ truy cập:**
+
+- URL: `http://localhost:3000/admin`
+
+**Tài khoản đăng nhập local:**
+
+- Mật khẩu: `admin123`
+
+**Cách đăng nhập:**
+
+1. Khởi chạy hệ thống BrewLite.
+2. Truy cập `http://localhost:3000/admin`.
+3. Nhập mật khẩu `admin123`.
+4. Nhấn nút **Đăng nhập** để truy cập trang quản trị.
+
+**Lưu ý:**
+
+- Mật khẩu Admin hiện được khai báo trực tiếp trong mã nguồn Frontend.
+- Sau khi đăng nhập thành công, hệ thống lưu trạng thái đăng nhập vào `sessionStorage` bằng khóa `brewlite_admin_loggedIn`.
+- Trạng thái đăng nhập được duy trì trong phiên tab trình duyệt hiện tại.
+
+**Lưu ý bảo mật:**
+
+- Đây là cơ chế đăng nhập Admin đơn giản phục vụ phiên bản hiện tại.
+- Mật khẩu được lưu trực tiếp trong mã nguồn Frontend nên không được xem là cơ chế xác thực an toàn.
+- Không sử dụng mật khẩu này làm thông tin bảo mật cho môi trường Production có dữ liệu thực.
+- Khi triển khai thực tế, cần chuyển sang xác thực Admin ở Backend và quản lý thông tin đăng nhập bằng cấu hình bảo mật.
+
+## 6. Cấu hình môi trường
 
 Dự án sử dụng biến môi trường để quản lý các thông tin cấu hình giữa môi trường local và Production.
 
-### 5.1. Backend
+### 6.1. Backend
 
 File cấu hình: `apps/api/.env`
 
@@ -239,7 +271,7 @@ File cấu hình: `apps/api/.env`
 | `FRONTEND_URL` | Địa chỉ Frontend được phép kết nối |
 | `JWT_SECRET` | Khóa bí mật dùng cho xác thực JWT |
 
-### 5.2. Frontend
+### 6.2. Frontend
 
 File cấu hình: `apps/web/.env.local`
 
@@ -249,7 +281,7 @@ File cấu hình: `apps/web/.env.local`
 
 Các giá trị trên là cấu hình mẫu cho môi trường local. Khi triển khai Production, cần thay bằng URL và thông tin tương ứng trên Render.
 
-### 5.3. Lưu ý bảo mật
+### 6.3. Lưu ý bảo mật
 
 - Không đưa các file `.env`, `.env.local` hoặc thông tin bí mật lên GitHub.
 - Không công khai mật khẩu database, JWT secret hoặc khóa bí mật của dịch vụ thanh toán.
@@ -257,11 +289,11 @@ Các giá trị trên là cấu hình mẫu cho môi trường local. Khi triể
 - Không đưa thông tin bí mật vào mã nguồn, file cấu hình mẫu hoặc log CI/CD.
 - Database Production chỉ cho phép Backend kết nối thông qua cấu hình kết nối nội bộ của Render.
 
-## 6. Kiểm tra, kiểm thử và build
+## 7. Kiểm tra, kiểm thử và build
 
 Các lệnh dưới đây được thực hiện tại thư mục tương ứng của từng ứng dụng.
 
-### 6.1. Backend
+### 7.1. Backend
 
 ```powershell
 cd apps/api
@@ -271,7 +303,7 @@ npm test -- --runInBand
 npm run build
 ```
 
-### 6.2. Frontend
+### 7.2. Frontend
 
 ```powershell
 cd apps/web
@@ -281,7 +313,7 @@ npm run test
 npm run build
 ```
 
-### 6.3. API End-to-End Testing
+### 7.3. API End-to-End Testing
 
 Bài kiểm thử API E2E cần một PostgreSQL database mới đã được khởi tạo và seed dữ liệu. Có thể sử dụng PostgreSQL từ Docker Compose.
 
@@ -313,7 +345,7 @@ Nếu sử dụng cổng `5433`, thay `5434` trong chuỗi kết nối bằng `5
 
 Bài kiểm thử E2E thực hiện các bước chính: lấy dữ liệu menu, đăng ký và đăng nhập tài khoản khách hàng thử nghiệm, tạo đơn hàng Pickup, thực hiện thanh toán bằng phương thức Mock và truy vấn thông tin xác nhận đơn hàng.
 
-### 6.4. Continuous Integration
+### 7.4. Continuous Integration
 
 GitHub Actions được sử dụng để tự động kiểm tra mã nguồn khi tạo Pull Request vào nhánh `master`.
 
@@ -326,9 +358,9 @@ Quy trình CI bao gồm:
 
 Các kết quả kiểm thử được theo dõi trong mục **Actions** của repository GitHub.
 
-## 7. Trạng thái dự án
+## 8. Trạng thái dự án
 
-### 7.1. Phát triển hệ thống
+### 8.1. Phát triển hệ thống
 
 - [x] Khởi tạo cấu trúc monorepo.
 - [x] Xây dựng Frontend bằng Next.js.
@@ -340,7 +372,7 @@ Các kết quả kiểm thử được theo dõi trong mục **Actions** của r
 - [x] Tích hợp quy trình thanh toán thử nghiệm.
 - [x] Xây dựng chức năng theo dõi và tra cứu đơn hàng.
 
-### 7.2. Kiểm thử và triển khai
+### 8.2. Kiểm thử và triển khai
 
 - [x] Thiết lập Unit Test cho Backend.
 - [x] Thiết lập API End-to-End Test.
@@ -352,7 +384,7 @@ Các kết quả kiểm thử được theo dõi trong mục **Actions** của r
 - [x] Triển khai PostgreSQL trên Render.
 - [x] Kiểm tra API Health Check trên Production.
 
-## 8. Triển khai Production
+## 9. Triển khai Production
 
 BrewLite sử dụng Render làm nền tảng triển khai Production, gồm ba dịch vụ chính:
 
@@ -360,7 +392,7 @@ BrewLite sử dụng Render làm nền tảng triển khai Production, gồm ba 
 - **Backend:** NestJS Web Service.
 - **Database:** PostgreSQL Database.
 
-### 8.1. Địa chỉ truy cập
+### 9.1. Địa chỉ truy cập
 
 | Thành phần | Địa chỉ |
 |---|---|
@@ -370,7 +402,7 @@ BrewLite sử dụng Render làm nền tảng triển khai Production, gồm ba 
 
 API Health Check sử dụng phương thức `GET /health` để kiểm tra trạng thái khởi chạy của Backend.
 
-### 8.2. Hướng dẫn triển khai
+### 9.2. Hướng dẫn triển khai
 
 Cấu hình triển khai được quản lý bằng file `render.yaml` tại thư mục gốc repository.
 
@@ -380,7 +412,7 @@ Chi tiết các bước tạo Render Blueprint, cấu hình biến môi trườn
 
 **Lưu ý:** Dịch vụ miễn phí trên Render có thể chuyển sang trạng thái ngủ khi không có yêu cầu trong một khoảng thời gian. Vì vậy, yêu cầu đầu tiên sau thời gian không hoạt động có thể mất thêm thời gian để tải dữ liệu.
 
-## 9. Đóng góp và phát triển
+## 10. Đóng góp và phát triển
 
 Các thành viên sử dụng Git và GitHub để quản lý mã nguồn, phối hợp phát triển và kiểm soát thay đổi.
 
@@ -393,3 +425,6 @@ Quy trình làm việc cơ bản:
 5. Tạo Pull Request để xem xét và tích hợp vào nhánh `master`.
 
 Các thay đổi cần được kiểm tra trước khi tích hợp nhằm đảm bảo tính ổn định của hệ thống.
+
+
+
