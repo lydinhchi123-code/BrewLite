@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, type FormEvent } from "react";
@@ -24,7 +23,12 @@ export default function DangNhapAdmin() {
   return (
     <div className="admin-login-page">
       <form className="admin-login-box" onSubmit={handleLogin}>
-        <div className="admin-login-icon">☕</div>
+        <div className="admin-login-icon">
+          <img
+            src="/images/BrewLite_logo_transparent.png"
+            alt="BrewLite Coffee"
+          />
+        </div>
         <h1>BrewLite Admin</h1>
         <p>Đăng nhập vào trang quản trị</p>
 
@@ -57,7 +61,7 @@ export default function DangNhapAdmin() {
           background: white;
           padding: 40px;
           border-radius: 16px;
-          box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
           display: flex;
           flex-direction: column;
           gap: 15px;
@@ -68,12 +72,15 @@ export default function DangNhapAdmin() {
           text-align: center;
         }
 
-        h1, p {
+        h1,
+        p {
           text-align: center;
           margin: 0;
         }
 
-        h1 { color: #795334; }
+        h1 {
+          color: #795334;
+        }
 
         p {
           color: #888;

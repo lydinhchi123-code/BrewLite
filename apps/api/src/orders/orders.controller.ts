@@ -20,9 +20,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('orders')
 export class OrdersController {
-  constructor(
-    private readonly ordersService: OrdersService,
-  ) {}
+  constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -32,14 +30,8 @@ export class OrdersController {
       transform: true,
     }),
   )
-  create(
-    @Body() createOrderDto: CreateOrderDto,
-    @Req() req: any,
-  ) {
-    return this.ordersService.create(
-      createOrderDto,
-      Number(req.user.sub),
-    );
+  create(@Body() createOrderDto: CreateOrderDto, @Req() req: any) {
+    return this.ordersService.create(createOrderDto, req.user?.sub);
   }
 
   @Get()
@@ -51,22 +43,16 @@ export class OrdersController {
   getDashboardStats() {
     return this.ordersService.getDashboardStats();
   }
-  
-  @Get('khach-hang')
+
+  @Get('me')
   @UseGuards(JwtAuthGuard)
-  findByCustomerId(@Req() req: any) {
-    return this.ordersService.findByCustomerId(
-      Number(req.user.sub),
-    );
+  findMyOrders(@Req() req: any) {
+    return this.ordersService.findByCustomerId(req.user?.sub);
   }
 
-  // Lấy chi tiết một đơn hàng
   @Get(':orderId')
   @UseGuards(JwtAuthGuard)
-  findOne(
-    @Param('orderId') orderId: string,
-    @Req() req: any,
-  ) {
+  findOne(@Param('orderId') orderId: string, @Req() req: any) {
     const makh = req.user?.sub;
 
     if (makh == null || !/^\d+$/.test(String(makh))) {
@@ -74,8 +60,7 @@ export class OrdersController {
         'Không xác định được khách hàng đăng nhập.',
       );
     }
-
-    return this.ordersService.findOne(orderId, String(makh));
+    return this.ordersService.findOne(orderId, req.user?.sub);
   }
 
   @Patch(':madonhang/status')
@@ -90,18 +75,12 @@ export class OrdersController {
     @Param('madonhang', ParseIntPipe) madonhang: number,
     @Body() dto: UpdateOrderStatusDto,
   ) {
-    return this.ordersService.updateStatus(
-      madonhang,
-      dto.status,
-    );
+    return this.ordersService.updateStatus(madonhang, dto.status);
   }
 
   @Patch(':orderId/cancel')
   @UseGuards(JwtAuthGuard)
-  cancelOrder(
-    @Param('orderId') orderId: string,
-    @Req() req: any,
-  ) {
+  cancelOrder(@Param('orderId') orderId: string, @Req() req: any) {
     const makh = req.user?.sub;
 
     if (makh == null || !/^\d+$/.test(String(makh))) {
@@ -110,9 +89,6 @@ export class OrdersController {
       );
     }
 
-    return this.ordersService.cancelOrder(
-      orderId,
-      String(makh),
-    );
+    return this.ordersService.cancelOrder(orderId, String(makh));
   }
 }

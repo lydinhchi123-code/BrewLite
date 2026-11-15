@@ -36,8 +36,7 @@ describe('BrewLite order flow (e2e)', () => {
       .get('/products')
       .expect(200);
     const cake = menu.body.find(
-      (product: { categorySlug?: string }) =>
-        product.categorySlug === 'banh',
+      (product: { categorySlug?: string }) => product.categorySlug === 'banh',
     );
     expect(cake).toBeDefined();
 
@@ -68,7 +67,9 @@ describe('BrewLite order flow (e2e)', () => {
       .set('Authorization', `Bearer ${customerToken}`)
       .send({
         deliveryMethod: 'PICKUP',
-        items: [{ id: String(cake.id), name: cake.name, quantity: 1 }],
+        items: [
+          { id: String(cake.id), name: cake.name, quantity: 1, price: price },
+        ],
         customerName: 'Khach Hang Thu Nghiem',
         customerPhone,
         address: 'Nhận tại cửa hàng',
@@ -78,7 +79,9 @@ describe('BrewLite order flow (e2e)', () => {
       })
       .expect((response) => {
         if (response.status !== 201) {
-          throw new Error(`Create order failed: ${JSON.stringify(response.body)}`);
+          throw new Error(
+            `Create order failed: ${JSON.stringify(response.body)}`,
+          );
         }
       });
 
