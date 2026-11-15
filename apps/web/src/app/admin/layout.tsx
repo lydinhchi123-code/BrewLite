@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -29,9 +28,7 @@ export default function AdminLayout({
     Promise.resolve().then(() => {
       if (!active) return;
 
-      const loggedIn = sessionStorage.getItem(
-        "brewlite_admin_loggedIn"
-      );
+      const loggedIn = sessionStorage.getItem("brewlite_admin_loggedIn");
 
       if (loggedIn !== "true") {
         router.replace("/dang-nhap-admin");
@@ -66,9 +63,13 @@ export default function AdminLayout({
     <div className="admin-shell">
       <aside className="admin-sidebar">
         <Link href="/admin" className="admin-brand">
-          <span className="admin-brand-icon">☕</span>
+          <span className="admin-brand-icon"></span>
           <span>
-            <strong>BrewLite</strong>
+            <img
+              src="/images/BrewLite_logo_transparent.png"
+              alt="BrewLite Coffee"
+            />
+
             <small>ADMINISTRATION</small>
           </span>
         </Link>
@@ -114,7 +115,7 @@ export default function AdminLayout({
               {menuItems.find((item) =>
                 item.href === "/admin"
                   ? pathname === "/admin"
-                  : pathname.startsWith(item.href)
+                  : pathname.startsWith(item.href),
               )?.label ?? "Quản trị"}
             </h2>
           </div>

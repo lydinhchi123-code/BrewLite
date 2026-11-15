@@ -156,7 +156,7 @@ export default function Header() {
       if (!regexHoTen.test(ten)) {
         setLoi(true);
         setThongBao(
-          "Họ và tên phải bắt đầu bằng chữ cái và không được chứa số hoặc ký tự đặc biệt."
+          "Họ và tên phải bắt đầu bằng chữ cái và không được chứa số hoặc ký tự đặc biệt.",
         );
         return;
       }
@@ -164,7 +164,7 @@ export default function Header() {
       if (!regexSoDienThoai.test(sdt)) {
         setLoi(true);
         setThongBao(
-          "Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0."
+          "Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0.",
         );
         return;
       }
@@ -243,7 +243,7 @@ export default function Header() {
 
           guestCart.forEach((guestItem) => {
             const existingIndex = mergedCart.findIndex(
-              (item) => item.key === guestItem.key
+              (item) => item.key === guestItem.key,
             );
 
             if (existingIndex >= 0) {
@@ -365,8 +365,12 @@ export default function Header() {
             className="logo"
             onClick={() => setMoMenuMobile(false)}
           >
-            <span className="logo-mark">☕</span>
-            <strong>BrewLite</strong>
+            <span className="logo-mark">
+              <img
+                src="/images/BrewLite_logo_transparent.png"
+                alt="BrewLite Coffee"
+              />
+            </span>
           </Link>
 
           <nav className={`nav ${moMenuMobile ? "nav-open" : ""}`}>
@@ -429,14 +433,14 @@ export default function Header() {
               </button>
             )}
 
-            <Link
-              href="/3TrangGioHang"
-              className="btn btn-primary cart-button"
-            >
+            <Link href="/3TrangGioHang" className="btn btn-primary cart-button">
               <span>Giỏ hàng</span>
 
               {soLuongGioHang > 0 && (
-                <span className="cart-count" aria-label={`${soLuongGioHang} món hàng`}>
+                <span
+                  className="cart-count"
+                  aria-label={`${soLuongGioHang} món hàng`}
+                >
                   {soLuongGioHang}
                 </span>
               )}
@@ -478,7 +482,13 @@ export default function Header() {
               ×
             </button>
 
-            <div className="auth-brand">☕ BrewLite</div>
+            <div className="auth-brand">
+              <img
+                src="/images/BrewLite_logo_transparent.png"
+                alt="BrewLite Coffee"
+              />{" "}
+              BrewLite
+            </div>
 
             <h2 id="auth-title">
               {cheDo === "dang-nhap"
@@ -951,7 +961,7 @@ export default function Header() {
             cursor: not-allowed;
           }
         }
-          .cart-button {
+        .cart-button {
           display: inline-flex;
           align-items: center;
           justify-content: center;

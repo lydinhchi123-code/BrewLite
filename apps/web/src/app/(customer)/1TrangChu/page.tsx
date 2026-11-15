@@ -1,4 +1,3 @@
-
 "use client";
 
 import "./trang-chu.css";
@@ -11,8 +10,7 @@ type MonNoiBat = {
   anh: string;
 };
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 const TEN_MON_NOI_BAT = [
   "Cà phê sữa đá",
@@ -35,16 +33,16 @@ export default function TrangChu() {
 
         if (!response.ok) {
           throw new Error(
-            `Không lấy được danh sách món. HTTP ${response.status}`
+            `Không lấy được danh sách món. HTTP ${response.status}`,
           );
         }
 
         const payload: unknown = await response.json();
 
-        const isRecord = (
-          value: unknown
-        ): value is Record<string, unknown> => {
-          return typeof value === "object" && value !== null && !Array.isArray(value);
+        const isRecord = (value: unknown): value is Record<string, unknown> => {
+          return (
+            typeof value === "object" && value !== null && !Array.isArray(value)
+          );
         };
 
         const rawList: unknown[] = Array.isArray(payload)
@@ -57,51 +55,49 @@ export default function TrangChu() {
 
         const danhSach = rawList.filter(isRecord);
 
-        const ketQua: MonNoiBat[] = TEN_MON_NOI_BAT
-          .map((tenMon) => {
-            const mon = danhSach.find((item) => {
-              const tenTrongDB = String(
-                item.name ?? item.product_name ?? item.productName ?? ""
-              )
-                .trim()
-                .toLocaleLowerCase("vi-VN");
+        const ketQua: MonNoiBat[] = TEN_MON_NOI_BAT.map((tenMon) => {
+          const mon = danhSach.find((item) => {
+            const tenTrongDB = String(
+              item.name ?? item.product_name ?? item.productName ?? "",
+            )
+              .trim()
+              .toLocaleLowerCase("vi-VN");
 
-              return tenTrongDB === tenMon.toLocaleLowerCase("vi-VN");
-            });
+            return tenTrongDB === tenMon.toLocaleLowerCase("vi-VN");
+          });
 
-            if (!mon) {
-              console.warn(`Không tìm thấy món: ${tenMon}`);
-              return null;
-            }
+          if (!mon) {
+            console.warn(`Không tìm thấy món: ${tenMon}`);
+            return null;
+          }
 
-            const gia = Number(
-              mon.price ??
-                mon.basePrice ??
-                mon.base_price ??
-                mon.product_price ??
-                0
-            );
+          const gia = Number(
+            mon.price ??
+              mon.basePrice ??
+              mon.base_price ??
+              mon.product_price ??
+              0,
+          );
 
-            const category = isRecord(mon.category)
-              ? mon.category.name ?? mon.category.category_name ?? ""
-              : mon.category ?? mon.category_name ?? "";
+          const category = isRecord(mon.category)
+            ? (mon.category.name ?? mon.category.category_name ?? "")
+            : (mon.category ?? mon.category_name ?? "");
 
-            return {
-              ten: String(
-                mon.name ?? mon.product_name ?? mon.productName ?? tenMon
-              ),
-              loai: String(category),
-              gia,
-              anh: String(
-                mon.image ??
-                  mon.image_url ??
-                  mon.imageUrl ??
-                  mon.imageUrlPath ??
-                  ""
-              ),
-            };
-          })
-          .filter((mon): mon is MonNoiBat => mon !== null);
+          return {
+            ten: String(
+              mon.name ?? mon.product_name ?? mon.productName ?? tenMon,
+            ),
+            loai: String(category),
+            gia,
+            anh: String(
+              mon.image ??
+                mon.image_url ??
+                mon.imageUrl ??
+                mon.imageUrlPath ??
+                "",
+            ),
+          };
+        }).filter((mon): mon is MonNoiBat => mon !== null);
 
         if (!cancelled) {
           setMonNoiBat(ketQua);
@@ -140,8 +136,8 @@ export default function TrangChu() {
           </h1>
 
           <p>
-            Thưởng thức hương vị cà phê đặc biệt và những thức uống
-            được chuẩn bị dành riêng cho bạn.
+            Thưởng thức hương vị cà phê đặc biệt và những thức uống được chuẩn
+            bị dành riêng cho bạn.
           </p>
 
           <a href="/2TrangMenu" className="tc-button">
@@ -160,7 +156,12 @@ export default function TrangChu() {
           />
 
           <div className="tc-image-note">
-            <span>☕</span>
+            <span>
+              <img
+                src="/images/BrewLite_logo_transparent.png"
+                alt="BrewLite Coffee"
+              />
+            </span>
             <div>
               <strong>Your daily ritual</strong>
               <small>Good coffee, good mood.</small>
@@ -180,9 +181,8 @@ export default function TrangChu() {
         </h2>
 
         <p>
-          BrewLite mang đến những thức uống chất lượng trong một
-          không gian ấm áp, để mỗi ngày của bạn có thêm một khoảnh
-          khắc thật dễ chịu.
+          BrewLite mang đến những thức uống chất lượng trong một không gian ấm
+          áp, để mỗi ngày của bạn có thêm một khoảnh khắc thật dễ chịu.
         </p>
       </section>
 
@@ -213,31 +213,25 @@ export default function TrangChu() {
                   {mon.anh ? (
                     <img src={mon.anh} alt={mon.ten} />
                   ) : (
-                    <div className="tc-product-no-image">
-                      Chưa có hình ảnh
-                    </div>
+                    <div className="tc-product-no-image">Chưa có hình ảnh</div>
                   )}
 
                   <span className="tc-product-arrow">↗</span>
                 </a>
 
                 <div className="tc-product-info">
-                  <span className="tc-product-category">
-                    {mon.loai}
-                  </span>
+                  <span className="tc-product-category">{mon.loai}</span>
 
                   <h3>{mon.ten}</h3>
 
-                  <strong>
-                    {mon.gia.toLocaleString("vi-VN")}₫
-                  </strong>
+                  <strong>{mon.gia.toLocaleString("vi-VN")}₫</strong>
                 </div>
               </article>
             ))
           ) : (
             <p>
-              Chưa tải được món nổi bật. Vui lòng kiểm tra kết nối
-              máy chủ hoặc dữ liệu thực đơn.
+              Chưa tải được món nổi bật. Vui lòng kiểm tra kết nối máy chủ hoặc
+              dữ liệu thực đơn.
             </p>
           )}
         </div>
