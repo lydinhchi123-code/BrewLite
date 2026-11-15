@@ -116,3 +116,101 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
           tags: ghcr.io/${{ steps.image.outputs.owner }}/brewlite-web:${{ github.sha }}
+
+  deploy-render:
+    name: Deploy images to Render
+    needs: publish-images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    outputs:
+      api_deploy_id: ${{ steps.deploy_api.outputs.deploy_id }}
+      web_deploy_id: ${{ steps.deploy_web.outputs.deploy_id }}
+    steps:
+      - name: Deploy API image
+        id: deploy_api
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
+          IMAGE_URL: ghcr.io/lydinhchi123-code/brewlite-api:${{ github.sha }}
+        run: |
+          response="$(curl --fail-with-body --silent --show-error --get \
+            --data-urlencode "imgURL=${IMAGE_URL}" \
+            "${RENDER_DEPLOY_HOOK}")"
+          echo "$response"
+          deploy_id="$(jq -r '.deploy.id // empty' <<< "$response")"
+          if [[ -z "$deploy_id" ]]; then
+            echo "Render did not return an API deploy ID." >&2
+            exit 1
+          fi
+          echo "deploy_id=$deploy_id" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy web image
+        id: deploy_web
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_WEB_DEPLOY_HOOK }}
+          IMAGE_URL: ghcr.io/lydinhchi123-code/brewlite-web:${{ github.sha }}
+        run: |
+          response="$(curl --fail-with-body --silent --show-error --get \
+            --data-urlencode "imgURL=${IMAGE_URL}" \
+            "${RENDER_DEPLOY_HOOK}")"
+          echo "$response"
+          deploy_id="$(jq -r '.deploy.id // empty' <<< "$response")"
+          if [[ -z "$deploy_id" ]]; then
+            echo "Render did not return a web deploy ID." >&2
+            exit 1
+          fi
+          echo "deploy_id=$deploy_id" >> "$GITHUB_OUTPUT"
+
+  smoke-test:
+    name: Wait for deploy and smoke test
+    needs: deploy-render
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Wait for API and web deploys
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          API_SERVICE_ID: ${{ vars.RENDER_API_SERVICE_ID }}
+          WEB_SERVICE_ID: ${{ vars.RENDER_WEB_SERVICE_ID }}
+          API_DEPLOY_ID: ${{ needs.deploy-render.outputs.api_deploy_id }}
+          WEB_DEPLOY_ID: ${{ needs.deploy-render.outputs.web_deploy_id }}
+        run: |
+          wait_for_deploy() {
+            local service_id="$1"
+            local deploy_id="$2"
+            local name="$3"
+
+            for attempt in $(seq 1 60); do
+              response="$(curl --fail-with-body --silent --show-error \
+                -H "Authorization: Bearer ${RENDER_API_KEY}" \
+                -H "Accept: application/json" \
+                "https://api.render.com/v1/services/${service_id}/deploys/${deploy_id}")"
+              status="$(jq -r '.status' <<< "$response")"
+              echo "${name} deploy status: ${status}"
+
+              if [[ "$status" == "live" ]]; then
+                return 0
+              fi
+
+              case "$status" in
+                build_failed|update_failed|pre_deploy_failed|canceled|deactivated)
+                  echo "${name} deploy failed: ${status}" >&2
+                  return 1
+                  ;;
+              esac
+
+              sleep 10
+            done
+
+            echo "Timed out waiting for ${name} deploy." >&2
+            return 1
+          }
+
+          wait_for_deploy "$API_SERVICE_ID" "$API_DEPLOY_ID" "API"
+          wait_for_deploy "$WEB_SERVICE_ID" "$WEB_DEPLOY_ID" "Web"
+
+      - name: Smoke test API health
+        run: curl --fail-with-body --silent --show-error https://brewlite-api-tutb.onrender.com/health
+
+      - name: Smoke test web
+        run: curl --fail --silent --show-error --output /dev/null https://brewlite-web-ksd1.onrender.com/
