@@ -8,12 +8,12 @@ BrewLite has been deployed on Render, including the Next.js frontend, NestJS API
 
 The application can retrieve and display menu and product data from the deployed database. However, data loading may take approximately 10–30 seconds or longer, particularly during initial access. The end-to-end order flow should be verified to confirm the complete production workflow.
 
-| Part | Value after setup |
-| --- | --- |
-| Frontend | Copy the `brewlite-web` `onrender.com` HTTPS URL from Render |
-| API | Copy the `brewlite-api` `onrender.com` HTTPS URL from Render |
-| Health check | `<API URL>/health` (expected HTTP 200 and `{"status":"ok",...}`) |
-| PostgreSQL | Render Postgres internal connection only; external IP allowlist is empty in `render.yaml` |
+| Part         | Value after setup                                                                         |
+| ------------ | ----------------------------------------------------------------------------------------- |
+| Frontend     | Copy the `brewlite-web` `onrender.com` HTTPS URL from Render                              |
+| API          | Copy the `brewlite-api` `onrender.com` HTTPS URL from Render                              |
+| Health check | `<API URL>/health` (expected HTTP 200 and `{"status":"ok",...}`)                          |
+| PostgreSQL   | Render Postgres internal connection only; external IP allowlist is empty in `render.yaml` |
 
 ## First deployment
 
@@ -29,7 +29,7 @@ The Blueprint's free plans are for a class demo, not durable production. Render'
 
 ## CI and deployments
 
-GitHub Actions runs lint, tests, and builds for the API and frontend. Render services use `autoDeployTrigger: checksPass`, so Render deploys commits from the linked branch only after CI checks pass. Deployments and logs are visible in each service's **Events** and **Logs** pages in Render.
+GitHub Actions runs lint, tests, and builds for the API and frontend. If they pass, it pushes the API and web images to GHCR tagged with the commit SHA and, on `master`, triggers Render deployments through Deploy Hooks. Deployments and logs are visible in each service's **Events** and **Logs** pages in Render.
 
 The repository does not currently define automated PostgreSQL migrations. For schema changes, back up the database first, apply a reviewed migration using the database owner's process, verify it, and then deploy. Never run the fresh-database schema/seed sequence against an existing production database.
 
@@ -54,4 +54,3 @@ The API provides `GET /health`. Render uses `/health` as the API service health 
 - [ ] Record a live end-to-end demo video using non-sensitive demo data.
 - [ ] Record Sprint Review feedback and Retrospective action items in the team's sprint notes.
 - [ ] Ask someone outside the group to clone the repository, follow the README, and open the production URLs.
-
