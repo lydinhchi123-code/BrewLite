@@ -61,6 +61,14 @@ export class OrdersService {
     } = createOrderDto;
 
     const isPickup = deliveryMethod === 'PICKUP';
+    // Xử lý địa chỉ theo phương thức nhận hàng.
+    const deliveryAddress = isPickup
+      ? 'Nhận tại cửa hàng'
+      : address;
+
+    const deliveryWard = isPickup
+      ? 'Nhận tại cửa hàng'
+      : phuong;
     const makh = authenticatedMakh;
 
     if (
@@ -478,8 +486,8 @@ export class OrdersService {
           Number(makh),
           customerName,
           customerPhone,
-          address,
-          phuong,
+          deliveryAddress,
+          deliveryWard,
           note ?? null,
           deliveryMethod ?? 'DELIVERY',
           calculatedSubtotal,
@@ -972,14 +980,6 @@ export class OrdersService {
       LEFT JOIN chitietdonhang c
         ON c.madonhang = d.madonhang
       WHERE d.makh = $1
-        AND (
-          d.trangthai <> 'PENDING'
-          OR EXISTS (
-            SELECT 1
-            FROM thanhtoan t
-            WHERE t.madonhang = d.madonhang
-          )
-        )
       GROUP BY d.madonhang
       ORDER BY d.ngaydat DESC
       `,
