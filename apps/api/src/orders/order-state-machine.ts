@@ -6,6 +6,7 @@ export enum OrderStatus {
   PREPARING = 'PREPARING',
   READY = 'READY',
   COMPLETED = 'COMPLETED',
+  RECEIVED = 'RECEIVED',
   CANCELLED = 'CANCELLED',
 }
 
@@ -38,6 +39,7 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   ],
 
   [OrderStatus.COMPLETED]: [],
+  [OrderStatus.RECEIVED]: [],
   [OrderStatus.CANCELLED]: [],
 };
 

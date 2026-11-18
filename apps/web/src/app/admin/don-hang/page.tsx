@@ -12,6 +12,7 @@ const statuses = [
   "PREPARING",
   "READY",
   "COMPLETED",
+  "RECEIVED",
   "PAYMENT_FAILED",
   "CANCELLED",
 ];
@@ -22,6 +23,7 @@ const statusLabels: Record<string, string> = {
   PREPARING: "Đang chuẩn bị",
   READY: "Nước đã sẵn sàng",
   COMPLETED: "Hoàn thành",
+  RECEIVED: "Đã nhận",
   PAYMENT_FAILED: "Thanh toán thất bại",
   CANCELLED: "Đã hủy",
 };
@@ -32,6 +34,7 @@ const nextStatuses: Record<string, string[]> = {
   PREPARING: ["READY"],
   READY: ["COMPLETED"],
   COMPLETED: [],
+  RECEIVED: [],
   PAYMENT_FAILED: [],
   CANCELLED: [],
 };
@@ -238,8 +241,23 @@ export default function AdminOrdersPage() {
       );
 
       if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || `Cập nhật thất bại (HTTP ${response.status})`);
+        const responseText = await response.text();
+        let message = responseText;
+
+        try {
+          const errorData = JSON.parse(responseText) as {
+            message?: string | string[];
+          };
+          message = Array.isArray(errorData.message)
+            ? errorData.message.join(", ")
+            : errorData.message || responseText;
+        } catch {
+          // Giữ phản hồi dạng text để hiển thị nếu server không trả JSON.
+        }
+
+        throw new Error(
+          message || `Cập nhật thất bại (HTTP ${response.status})`,
+        );
       }
 
       setOrders((previous) =>
