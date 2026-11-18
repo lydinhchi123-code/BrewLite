@@ -13,7 +13,7 @@ type TaiKhoan = {
   trangthai: number;
 };
 
-type OrderStatus = "Đang xử lý" | "Hoàn thành" | "Đã hủy";
+type OrderStatus = "Đang xử lý" | "Hoàn thành" | "Đã nhận" | "Đã hủy";
 
 type OrderItem = {
   id: number;
@@ -101,6 +101,10 @@ function mapOrderStatus(status: string): OrderStatus {
     return "Hoàn thành";
   }
 
+  if (["received", "da_nhan"].includes(value)) {
+    return "Đã nhận";
+  }
+
   if (["da_huy", "đã_hủy", "đã_huỷ", "canceled", "cancelled"].includes(value)) {
     return "Đã hủy";
   }
@@ -165,7 +169,7 @@ function mapApiOrder(order: ApiOrder): Order {
   };
 }
 
-const filters = ["Tất cả", "Đang xử lý", "Hoàn thành", "Đã hủy"] as const;
+const filters = ["Tất cả", "Đang xử lý", "Hoàn thành", "Đã nhận", "Đã hủy"] as const;
 
 type Filter = (typeof filters)[number];
 
@@ -179,6 +183,7 @@ function getOrderTotal(order: Order) {
 
 function getStatusClass(status: OrderStatus) {
   if (status === "Hoàn thành") return "status-success";
+  if (status === "Đã nhận") return "status-success";
   if (status === "Đang xử lý") return "status-pending";
   return "status-cancelled";
 }
@@ -239,6 +244,9 @@ export default function OrderHistoryPage() {
 
   const [dangHuyDon, setDangHuyDon] = useState(false);
   const [loiHuyDon, setLoiHuyDon] = useState("");
+  const [dangXacNhanOrderId, setDangXacNhanOrderId] = useState<string | null>(null);
+  const [loiXacNhan, setLoiXacNhan] = useState("");
+  const [loiXacNhanOrderId, setLoiXacNhanOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     function capNhatTaiKhoan() {
@@ -420,6 +428,57 @@ export default function OrderHistoryPage() {
     }
   }
 
+  async function handleConfirmReceipt(order: Order) {
+    if (order.apiStatus !== "COMPLETED" || dangXacNhanOrderId) return;
+
+    setDangXacNhanOrderId(order.id);
+    setLoiXacNhan("");
+    setLoiXacNhanOrderId(null);
+
+    try {
+      const token = localStorage.getItem("brewlite_accessToken");
+      if (!token) throw new Error("Vui lòng đăng nhập lại.");
+
+      const response = await fetch(
+        `${API_URL}/orders/${encodeURIComponent(order.id)}/received`,
+        {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        if (response.status >= 500) {
+          throw new Error(
+            "Máy chủ chưa lưu được xác nhận nhận hàng. Vui lòng thử lại sau.",
+          );
+        }
+        throw new Error(data?.message || `Xác nhận thất bại (HTTP ${response.status}).`);
+      }
+
+      const receivedOrder: Order = {
+        ...order,
+        status: "Đã nhận",
+        apiStatus: "RECEIVED",
+      };
+
+      setOrders((previousOrders) =>
+        previousOrders.map((item) => item.id === order.id ? receivedOrder : item),
+      );
+      setSelectedOrder((selected) =>
+        selected?.id === order.id ? receivedOrder : selected,
+      );
+    } catch (error) {
+      setLoiXacNhanOrderId(order.id);
+      setLoiXacNhan(
+        error instanceof Error ? error.message : "Không thể xác nhận đã nhận đơn hàng.",
+      );
+    } finally {
+      setDangXacNhanOrderId(null);
+    }
+  }
+
   if (!daKiemTra) {
     return (
       <main className="history-page">
@@ -589,14 +648,30 @@ export default function OrderHistoryPage() {
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      className="history-detail-button"
-                      onClick={() => setSelectedOrder(order)}
-                      aria-label={`Xem chi tiết đơn hàng ${order.id}`}
-                    >
-                      Xem chi tiết <span aria-hidden="true">→</span>
-                    </button>
+                    <div className="history-card-actions">
+                      {order.apiStatus === "COMPLETED" && (
+                        <button
+                          type="button"
+                          className="history-detail-button history-receive-button"
+                          onClick={() => void handleConfirmReceipt(order)}
+                          disabled={dangXacNhanOrderId === order.id}
+                        >
+                          {dangXacNhanOrderId === order.id ? "Đang xác nhận..." : "Đã nhận"}
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        className="history-detail-button"
+                        onClick={() => setSelectedOrder(order)}
+                        aria-label={`Xem chi tiết đơn hàng ${order.id}`}
+                      >
+                        Xem chi tiết <span aria-hidden="true">→</span>
+                      </button>
+                    </div>
+                    {loiXacNhan && loiXacNhanOrderId === order.id && (
+                      <p className="history-receive-error" role="alert">{loiXacNhan}</p>
+                    )}
                   </div>
                 </article>
               );

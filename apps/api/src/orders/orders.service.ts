@@ -663,7 +663,26 @@ export class OrdersService {
           );
         }
 
+        const noIceSelected =
+          (item.ice ?? '')
+            .trim()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/đ/g, 'd') === 'khong da';
+
         for (const detail of detailsResult.rows) {
+          const normalizedIngredientName =
+            String(detail.ingredient_name)
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toLowerCase()
+              .replace(/đ/g, 'd');
+
+          if (noIceSelected && normalizedIngredientName === 'da vien') {
+            continue;
+          }
+
           // Đơn vị trong công thức phải khớp đơn vị cơ sở
           // của nguyên liệu để tránh trừ sai lượng.
           if (detail.unit !== detail.base_unit) {
@@ -1383,6 +1402,78 @@ export class OrdersService {
           'LỖI ROLLBACK HỦY ĐƠN:',
           rollbackError,
         );
+      }
+
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async confirmReceipt(
+    orderId: string,
+    authenticatedMakh?: string | number,
+  ) {
+    const makh = Number(authenticatedMakh);
+
+    if (!Number.isSafeInteger(makh) || makh < 1) {
+      throw new UnauthorizedException(
+        'Vui lòng đăng nhập để xác nhận đã nhận đơn hàng.',
+      );
+    }
+
+    if (!/^ORD-[A-Za-z0-9-]+$/.test(orderId)) {
+      throw new BadRequestException('Mã đơn hàng không hợp lệ.');
+    }
+
+    const client = await this.pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const result = await client.query(
+        `
+        SELECT madonhang, trangthai
+        FROM donhang
+        WHERE madonhanghienthi = $1
+          AND makh = $2
+        FOR UPDATE
+        `,
+        [orderId, makh],
+      );
+
+      if (result.rowCount === 0) {
+        throw new NotFoundException('Không tìm thấy đơn hàng.');
+      }
+
+      if (result.rows[0].trangthai !== OrderStatus.COMPLETED) {
+        throw new BadRequestException(
+          'Chỉ có thể xác nhận đã nhận đơn hàng đã hoàn thành.',
+        );
+      }
+
+      const updated = await client.query(
+        `
+        UPDATE donhang
+        SET trangthai = $1,
+            ngaycapnhat = CURRENT_TIMESTAMP
+        WHERE madonhang = $2
+        RETURNING *
+        `,
+        [OrderStatus.RECEIVED, result.rows[0].madonhang],
+      );
+
+      await client.query('COMMIT');
+
+      return {
+        message: 'Đã xác nhận nhận đơn hàng.',
+        order: updated.rows[0],
+      };
+    } catch (error: unknown) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError: unknown) {
+        console.error('Lỗi rollback xác nhận nhận đơn hàng:', rollbackError);
       }
 
       throw error;

@@ -91,4 +91,18 @@ export class OrdersController {
 
     return this.ordersService.cancelOrder(orderId, String(makh));
   }
+
+  @Patch(':orderId/received')
+  @UseGuards(JwtAuthGuard)
+  confirmReceipt(@Param('orderId') orderId: string, @Req() req: any) {
+    const makh = req.user?.sub;
+
+    if (makh == null || !/^\d+$/.test(String(makh))) {
+      throw new UnauthorizedException(
+        'Vui lòng đăng nhập để xác nhận đã nhận đơn hàng.',
+      );
+    }
+
+    return this.ordersService.confirmReceipt(orderId, String(makh));
+  }
 }

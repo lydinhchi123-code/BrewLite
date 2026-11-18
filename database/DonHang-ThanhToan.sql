@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS donhang (
                 'PREPARING',
                 'READY',
                 'COMPLETED',
+                'RECEIVED',
                 'CANCELLED'
             )
         ),
