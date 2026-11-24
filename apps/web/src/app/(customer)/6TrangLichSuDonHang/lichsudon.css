@@ -261,10 +261,19 @@
 
 .history-card-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding-top: 18px;
+}
+
+.history-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-left: auto;
 }
 
 .history-total-label {
@@ -300,6 +309,30 @@
 .history-detail-button:hover {
   background: #704a32;
   color: #fff;
+}
+
+.history-receive-button {
+  border-color: #6f8f78;
+  background: #6f8f78;
+  color: #fff;
+}
+
+.history-receive-button:hover:not(:disabled) {
+  border-color: #587861;
+  background: #587861;
+}
+
+.history-receive-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.history-receive-error {
+  flex: 0 0 100%;
+  margin: 0;
+  color: #a44747;
+  font-size: 12px;
+  text-align: right;
 }
 
 /* ===== Chưa có đơn hàng ===== */
@@ -668,6 +701,10 @@
     gap: 10px;
   }
 
+  .history-card-actions {
+    gap: 8px;
+  }
+
   .history-total-price {
     font-size: 18px;
   }
@@ -676,6 +713,10 @@
     gap: 5px;
     padding: 10px;
     font-size: 12px;
+  }
+
+  .history-receive-button {
+    padding: 10px 16px;
   }
 
   .history-modal-overlay {
@@ -702,6 +743,7 @@
   .history-filter,
   .history-card,
   .history-detail-button,
+  .history-receive-button,
   .history-modal-done {
     transition: none;
   }
